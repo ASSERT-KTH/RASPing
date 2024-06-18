@@ -1,0 +1,336 @@
+import jax
+import numpy as np
+import matplotlib.pyplot as plt
+
+# The default of float16 can lead to discrepancies between outputs of
+# the compiled model and the RASP program.
+jax.config.update('jax_default_matmul_precision', 'float32')
+
+from tracr.compiler import compiling
+from tracr.compiler import lib
+from tracr.rasp import rasp
+
+from Model import Model
+
+#Return all the accepted model names and their corresponding accepted inputs
+def getAcceptedNamesAndInput():
+    return {"reverse": ["a","b","c","d","e"], #Tokens doesn't matter much. Only the quantity influnce the results due to encoding (I think)
+            "hist": ["a","b","c","d"], #Tokens doesn't matter much. Only the quantity influnce the results due to encoding (I think)
+            "sort": [1,2,3,4,5,6], #[0,1,2,3,4,5,6]    Seems to fail sometimes if 0 is included (irrespktive of if 0 is in the failed input or not, don't know why)
+            "most-freq": [1,2,3,4,5],
+            "shuffle_dyck1": ["(",")"],
+            "shuffle_dyck2": ["(",")","{","}"]}
+
+#Generate a data set based on "name" with "size" samples and a max sequence length of "maxSeqLength" 
+def generateData(name: str, maxSeqLength: int, size: int):
+    data = [None]*size
+
+    acceptedNamesAndInput = getAcceptedNamesAndInput()
+
+    match name:
+        case "reverse":
+            acceptedTokens = acceptedNamesAndInput[name]
+
+            for i in range(size):
+                inputLength = np.random.randint(2, maxSeqLength+1)  #Uniformly distributed between 2 and max length
+
+                inputSeq = []
+                outputSeq = []
+                for t in np.random.choice(acceptedTokens, inputLength):
+                    inputSeq.append(t)
+                    outputSeq.insert(0,t)
+                inputSeq.insert(0,"BOS")
+                outputSeq.insert(0,"BOS")
+
+                data[i] = (inputSeq, outputSeq)
+
+        case "hist":
+            acceptedTokens = acceptedNamesAndInput[name]  
+            
+            for i in range(size):
+                inputLength = np.random.randint(2, maxSeqLength+1)  #Uniformly distributed between 2 and max length
+
+                inputSeq = []
+                tokenCounter = dict(zip(acceptedTokens, [0]*len(acceptedTokens)))   #Counter built during generating input
+                for t in np.random.choice(acceptedTokens, inputLength):
+                    inputSeq.append(t)
+                    tokenCounter[t]+=1
+    
+                outputSeq = []
+                for t in inputSeq:  #Fill output according to token counter
+                    outputSeq.append(tokenCounter[t])
+
+                inputSeq.insert(0,"BOS")
+                outputSeq.insert(0,"BOS")
+
+                data[i] = (inputSeq, outputSeq)
+
+        case "sort":
+            acceptedTokens = acceptedNamesAndInput[name]  
+            
+            for i in range(size):
+                inputLength = np.random.randint(2, maxSeqLength+1)  #Uniformly distributed between 2 and max length
+
+                inputSeq = []
+                outputSeq = []
+                for t in np.random.choice(acceptedTokens, inputLength):
+                    inputSeq.append(t)
+                    outputSeq.append(t)
+    
+                inputSeq.insert(0,"BOS")
+                outputSeq.sort()
+                outputSeq.insert(0,"BOS")
+
+                data[i] = (inputSeq, outputSeq)
+
+        case "most-freq":   #sort based on most frequent token with original position as tie breaker
+            acceptedTokens = acceptedNamesAndInput[name]  
+
+            for i in range(size):
+                inputLength = np.random.randint(2, maxSeqLength+1)  #Uniformly distributed between 2 and max length
+
+                inputSeq = []
+                tempSeq = []
+                tokenCounter = dict(zip(acceptedTokens, [0]*len(acceptedTokens)))   #Counter built during generating input
+                for t in np.random.choice(acceptedTokens, inputLength):
+                    inputSeq.append(t)
+                    tokenCounter[t]+=1
+                    tempSeq.append(t)    
+                
+                tempSeq.sort(key = (lambda x: -tokenCounter[x]))  #Sort the list in descending order of frequency
+
+                outputSeq = tempSeq
+
+                #Groups the tokens (Apparently not done by the Tracr solution)
+                """
+                outputSeq = []
+                for t in tempSeq:
+                    if t not in outputSeq:
+                        for ii in range(tokenCounter[t]):
+                            outputSeq.append(t)
+                """
+
+                inputSeq.insert(0,"BOS")
+                outputSeq.insert(0,"BOS")
+
+                data[i] = (inputSeq, outputSeq)
+
+        case "shuffle_dyck1":
+            acceptedTokens = acceptedNamesAndInput[name]
+
+            for i in range(size):
+                for ii in range(3):     #Ensures that roughly one out of eight sequences has an odd length
+                    inputLength = np.random.randint(2, maxSeqLength+1)  #Uniformly distributed between 2 and max length
+                    if inputLength%2==0:
+                        break
+
+                inputSeq = []
+                tokenCount = {"(":0,")":0}
+                tokenProb = np.zeros(len(acceptedTokens))   #Live probabilty distribution to more evenly distribute the balanced and unblanaced sequences
+                tokenProb[1] = 1/(inputLength+1)
+                tokenProb[0] = 1 - tokenProb[1]
+
+                #Build the sequence token by token and ensuring the probability of drawing a balanced sequence is always higher than drawing an unbalanced sequence
+                for ind in range(inputLength):
+                    t = np.random.choice(acceptedTokens, 1, p=tokenProb)[0]
+                    tokenCount[t]+=1
+                    inputSeq.append(t)
+
+                    tokenDiff = tokenCount["("]-tokenCount[")"]
+                    if tokenDiff == 0:  #High probability of begining paranthesis if balanced
+                        tokenProb[1] = 1/(inputLength+1)
+                        tokenProb[0] = 1 - tokenProb[1]
+                    elif tokenDiff > 0:   #High probability of end paranthesis if more begining paranthesis
+                        tokenProb[0] = 1/((inputLength+1)*tokenDiff)
+                        tokenProb[1] = 1 - tokenProb[0]
+                    else: #High probability of begining paranthesis if more end paranthesis
+                        tokenProb[1] = 1/((inputLength+1)*(-tokenDiff))
+                        tokenProb[0] = 1 - tokenProb[1]
+                
+                #Checks for balance
+                balanceCounter=0
+                for t in inputSeq:
+                    if t=="(":
+                        balanceCounter+=1
+                    else:
+                        balanceCounter-=1
+                    if balanceCounter<0:
+                        break
+                
+                if balanceCounter!=0:
+                    outputSeq = [0]*len(inputSeq)
+                else:
+                    outputSeq = [1]*len(inputSeq)
+
+                inputSeq.insert(0,"BOS")
+                outputSeq.insert(0,"BOS")
+
+                data[i] = (inputSeq, outputSeq)
+
+        case "shuffle_dyck2":
+            acceptedTokens = acceptedNamesAndInput[name]
+
+            for i in range(size):
+                for ii in range(3):     #Ensures that roughly one out of eight sequences has an odd length
+                    inputLength = np.random.randint(2, maxSeqLength+1)  #Uniformly distributed between 2 and max length
+                    if inputLength%2==0:
+                        break
+
+                inputSeq = []
+                tokenCount = {"(":0,")":0,"{":0,"}":0}
+                tokenProb = np.zeros(len(acceptedTokens))   #Live probabilty distribution to more evenly distribute the balanced and unblanaced sequences
+                tokenProb[1] = 1/((inputLength+1)*2)
+                tokenProb[0] = 1/2 - tokenProb[1]
+                tokenProb[3] = tokenProb[1]
+                tokenProb[2] = tokenProb[0]
+
+                #Build the sequence token by token and ensuring the probability of drawing a balanced sequence is always higher than drawing an unbalanced sequence
+                for ind in range(inputLength):
+                    t = np.random.choice(acceptedTokens, 1, p=tokenProb)[0]
+                    tokenCount[t]+=1
+                    inputSeq.append(t)
+
+                    tokenDiff1 = tokenCount["("]-tokenCount[")"]
+                    tokenDiff2 = tokenCount["{"]-tokenCount["}"]
+                    if tokenDiff1 == 0 and tokenDiff2==0:  #High probability of begining paranthesis if balanced
+                        tokenProb[1] = 1/((inputLength+1)*2)
+                        tokenProb[0] = 1/2 - tokenProb[1]
+                        tokenProb[3] = tokenProb[1]
+                        tokenProb[2] = tokenProb[0]
+                    #High probability of end paranthesis if more begining paranthesis
+                    elif tokenDiff2 > 0 and tokenDiff1 > 0:
+                        tokenProb[0] = 1/((inputLength+1)*tokenDiff1*2)
+                        tokenProb[2] = 1/((inputLength+1)*tokenDiff2*2)
+                        tokenProb[1] = 1/2 - tokenProb[0]
+                        tokenProb[3] = 1/2 - tokenProb[2]
+                    elif tokenDiff1 > 0 and tokenDiff2==0: 
+                        tokenProb[1] = 1 - 1/((inputLength+1)*tokenDiff1)
+                        split = 1 - tokenProb[1]    #The reminder of probability to distribute
+                        tokenProb[2] = split - split/((inputLength+1))    #More likely to start a new parenthesis than break sequence
+                        split = split - tokenProb[2]
+                        tokenProb[0] = split/2
+                        tokenProb[3] = split/2
+                    elif tokenDiff2 > 0 and tokenDiff1==0:   
+                        tokenProb[3] = 1 - 1/((inputLength+1)*tokenDiff2)
+                        split = 1 - tokenProb[3]    #The reminder of probability to distribute
+                        tokenProb[0] = split - split/((inputLength+1))    #More likely to start a new parenthesis than break sequence
+                        split = split - tokenProb[0]
+                        tokenProb[1] = split/2
+                        tokenProb[2] = split/2
+                    #High probability of begining paranthesis if more end paranthesis
+                    elif tokenDiff2 < 0 and tokenDiff1 < 0:
+                        tokenProb[1] = 1/((inputLength+1)*(-tokenDiff1)*2)
+                        tokenProb[3] = 1/((inputLength+1)*(-tokenDiff2)*2)
+                        tokenProb[0] = 1/2 - tokenProb[1]
+                        tokenProb[2] = 1/2 - tokenProb[3]
+                    elif tokenDiff1 < 0 and tokenDiff2 == 0:
+                        tokenProb[0] = 1 - 1/((inputLength+1)*(-tokenDiff1))
+                        split = 1 - tokenProb[0]    #The reminder of probability to distribute
+                        tokenProb[2] = split - split/((inputLength+1))    #More likely to start a new parenthesis than break sequence
+                        split = split - tokenProb[2]
+                        tokenProb[1] = split/2
+                        tokenProb[3] = split/2
+                    elif tokenDiff2 < 0 and tokenDiff1 == 0:
+                        tokenProb[2] = 1 - 1/((inputLength+1)*(-tokenDiff2))
+                        split = 1 - tokenProb[2]    #The reminder of probability to distribute
+                        tokenProb[0] = split - split/((inputLength+1))    #More likely to start a new parenthesis than break sequence
+                        split = split - tokenProb[0]
+                        tokenProb[1] = split/2
+                        tokenProb[3] = split/2
+                    #Higher probability to balance the sequence if currently unbalanced
+                    elif tokenDiff1 > 0 and tokenDiff2 < 0:
+                        tokenProb[1] = 1/((inputLength+1)*tokenDiff1*2)
+                        tokenProb[2] = 1/((inputLength+1)*(-tokenDiff2)*2)
+                        tokenProb[0] = 1/2 - tokenProb[1]
+                        tokenProb[3] = 1/2 - tokenProb[2]
+                    elif tokenDiff2 > 0 and tokenDiff1 < 0:
+                        tokenProb[3] = 1/((inputLength+1)*tokenDiff2*2)
+                        tokenProb[0] = 1/((inputLength+1)*(-tokenDiff1)*2)
+                        tokenProb[1] = 1/2 - tokenProb[0]
+                        tokenProb[2] = 1/2 - tokenProb[3]
+                
+                #Checks for balance
+                balanceCounter=[0,0]
+                for t in inputSeq:
+                    if t=="(":
+                        balanceCounter[0]+=1
+                    if t==")":
+                        balanceCounter[0]-=1
+                    if t=="{":
+                        balanceCounter[1]+=1
+                    if t=="}":
+                        balanceCounter[1]-=1
+                    
+                    if balanceCounter[0]<0 or balanceCounter[1]<0:
+                        break
+                
+                if balanceCounter[0]!=0 or balanceCounter[1]!=0:
+                    outputSeq = [0]*len(inputSeq)
+                else:
+                    outputSeq = [1]*len(inputSeq)
+
+                inputSeq.insert(0,"BOS")
+                outputSeq.insert(0,"BOS")
+
+                data[i] = (inputSeq, outputSeq)
+
+
+        case _:
+            print(name, "is not an accepted name the accepted names are",acceptedNamesAndInput)
+            return None
+
+    return data
+
+#Generate a rasp model based on "name" and max sequence length "maxLength"
+def generateModel(name: str, maxLength: int) -> Model:
+    model = None
+    acceptedNamesAndInput = getAcceptedNamesAndInput()
+
+    match name:
+        case "reverse":
+            inputs = {t for t in acceptedNamesAndInput[name]}
+            model = Model(lib.make_reverse(rasp.tokens), inputs, maxLength, name)
+
+        case "hist":
+            inputs = {t for t in acceptedNamesAndInput[name]}
+            model = Model(lib.make_hist(), inputs, maxLength, name)
+
+        case "sort":
+            inputs = {t for t in acceptedNamesAndInput[name]}
+            model = Model(lib.make_sort(rasp.tokens, rasp.tokens, max_seq_len=maxLength, min_key=min(inputs)), inputs, maxLength, name)
+
+        case "most-freq":
+            inputs = {t for t in acceptedNamesAndInput[name]}
+            model = Model(lib.make_sort_freq(maxLength), inputs, maxLength, name)
+
+        case "shuffle_dyck1":
+            inputs = {t for t in acceptedNamesAndInput[name]}
+            model = Model(lib.make_shuffle_dyck(["()"]), inputs, maxLength, name)
+        
+        case "shuffle_dyck2":
+            inputs = {t for t in acceptedNamesAndInput[name]}
+            model = Model(lib.make_shuffle_dyck(["()","{}"]), inputs, maxLength, name)
+
+        case _:
+            print(name, "is not an accepted name the accepted names are",acceptedNamesAndInput)
+            return None
+
+    return model
+
+#Prints some statistics on the generated dyck data
+def checkDyckBalance(data):
+    oddLength = 0
+    balanced = 0
+
+    for (input, output) in data:
+        if len(input)%2==0 :    #length + bos
+            oddLength +=1
+        if output[1]==1:
+            balanced+=1
+    
+    oddLength /= len(data)/100
+    balanced /= len(data)/100
+
+    print("Percentage of data which is:")
+    print("Of odd length:", oddLength)
+    print("Balanced:", balanced)
