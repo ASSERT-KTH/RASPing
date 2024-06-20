@@ -34,9 +34,23 @@ class Model:
         self.model = compiling.compile_rasp_to_model(self.raspFunction, self.inputs, self.seqLength, compiler_bos="BOS")
         self.name = name
 
+        #Copy the inital weights in order to reset if required
+        self.initialWeights = {}
+        for name1, layer in self.model.params.items():
+            self.initialWeights[name1] = {}
+            for name2, weight in layer.items():
+                self.initialWeights[name1][name2] = weight
+
         self.weightStatistics = {}
         self.updateWeightStatistics()
 
+    #Reset weight to initial values
+    def resetWeights(self):
+        for name1, layer in self.model.params.items():
+            for name2, _ in layer.items():
+                self.model.params[name1][name2] = self.initialWeights[name1][name2]
+
+    #Calculate and store new statistics for the weight distribution
     def updateWeightStatistics(self):
         self.weightStatistics = {}
         
@@ -69,6 +83,7 @@ class Model:
         #print("\nTotal statistics")
         self.weightStatistics["total"] = calculateWeightStatistics(totalCounter)
 
+    #Print the statistics for the weight distribution
     def printWeightStatistics(self, includeB=False):
         print(self.model.model_config)
         print("\nLayer analysis:")
