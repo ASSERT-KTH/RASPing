@@ -1,3 +1,0 @@
-Added change log for specifying what has been added or changed when updating the gitHub directory
-
-
