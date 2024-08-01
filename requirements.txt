@@ -1,0 +1,11 @@
+ jax==0.4.31
+ jaxlib==0.4.31
+ optax==0.2.3
+ colour==0.1.5
+ notebook==7.2.1
+ dm-haiku @ git+https://github.com/google-deepmind/dm-haiku@main
+ tracr @ git+https://github.com/google-deepmind/tracr@main
+ matplotlib==3.9.1
+ numpy==2.0.1
+ pandas==2.2.2
+ tqdm==4.66.4
