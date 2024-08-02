@@ -1,14 +1,70 @@
 import jax
+import jax.numpy as jnp
 import numpy as np
 import matplotlib.pyplot as plt
+import tqdm
+import optax
+
+from typing import NamedTuple
+import haiku as hk
 
 # The default of float16 can lead to discrepancies between outputs of
 # the compiled model and the RASP program.
-jax.config.update('jax_default_matmul_precision', 'float32')
+jax.config.update("jax_debug_nans", True)
+jax.config.update("jax_enable_x64", True)
 
 from tracr.compiler import compiling
 from tracr.compiler import lib
 from tracr.rasp import rasp
+
+#Global forward functions which gets set to the appropriate function each time it needs to be called from a class instance
+forward = None
+forward_fun = None
+
+class TrainingState(NamedTuple):
+    params: hk.Params
+    opt_state: optax.OptState
+    step: jax.Array
+
+def optimiser(lr) -> optax.GradientTransformation:
+    return optax.chain(
+        optax.clip_by_global_norm(1.0),
+        optax.adam(lr),
+    )
+
+@hk.without_apply_rng
+@hk.transform
+def loss_fn(x, y):
+    global forward
+    # Loss is the average negative log-likelihood per token (excluding the first token)
+    logits = forward(x).unembedded_output
+    log_probs = jax.nn.log_softmax(logits)
+    one_hot_targets = jax.nn.one_hot(y, logits.shape[-1])
+    log_likelihood = jnp.sum(one_hot_targets * log_probs, axis=-1)
+    # Mask the first token (BOS)
+    mask = jnp.ones_like(log_likelihood)
+    mask = mask.at[:, 0].set(0.0)
+    # Return the average negative log-likelihood per token
+    return -jnp.mean(log_likelihood * mask) / jnp.sum(mask)
+
+@jax.jit
+def update(state: TrainingState, x, y, lr: float) -> TrainingState:
+    """Learning rule (stochastic gradient descent)."""
+    loss_and_grads_fn = jax.value_and_grad(loss_fn.apply)
+    loss, grads = loss_and_grads_fn(state.params, x, y)
+    updates, opt_state = optimiser(lr).update(grads, state.opt_state)
+    params = optax.apply_updates(state.params, updates)
+    metrics = {"step": state.step, "loss": loss}
+    return TrainingState(params, opt_state, step=state.step+1), metrics
+
+@jax.jit
+def init(initial_params: hk.Params, lr: float) -> TrainingState:
+    initial_opt_state = optimiser(lr).init(initial_params)
+    return TrainingState(
+        params=initial_params,
+        opt_state=initial_opt_state,
+        step=jnp.array(0),
+    )
 
 #Calculates some weight statistic from a weight counter
 def calculateWeightStatistics(weightCounter: dict, doPrint = False):
@@ -24,6 +80,8 @@ def calculateWeightStatistics(weightCounter: dict, doPrint = False):
         print("N: %d\t min/max: %.2f/%.2f\t nValues: %d\t percentageZero: %.2f" % 
           (totalValues, minValue, maxValue, numberOfUniqueValues, zeroPercentage))
     return {"totalValues":totalValues, "maxValue": maxValue, "minValue": minValue, "zeroPercentage": zeroPercentage, "numberOfUniqueValues": numberOfUniqueValues}
+
+
 
 #A class which holds the rasp models as well as a few helper functions and some statistics
 class Model:
@@ -44,11 +102,37 @@ class Model:
         self.weightStatistics = {}
         self.updateWeightStatistics()
 
+        self.setForwardFun()
+
+    def setForwardFun(self):
+        #Sets up for the training forward pass and training by using haiku model without unembeded argmax (honestly not sure why this requires so many layers but if it works it works)
+        hk_model = hk.transform(self.model.get_compiled_model).apply(self.model.params, jax.random.PRNGKey(42))
+        hk_model.use_unembed_argmax = False
+
+        def mapping_forward(x):
+            return hk_model(x)
+        
+        global forward
+        forward = mapping_forward
+        
+        global forward_fun
+        forward_fun = hk.without_apply_rng(hk.transform(mapping_forward))
+
     #Reset weight to initial values
     def resetWeights(self):
         for name1, layer in self.model.params.items():
             for name2, _ in layer.items():
                 self.model.params[name1][name2] = self.initialWeights[name1][name2]
+
+    def setRandomWeights(self, mean=0.0, std=1.0):
+        randomParams = jax.tree_util.tree_map(
+            lambda p: jax.random.normal(jax.random.PRNGKey(42), p.shape) * std + mean, self.model.params
+        )
+        self.model.params = randomParams
+
+    #Sets the model weights to 'params'
+    def setWeights(self, params):
+        self.model.params = params
 
     #Calculate and store new statistics for the weight distribution
     def updateWeightStatistics(self):
@@ -127,9 +211,60 @@ class Model:
 
         return booleanAccuracy
     
+    #Returns the boolean result for each case in the data set where the data set is pre encoded
+    def evaluateEncoded(self, X, Y, customName = None):
+        self.setForwardFun()
+
+        if customName:
+            print("Evaluating model:",customName)
+        else:
+            print("Evaluating model:",self.name)
+        N=len(X)
+        booleanAccuracy = np.zeros(N)
+        
+        i = 0
+        for x, y in zip(X, Y):
+            logits = forward_fun.apply(self.model.params, jax.numpy.array([x])).unembedded_output
+            pred = jnp.argmax(logits, axis=-1)[0]
+            booleanAccuracy[i] = jnp.all(pred[1:] == y[1:])
+            i+=1
+            
+        return booleanAccuracy
+    
     #Apply model to a sample
     def apply(self, input):
         return self.model.apply(input).decoded
+    
+    #Perform a forward pass for training
+    def forward(self, x):
+        self.setForwardFun()
+        return forward_fun.apply(self.model.params, x)    
+    
+    def train(self, X, Y, n_epochs=1, batch_size=8, lr=0.0001, plot=False):
+        self.setForwardFun()
+
+        metrics = []  # to store the metrics values
+
+        state = init(self.model.params, lr)
+
+        for _ in tqdm.trange(n_epochs):
+            for i in range(0, len(X), batch_size):
+                x = X[i:i + batch_size]
+                y = Y[i:i + batch_size]
+                state, metric = update(state, x, y, lr)
+                
+            metrics.append(metric)
+
+        if plot:
+            # plot the loss values
+            plt.plot([m['step'] for m in metrics], [m['loss'] for m in metrics])
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.title('Training Loss')
+            plt.show()
+
+        self.model.params = state.params
+        return state.params
     
     #Add noise to the model weights according too noiseType, amount and param
     def addNoise(self, noiseType = "bitFlip", amount=1, param = 0.1, includeEncoding = False):
