@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tqdm
 import optax
+import pandas as pd
 
 from typing import NamedTuple
 import haiku as hk
@@ -32,26 +33,37 @@ def optimiser(lr) -> optax.GradientTransformation:
         optax.adam(lr),
     )
 
+#Add masking of the padding
+
 @hk.without_apply_rng
 @hk.transform
-def loss_fn(x, y):
+def loss_fn(x, y, padToken):
     global forward
     # Loss is the average negative log-likelihood per token (excluding the first token)
     logits = forward(x).unembedded_output
     log_probs = jax.nn.log_softmax(logits)
     one_hot_targets = jax.nn.one_hot(y, logits.shape[-1])
     log_likelihood = jnp.sum(one_hot_targets * log_probs, axis=-1)
+    """jax.debug.print("Logits: {}", logits)
+    jax.debug.print("Log probs: {}", log_probs)
+    jax.debug.print("one_hot_targets: {}", one_hot_targets)
+    jax.debug.print("log_likelihood: {}", log_likelihood)
+    jax.debug.print("Loss value: {}", -jnp.mean(log_likelihood * mask) / jnp.sum(mask))"""
     # Mask the first token (BOS)
     mask = jnp.ones_like(log_likelihood)
     mask = mask.at[:, 0].set(0.0)
+    # Mask the padding tokens
+    padMask = jnp.where(x!=padToken, mask, 0.0)
     # Return the average negative log-likelihood per token
-    return -jnp.mean(log_likelihood * mask) / jnp.sum(mask)
+    return -jnp.mean(log_likelihood * padMask) / jnp.sum(padMask)
 
 @jax.jit
-def update(state: TrainingState, x, y, lr: float) -> TrainingState:
+def update(state: TrainingState, x, y, lr: float, padToken) -> TrainingState:
     """Learning rule (stochastic gradient descent)."""
     loss_and_grads_fn = jax.value_and_grad(loss_fn.apply)
-    loss, grads = loss_and_grads_fn(state.params, x, y)
+    loss, grads = loss_and_grads_fn(state.params, x, y, padToken)
+    """jax.debug.print("#Loss#: {}",loss)
+    jax.debug.print("#grads# {}",loss)"""
     updates, opt_state = optimiser(lr).update(grads, state.opt_state)
     params = optax.apply_updates(state.params, updates)
     metrics = {"step": state.step, "loss": loss}
@@ -89,6 +101,7 @@ class Model:
         self.raspFunction = raspFunction
         self.inputs = inputs
         self.seqLength = seqLength
+        self.raspFunction = raspFunction
         self.model = compiling.compile_rasp_to_model(self.raspFunction, self.inputs, self.seqLength, compiler_bos="BOS")
         self.name = name
 
@@ -124,7 +137,7 @@ class Model:
             for name2, _ in layer.items():
                 self.model.params[name1][name2] = self.initialWeights[name1][name2]
 
-    def setRandomWeights(self, mean=0.0, std=1.0):
+    def setRandomWeights(self, mean=0.0, std=1.0):      #NOTE not actually random
         randomParams = jax.tree_util.tree_map(
             lambda p: jax.random.normal(jax.random.PRNGKey(42), p.shape) * std + mean, self.model.params
         )
@@ -188,13 +201,20 @@ class Model:
                     (weightStats["totalValues"], weightStats["minValue"], weightStats["maxValue"], weightStats["numberOfUniqueValues"], weightStats["zeroPercentage"]))
     
     #Returns the boolean result for each case in the data set
-    def evaluateModel(self, data, customName = None):
-        if customName:
-            print("Evaluating model:",customName)
-        else:
-            print("Evaluating model:",self.name)
+    def evaluateModel(self, data, customName = None, doPrint = True, outputArray = True):
+        self.setForwardFun()
+
+        if doPrint:
+            if customName:
+                print("Evaluating model:",customName)
+            else:
+                print("Evaluating model:",self.name)
+
         N=len(data)
-        booleanAccuracy = np.zeros(N)
+        if outputArray:
+            booleanAccuracy = np.zeros(N)
+        else:
+            booleanAccuracy = 0
         
         for i in range(N):
             inputSeq, trueOutputSeq = data[i]
@@ -205,31 +225,56 @@ class Model:
             for ii in range(seqLength):
                 sameToken[ii] = (outputSeq[ii]==trueOutputSeq[ii])
             
-            booleanAccuracy[i] = (np.sum(sameToken) == seqLength)
+            if outputArray:
+                booleanAccuracy[i] = (np.sum(sameToken) == seqLength)
+            else:
+                booleanAccuracy += (np.sum(sameToken) == seqLength)
 
             #TODO Add loading bar to keep track of progress
 
-        return booleanAccuracy
+        if outputArray:
+            return booleanAccuracy
+        else:
+            return booleanAccuracy / N
     
     #Returns the boolean result for each case in the data set where the data set is pre encoded
-    def evaluateEncoded(self, X, Y, customName = None):
+    def evaluateEncoded(self, X, Y, customName = None, doPrint = True, outputArray = True):
         self.setForwardFun()
 
-        if customName:
-            print("Evaluating model:",customName)
-        else:
-            print("Evaluating model:",self.name)
+        if doPrint:
+            if customName:
+                print("Evaluating model:",customName)
+            else:
+                print("Evaluating model:",self.name)
+
         N=len(X)
         booleanAccuracy = np.zeros(N)
+        if outputArray:
+            booleanAccuracy = np.zeros(N)
+        else:
+            booleanAccuracy = 0
+
+        #Finds the padding token of model
+        padToken = self.model.input_encoder.encoding_map["compiler_pad"]
+        maxLength = X.shape[1]
         
         i = 0
         for x, y in zip(X, Y):
             logits = forward_fun.apply(self.model.params, jax.numpy.array([x])).unembedded_output
             pred = jnp.argmax(logits, axis=-1)[0]
-            booleanAccuracy[i] = jnp.all(pred[1:] == y[1:])
+            
+            #Boolean accuracy on all considered tokens
+            pad = maxLength-jnp.count_nonzero(x-padToken)
+            if outputArray:
+                booleanAccuracy[i] = jnp.all(pred[1:maxLength-pad] == y[1:maxLength-pad])
+            else:
+                booleanAccuracy += jnp.all(pred[1:maxLength-pad] == y[1:maxLength-pad])
             i+=1
             
-        return booleanAccuracy
+        if outputArray:
+            return booleanAccuracy
+        else:
+            return booleanAccuracy / N
     
     #Apply model to a sample
     def apply(self, input):
@@ -240,20 +285,51 @@ class Model:
         self.setForwardFun()
         return forward_fun.apply(self.model.params, x)    
     
-    def train(self, X, Y, n_epochs=1, batch_size=8, lr=0.0001, plot=False):
+    def train(self, X_train, Y_train, n_epochs=1, batch_size=8, lr=0.0001, plot=False, X_val = None, Y_val = None, valCount = 0):
         self.setForwardFun()
+        padToken = self.model.input_encoder.encoding_map["compiler_pad"]
 
         metrics = []  # to store the metrics values
 
+        #Set up early stopping
+        if valCount:
+            if X_val is None or Y_val is None:
+                print("Error: X_val and Y_val not provided")
+                return -1
+        higherVal = 0
+        latestVal = np.inf
+
         state = init(self.model.params, lr)
 
-        for _ in tqdm.trange(n_epochs):
-            for i in range(0, len(X), batch_size):
-                x = X[i:i + batch_size]
-                y = Y[i:i + batch_size]
-                state, metric = update(state, x, y, lr)
+        stoppedTraining=False
+        for epoch in tqdm.trange(n_epochs):
+            for i in range(0, len(X_train), batch_size):
+                x = X_train[i:i + batch_size]
+                y = Y_train[i:i + batch_size]
+                state, metric = update(state, x, y, lr, padToken)
                 
             metrics.append(metric)
+
+            #Early stopping
+            if valCount:
+                x = X_val
+                y = Y_val
+                newVal = loss_fn.apply(state.params, x, y, padToken)    #Validation loss
+
+                if newVal > latestVal:
+                    higherVal += 1
+                    if higherVal == valCount:
+                        print("Stopped training after", epoch, "epochs by early stopping")
+                        stoppedTraining = True
+                        break
+                else:
+                    higherVal = 0
+                latestVal = newVal
+
+
+            if stoppedTraining:
+                break
+
 
         if plot:
             # plot the loss values
@@ -264,7 +340,36 @@ class Model:
             plt.show()
 
         self.model.params = state.params
-        return state.params
+    
+    def gridSearch(self, X_train, Y_train, X_test, Y_test, n_epochs_values = [100], batch_size_values = [256], learning_rate_values = [1e-5], averageCount = 5):
+        startingParams = self.model.params
+
+        # Create an empty DataFrame to store the results
+        results = []
+
+        # Perform hyper-parameter search
+        for n_epochs in n_epochs_values:
+            for batch_size in batch_size_values:
+                for learning_rate in learning_rate_values:
+                    setResults = np.zeros(averageCount)
+                    for i in range(averageCount):
+                        #self.setWeights(startingParams)     
+                        self.setRandomWeights()     #NOTE Potentially temp
+                        # Train the model with the current hyper-parameters
+                        trained_params = self.train(X_train, Y_train, n_epochs=n_epochs, batch_size=batch_size, lr=learning_rate)
+                        
+                        # Evaluate the model on the test set
+                        accuracy = np.mean(self.evaluateEncoded(X_test, Y_test, doPrint=False))
+                        setResults[i]=accuracy
+                        
+                    # Append the results to the DataFrame
+                    mean = np.mean(setResults)
+                    std = np.std(setResults)
+                    results.append({"n_epochs": n_epochs, "batch_size": batch_size, "learning_rate": learning_rate, "accuracy_mean": mean, "accuracy_std": std})
+
+        self.setWeights(startingParams)
+        # Print the results
+        print(pd.DataFrame(results).to_string())
     
     #Add noise to the model weights according too noiseType, amount and param
     def addNoise(self, noiseType = "bitFlip", amount=1, param = 0.1, includeEncoding = False):

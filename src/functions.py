@@ -1,4 +1,5 @@
 import jax
+import jax.numpy as jnp
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -316,6 +317,48 @@ def generateModel(name: str, maxLength: int) -> Model:
             return None
 
     return model
+
+#Encode and the data for training based on the target function's rasp encoding
+def encodeAndPadData(data, raspFunction: rasp.SOp, acceptedInputs,  maxSeqLength: int):
+    model = Model(raspFunction, acceptedInputs, maxSeqLength, "Temporary model")
+    inputEncoder = model.model.input_encoder
+    outputEncoder = model.model.output_encoder
+
+    fillerToken = next(iter(outputEncoder.encoding_map))    #A token accepted by the output encoder. Should not have an effect on loss
+
+    X = []
+    Y = []
+
+    for inputSeq, outputSeq in data:
+        #Copy sequences to avoid overwriting originals and pad them to max length
+        x = []
+        y = []
+        for i in range(maxSeqLength+1):
+            if i < len(inputSeq):   #Assumes that input is same size as output
+                x.append(inputSeq[i])
+                y.append(outputSeq[i])
+            else:
+                x.append("compiler_pad")
+                y.append(fillerToken)
+
+        y[0] = fillerToken
+
+        X.append(jnp.array(inputEncoder.encode(x)))
+        Y.append(jnp.array(outputEncoder.encode(y)))
+        
+    X = jnp.array(X)
+    Y = jnp.array(Y)
+
+    return X, Y
+
+    #NOTE The first token in the output is ignored but needs to be part of the input since the encoder breaks otherwise
+
+def generateAndEncodeData(name: str, maxLength: int, size: int):
+    data = generateData(name, maxLength, size)
+    model = generateModel(name, maxLength)
+    X, Y = encodeAndPadData(data, model.raspFunction, model.inputs, maxLength)
+    return X,Y
+
 
 #Prints some statistics on the generated dyck data
 def checkDyckBalance(data):
