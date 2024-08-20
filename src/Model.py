@@ -439,6 +439,7 @@ class Model:
                         self.setRandomWeights()     #NOTE Potentially temp
                         # Train the model with the current hyper-parameters
                         trained_params = self.train(X_train, Y_train, n_epochs=n_epochs, batch_size=batch_size, lr=learning_rate)
+                        self.setWeights(trained_params)
                         
                         # Evaluate the model on the test set
                         accuracy = np.mean(self.evaluateEncoded(X_test, Y_test, doPrint=False))
