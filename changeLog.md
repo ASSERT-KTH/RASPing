@@ -14,3 +14,17 @@ Changes to the Model class
   * In order to do this I mapped the forward function to a global function which is update every time a class instance needs to use it. This way each instance can keep its own structure while using the same functions.
 * Added training function to the class which calls the correct instance of the forward pass function
 * Added encoded evaluation method to the class
+
+Added Early stopping to training
+
+Added option to evaluate model on validation data during training
+* Added parameter valStep (defaults to 0)
+  * If valStep is zero behaves as regular training else evaluates model on valuation data every valStep epochs and returns the training results
+* Added a jitted evaluation to speed up computation
+
+Changed how the evaluateEncoded method is computed to slightly speed up computation
+
+Ran tests for over training via the tracr_new_Model_class_implementation notebook
+
+Streamlined process and uploaded results in PerformanceTesting/overTraining.ipynb / PerformanceTesting/savedData/overTraining
+
