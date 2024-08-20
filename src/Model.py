@@ -22,6 +22,10 @@ from tracr.rasp import rasp
 forward = None
 forward_fun = None
 
+class GridSearchParameters():
+    def __init__(self):
+        self.epochs = []
+
 class TrainingState(NamedTuple):
     params: hk.Params
     opt_state: optax.OptState
@@ -33,7 +37,20 @@ def optimiser(lr) -> optax.GradientTransformation:
         optax.adam(lr),
     )
 
-#Add masking of the padding
+@jax.jit
+def fastEvaluate(params, x, y, padToken):
+    global forward_fun
+    logits = forward_fun.apply(params, jnp.array(x)).unembedded_output
+    pred = jnp.argmax(logits, axis=-1)
+
+    # Mask the first token (BOS)
+    mask = jnp.ones_like(x)
+    mask = mask.at[:, 0].set(0)
+    # Mask the padding tokens
+    padMask = jnp.where(x!=padToken, mask, 0)
+    val = jnp.mean(jnp.all(pred*padMask == y*padMask, axis=[-1]).astype(float))
+    #jax.debug.print("Val: {}", val)
+    return val
 
 @hk.without_apply_rng
 @hk.transform
@@ -264,11 +281,14 @@ class Model:
             pred = jnp.argmax(logits, axis=-1)[0]
             
             #Boolean accuracy on all considered tokens
-            pad = maxLength-jnp.count_nonzero(x-padToken)
+            mask = jnp.ones_like(x)
+            mask = mask.at[0].set(0)
+            padMask = jnp.where(x!=padToken, mask, 0)
+
             if outputArray:
-                booleanAccuracy[i] = jnp.all(pred[1:maxLength-pad] == y[1:maxLength-pad])
+                booleanAccuracy[i] = jnp.all(pred*padMask == y*padMask)
             else:
-                booleanAccuracy += jnp.all(pred[1:maxLength-pad] == y[1:maxLength-pad])
+                booleanAccuracy += jnp.all(pred*padMask == y*padMask)
             i+=1
             
         if outputArray:
@@ -285,11 +305,12 @@ class Model:
         self.setForwardFun()
         return forward_fun.apply(self.model.params, x)    
     
-    def train(self, X_train, Y_train, n_epochs=1, batch_size=8, lr=0.0001, plot=False, X_val = None, Y_val = None, valCount = 0):
+    def train(self, X_train, Y_train, n_epochs=1, batch_size=8, lr=0.0001, plot=False, X_val = None, Y_val = None, valCount = 0, valStep=0):
         self.setForwardFun()
         padToken = self.model.input_encoder.encoding_map["compiler_pad"]
 
         metrics = []  # to store the metrics values
+        validations = []
 
         #Set up early stopping
         if valCount:
@@ -326,6 +347,9 @@ class Model:
                     higherVal = 0
                 latestVal = newVal
 
+            if valStep and epoch % valStep == 0:
+                val = fastEvaluate(state.params, X_val, Y_val, padToken)
+                validations.append(val)        
 
             if stoppedTraining:
                 break
@@ -334,12 +358,70 @@ class Model:
         if plot:
             # plot the loss values
             plt.plot([m['step'] for m in metrics], [m['loss'] for m in metrics])
-            plt.xlabel('Epoch')
+            plt.xlabel('Step')
             plt.ylabel('Loss')
             plt.title('Training Loss')
             plt.show()
 
+            if valStep:
+                # plot the validation accuracies
+                plt.plot(np.linspace(0, n_epochs, len(validations)), [m for m in validations])
+                plt.xlabel('Epochs')
+                plt.ylabel('Accuracy')
+                plt.title('Validation Accuracy')
+                plt.show()
+
         self.model.params = state.params
+        if valStep:
+            return metrics, validations
+
+    def testOverTraining(self, X_train, Y_train, X_val, Y_val, valStep = 100, n_epochs=1, batch_size=8, lr=0.0001, plot=False):
+        self.setForwardFun()
+        padToken = self.model.input_encoder.encoding_map["compiler_pad"]
+
+        metrics = []  # to store the metrics values
+        validations = []
+
+        state = init(self.model.params, lr)
+
+        for epoch in tqdm.trange(n_epochs):
+            for i in range(0, len(X_train), batch_size):
+                x = X_train[i:i + batch_size]
+                y = Y_train[i:i + batch_size]
+                state, metric = update(state, x, y, lr, padToken)
+
+                self.model.params = state.params
+                self.setForwardFun()
+                
+            metrics.append(metric)
+
+            if valStep and epoch % valStep == 0:
+                val = fastEvaluate(state.params, X_val, Y_val, padToken)
+                validations.append(val)        
+
+                self.model.params = state.params
+                print(self.evaluateEncoded(X_val, Y_val, doPrint=False, outputArray=False))
+
+
+        if plot:
+            # plot the loss values
+            plt.plot([m['step'] for m in metrics], [m['loss'] for m in metrics])
+            plt.xlabel('Step')
+            plt.ylabel('Loss')
+            plt.title('Training Loss')
+            plt.show()
+
+            if valStep:
+                # plot the loss values
+                plt.plot(np.linspace(0, n_epochs, len(validations)), [m for m in validations])
+                plt.xlabel('Epochs')
+                plt.ylabel('Accuracy')
+                plt.title('Validation Accuracy')
+                plt.show()
+
+        self.model.params = state.params
+        if valStep:
+            return metrics, validations
     
     def gridSearch(self, X_train, Y_train, X_test, Y_test, n_epochs_values = [100], batch_size_values = [256], learning_rate_values = [1e-5], averageCount = 5):
         startingParams = self.model.params
