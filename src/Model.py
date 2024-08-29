@@ -79,8 +79,6 @@ def update(state: TrainingState, x, y, lr: float, padToken) -> TrainingState:
     """Learning rule (stochastic gradient descent)."""
     loss_and_grads_fn = jax.value_and_grad(loss_fn.apply)
     loss, grads = loss_and_grads_fn(state.params, x, y, padToken)
-    """jax.debug.print("#Loss#: {}",loss)
-    jax.debug.print("#grads# {}",loss)"""
     updates, opt_state = optimiser(lr).update(grads, state.opt_state)
     params = optax.apply_updates(state.params, updates)
     metrics = {"step": state.step, "loss": loss}
@@ -135,18 +133,14 @@ class Model:
         self.setForwardFun()
 
     def setForwardFun(self):
-        #Sets up for the training forward pass and training by using haiku model without unembeded argmax (honestly not sure why this requires so many layers but if it works it works)
-        hk_model = hk.transform(self.model.get_compiled_model).apply(self.model.params, jax.random.PRNGKey(42))
-        hk_model.use_unembed_argmax = False
-
-        def mapping_forward(x):
-            return hk_model(x)
-        
         global forward
-        forward = mapping_forward
-        
+        def forward(x):
+            compiled_model = self.model.get_compiled_model()
+            compiled_model.use_unembed_argmax = False
+            return compiled_model(x, use_dropout=False)
+
         global forward_fun
-        forward_fun = hk.without_apply_rng(hk.transform(mapping_forward))
+        forward_fun = hk.without_apply_rng(hk.transform(forward))
 
     #Reset weight to initial values
     def resetWeights(self):
