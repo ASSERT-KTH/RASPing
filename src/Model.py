@@ -129,6 +129,8 @@ class Model:
             for name2, weight in layer.items():
                 self.initialWeights[name1][name2] = weight
 
+        self.jaxPRNGKey = jax.random.key(666)
+
         self.weightStatistics = {}
         self.updateWeightStatistics()
 
@@ -148,15 +150,20 @@ class Model:
         global forward_fun
         forward_fun = hk.without_apply_rng(hk.transform(mapping_forward))
 
+    def setJaxPRNGKey(self, newSeed):
+        self.jaxPRNGKey = jax.random.key(newSeed)
+
     #Reset weight to initial values
     def resetWeights(self):
         for name1, layer in self.model.params.items():
             for name2, _ in layer.items():
                 self.model.params[name1][name2] = self.initialWeights[name1][name2]
 
-    def setRandomWeights(self, mean=0.0, std=1.0):      #NOTE not actually random
+    def setRandomWeights(self, mean=0.0, std=1.0):     
+        self.jaxPRNGKey, newPRNGKey = jax.random.split(self.jaxPRNGKey)
+        PRNGSeq = hk.PRNGSequence(newPRNGKey)
         randomParams = jax.tree_util.tree_map(
-            lambda p: jax.random.normal(jax.random.PRNGKey(42), p.shape) * std + mean, self.model.params
+            lambda p: jax.random.normal(next(PRNGSeq), p.shape) * std + mean, self.model.params
         )
         self.model.params = randomParams
 
@@ -423,8 +430,13 @@ class Model:
         if valStep:
             return metrics, validations
     
-    def gridSearch(self, X_train, Y_train, X_test, Y_test, n_epochs_values = [100], batch_size_values = [256], learning_rate_values = [1e-5], averageCount = 5):
+    #Grid search with the hyperparameters on random weights
+    def gridSearch(self, X_train, Y_train, X_test, Y_test, n_epochs_values = [100], batch_size_values = [256], learning_rate_values = [1e-5], 
+                   Gaussian_mean_values = [0], Gaussian_std_values = [1], averageCount = 5):
         startingParams = self.model.params
+
+        self.setForwardFun()
+        padToken = self.model.input_encoder.encoding_map["compiler_pad"]
 
         # Create an empty DataFrame to store the results
         results = []
@@ -433,22 +445,23 @@ class Model:
         for n_epochs in n_epochs_values:
             for batch_size in batch_size_values:
                 for learning_rate in learning_rate_values:
-                    setResults = np.zeros(averageCount)
-                    for i in range(averageCount):
-                        #self.setWeights(startingParams)     
-                        self.setRandomWeights()     #NOTE Potentially temp
-                        # Train the model with the current hyper-parameters
-                        trained_params = self.train(X_train, Y_train, n_epochs=n_epochs, batch_size=batch_size, lr=learning_rate)
-                        self.setWeights(trained_params)
-                        
-                        # Evaluate the model on the test set
-                        accuracy = np.mean(self.evaluateEncoded(X_test, Y_test, doPrint=False))
-                        setResults[i]=accuracy
-                        
-                    # Append the results to the DataFrame
-                    mean = np.mean(setResults)
-                    std = np.std(setResults)
-                    results.append({"n_epochs": n_epochs, "batch_size": batch_size, "learning_rate": learning_rate, "accuracy_mean": mean, "accuracy_std": std})
+                    for Gaussian_mean in Gaussian_mean_values:
+                        for Gaussian_std in Gaussian_std_values:
+                            setResults = np.zeros(averageCount)
+                            for i in range(averageCount):   
+                                # Train the model with the current hyper-parameters
+                                self.setRandomWeights(Gaussian_mean, Gaussian_std)
+                                self.train(X_train, Y_train, n_epochs=n_epochs, batch_size=batch_size, lr=learning_rate)
+                                
+                                # Evaluate the model on the test set
+                                accuracy = fastEvaluate(self.model.params, X_test, Y_test, padToken)
+                                setResults[i]=accuracy
+                                
+                            # Append the results to the DataFrame
+                            mean = np.mean(setResults)
+                            std = np.std(setResults)
+                            results.append({"n_epochs": n_epochs, "batch_size": batch_size, "learning_rate": learning_rate, 
+                                            "Gaussian_mean": Gaussian_mean, "Gaussian_std": Gaussian_std, "accuracy_mean": mean, "accuracy_std": std})
 
         self.setWeights(startingParams)
         # Print the results

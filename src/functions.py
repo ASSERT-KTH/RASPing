@@ -23,7 +23,7 @@ def getAcceptedNamesAndInput():
             "shuffle_dyck2": ["(",")","{","}"]}
 
 #Generate a data set based on "name" with "size" samples and a max sequence length of "maxSeqLength" 
-def generateData(name: str, maxSeqLength: int, size: int):
+def generateData(name: str, maxSeqLength: int, size: int, removeDuplicates = False):
     data = [None]*size
 
     acceptedNamesAndInput = getAcceptedNamesAndInput()
@@ -279,6 +279,32 @@ def generateData(name: str, maxSeqLength: int, size: int):
         case _:
             print(name, "is not an accepted name the accepted names are",acceptedNamesAndInput)
             return None
+        
+    if removeDuplicates:
+        #Create a list of the unique found tokens
+
+        #Try building up a dict list
+        uniqueInputs = {}
+        uniqueData = []
+
+        #Might work, check with numpy
+        #Check that numpy unique returns a jax array and not a numpy array
+        for inputSeq, outputSeq in data:
+            nextToken = uniqueInputs
+            inputLength = len(inputSeq)
+            for ind, token in enumerate(inputSeq):
+                if token in nextToken.keys():
+                    nextToken = nextToken[token]
+                else:                    
+                    nextToken[token] = {}
+                    nextToken = nextToken[token]
+
+            #Check if this sequence has been added to the sequence or not
+            if "@end" not in nextToken.keys():
+                nextToken["@end"] = {}
+                uniqueData.append((inputSeq, outputSeq))
+
+        data = uniqueData
 
     return data
 
@@ -353,8 +379,8 @@ def encodeAndPadData(data, raspFunction: rasp.SOp, acceptedInputs,  maxSeqLength
 
     #NOTE The first token in the output is ignored but needs to be part of the input since the encoder breaks otherwise
 
-def generateAndEncodeData(name: str, maxLength: int, size: int):
-    data = generateData(name, maxLength, size)
+def generateAndEncodeData(name: str, maxLength: int, size: int, removeDuplicates=True):
+    data = generateData(name, maxLength, size, removeDuplicates)
     model = generateModel(name, maxLength)
     X, Y = encodeAndPadData(data, model.raspFunction, model.inputs, maxLength)
     return X,Y
