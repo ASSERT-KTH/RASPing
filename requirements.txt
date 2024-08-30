@@ -1,4 +1,4 @@
- jax==0.4.31
+ jax[cuda12]==0.4.31
  jaxlib==0.4.31
  optax==0.2.3
  colour==0.1.5
