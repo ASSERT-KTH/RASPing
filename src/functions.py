@@ -11,7 +11,7 @@ from tracr.compiler import compiling
 from tracr.compiler import lib
 from tracr.rasp import rasp
 
-from Model import Model
+from .model import Model
 
 #Return all the accepted model names and their corresponding accepted inputs
 def getAcceptedNamesAndInput():
