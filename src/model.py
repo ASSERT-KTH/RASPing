@@ -254,7 +254,11 @@ class Model:
             return booleanAccuracy
         else:
             return booleanAccuracy / N
-    
+
+    def fastEvaluateEncoded(self, X, Y):
+        padToken = self.model.input_encoder.encoding_map["compiler_pad"]
+        return fastEvaluate(self.model.params, X, Y, padToken)
+
     #Returns the boolean result for each case in the data set where the data set is pre encoded
     def evaluateEncoded(self, X, Y, customName = None, doPrint = True, outputArray = True):
         self.setForwardFun()
