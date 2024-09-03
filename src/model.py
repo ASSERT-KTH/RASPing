@@ -13,6 +13,7 @@ import haiku as hk
 # the compiled model and the RASP program.
 jax.config.update("jax_debug_nans", True)
 jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_default_matmul_precision", "float32")
 
 from tracr.compiler import compiling
 from tracr.compiler import lib
