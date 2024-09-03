@@ -3,10 +3,6 @@ import jax.numpy as jnp
 import numpy as np
 import matplotlib.pyplot as plt
 
-# The default of float16 can lead to discrepancies between outputs of
-# the compiled model and the RASP program.
-jax.config.update('jax_default_matmul_precision', 'float32')
-
 from tracr.compiler import compiling
 from tracr.compiler import lib
 from tracr.rasp import rasp
