@@ -53,6 +53,64 @@ def fastEvaluate(params, x, y, padToken):
     #jax.debug.print("Val: {}", val)
     return val
 
+# Cross-entropy loss + zero loss on perfect sequence
+# @hk.without_apply_rng
+# @hk.transform
+# def loss_fn(x, y, padToken):
+#     global forward
+#     logits = forward(x).unembedded_output
+#     log_probs = jax.nn.log_softmax(logits)
+#     one_hot_targets = jax.nn.one_hot(y, logits.shape[-1])
+
+#     # Mask the first token (BOS) and padding tokens
+#     mask = jnp.ones_like(y)
+#     mask = mask.at[:, 0].set(0)
+#     # Mask the padding tokens
+#     pad_mask = jnp.where(x != padToken, mask, 0)
+
+#     # Compute cross-entropy loss for each function
+#     ce_loss = -jnp.sum(one_hot_targets * log_probs, axis=-1)
+#     ce_loss = jnp.sum(ce_loss * pad_mask, axis=-1) / jnp.sum(pad_mask, axis=-1)
+
+#     # Check if the predictions are perfect
+#     # Mask the prediction and target for computing the prefect mask
+#     predictions = jnp.argmax(logits, axis=-1)
+#     predictions = predictions * pad_mask
+#     y = y * pad_mask
+#     perfect_mask = jnp.all(predictions == y, axis=-1)
+
+#     # If the predictions are perfect, set the loss to 0.0
+#     loss = jnp.where(perfect_mask, 0.0, ce_loss)
+#     loss = jnp.mean(loss)
+
+#     return loss
+
+# Cross-entropy loss + smoothed accuracy
+# @hk.without_apply_rng
+# @hk.transform
+# def loss_fn(x, y, padToken, accuracy_weight=0.1):
+#     global forward
+#     logits = forward(x).unembedded_output
+#     log_probs = jax.nn.log_softmax(logits)
+#     one_hot_targets = jax.nn.one_hot(y, logits.shape[-1])
+
+#     # Mask the first token (BOS) and padding tokens
+#     mask = jnp.ones_like(y)
+#     mask = mask.at[:, 0].set(0)
+#     # Mask the padding tokens
+#     pad_mask = jnp.where(x != padToken, mask, 0)
+
+#     ce_loss = -jnp.sum(one_hot_targets * log_probs, axis=-1)
+#     ce_loss = jnp.sum(ce_loss * pad_mask, axis=-1) / jnp.sum(pad_mask, axis=-1)
+
+#     predictions = jnp.argmax(logits, axis=-1)
+#     correct_predictions = (predictions == y).astype(jnp.float32) * pad_mask
+#     sequence_accuracy = jnp.sum(correct_predictions, axis=-1) / jnp.sum(pad_mask, axis=-1)
+    
+#     accuracy_reward = -jnp.log(sequence_accuracy + 1e-8)
+#     loss = jnp.mean(ce_loss + accuracy_weight * accuracy_reward)
+#     return loss
+
 @hk.without_apply_rng
 @hk.transform
 def loss_fn(x, y, padToken):
@@ -62,11 +120,6 @@ def loss_fn(x, y, padToken):
     log_probs = jax.nn.log_softmax(logits)
     one_hot_targets = jax.nn.one_hot(y, logits.shape[-1])
     log_likelihood = jnp.sum(one_hot_targets * log_probs, axis=-1)
-    """jax.debug.print("Logits: {}", logits)
-    jax.debug.print("Log probs: {}", log_probs)
-    jax.debug.print("one_hot_targets: {}", one_hot_targets)
-    jax.debug.print("log_likelihood: {}", log_likelihood)
-    jax.debug.print("Loss value: {}", -jnp.mean(log_likelihood * mask) / jnp.sum(mask))"""
     # Mask the first token (BOS)
     mask = jnp.ones_like(log_likelihood)
     mask = mask.at[:, 0].set(0.0)
@@ -140,6 +193,7 @@ class Model:
         def forward(x):
             compiled_model = self.model.get_compiled_model()
             compiled_model.use_unembed_argmax = False
+            compiled_model.pad_token = self.model.input_encoder.encoding_map["compiler_pad"]
             return compiled_model(x, use_dropout=False)
 
         global forward_fun
