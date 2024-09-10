@@ -189,3 +189,5 @@ class Trainer:
         self.model.params = self.state.params
         if self.valStep:
             return metrics, validations
+        else:
+            return metrics
