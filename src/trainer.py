@@ -1,3 +1,4 @@
+import os
 import jax
 import optax
 import haiku as hk
@@ -6,7 +7,7 @@ import jax.numpy as jnp
 
 import tqdm
 import matplotlib.pyplot as plt
-from typing import NamedTuple
+from typing import NamedTuple, Optional, Any
 
 
 class TrainingState(NamedTuple):
@@ -19,19 +20,20 @@ class Trainer:
 
     def __init__(
         self,
-        model,
-        params,
-        X_train,
-        Y_train,
-        loss_fn,
-        n_epochs=1,
-        batch_size=8,
-        lr=0.0001,
-        plot=False,
-        X_val=None,
-        Y_val=None,
-        valCount=0,
-        valStep=0,
+        model: Any,
+        params: hk.Params,
+        X_train: jnp.ndarray,
+        Y_train: jnp.ndarray,
+        loss_fn: Any,
+        n_epochs: int = 1,
+        batch_size: int = 8,
+        lr: float = 0.0001,
+        plot: bool = False,
+        X_val: Optional[jnp.ndarray] = None,
+        Y_val: Optional[jnp.ndarray] = None,
+        valCount: int = 0,
+        valStep: int = 0,
+        output_dir: Optional[str] = None,
     ):
         self.model = model
         self.params = params
@@ -46,7 +48,7 @@ class Trainer:
         self.Y_val = Y_val
         self.valCount = valCount
         self.valStep = valStep
-
+        self.output_dir = output_dir
         self.init()
 
     def init(self):
@@ -187,7 +189,21 @@ class Trainer:
                 plt.show()
 
         self.model.params = self.state.params
+
+        if self.output_dir:
+            if not os.path.exists(self.output_dir):
+                os.makedirs(self.output_dir, exist_ok=True)
+            self.save_metrics(metrics, validations)
+            self.save_model()
+
         if self.valStep:
             return metrics, validations
         else:
             return metrics
+
+    def save_metrics(self, metrics, validations):
+        np.save(self.output_dir + "metrics.npy", metrics)
+        np.save(self.output_dir + "validations.npy", validations)
+
+    def save_model(self):
+        np.save(self.output_dir + "model.npy", self.state.params)

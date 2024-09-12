@@ -248,7 +248,7 @@ class Model:
         self.setForwardFun()
         return forward_fun.apply(self.model.params, x)    
     
-    def train(self, X_train, Y_train, n_epochs=1, batch_size=8, lr=0.0001, plot=False, X_val = None, Y_val = None, valCount = 0, valStep=0, loss_fn = cross_entropy_loss):
+    def train(self, X_train, Y_train, n_epochs=1, batch_size=8, lr=0.0001, plot=False, X_val = None, Y_val = None, valCount = 0, valStep=0, loss_fn = cross_entropy_loss, output_dir: str = None):
         trainer = Trainer(
             model=self.model,
             params=self.model.params,
@@ -262,7 +262,8 @@ class Model:
             X_val=X_val,
             Y_val=Y_val,
             valCount=valCount,
-            valStep=valStep
+            valStep=valStep,
+            output_dir=output_dir,
         )
 
         result = trainer.train()
