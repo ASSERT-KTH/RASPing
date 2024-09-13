@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+#SBATCH -J RASPING-LOSS
+#SBATCH -t 24:00:00
+#SBATCH -N 1
+#SBATCH --reservation=1g.10gb
+
+apptainer exec --nv ../../container python loss_functions.py
