@@ -1,16 +1,12 @@
-from tracr.rasp import rasp
-from tracr.compiler import compiling
-from tracr.compiler import lib
-
 import sys
 import os
+import click
 
 # TODO: this is a hack, change this for editable install
 module_path = os.path.abspath(os.path.join('../..'))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
-from src.model import Model
 from src.functions import *
 
 from src.loss import cross_entropy_loss, cross_entropy_loss_smoothed_accuracy, cross_entropy_loss_with_perfect_sequence
@@ -26,28 +22,25 @@ def test_loss_function(model_name: str, loss_fn, max_len: int = 10, n_samples: i
 
     return model.train(X_train,Y_train, n_epochs, batch_size, learning_rate, False, X_val, Y_val, 0, 10, loss_fn=loss_fn, output_dir=output_dir)
 
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+@click.command()
+@click.option("--model_name", type=str, help="The name of the program/model to train")
+@click.option("--loss_fn_name", type=str, help="The name of the loss function to test")
+def run_test(model_name, loss_fn_name):
+    if model_name not in getAcceptedNamesAndInput().keys():
+        raise ValueError(f"Model {model_name} not found")
 
-def run_test(model_name, loss_fn_name, loss_fn):
+    loss_fns = {
+        "cross_entropy_loss": cross_entropy_loss,
+        "cross_entropy_loss_smoothed_accuracy": cross_entropy_loss_smoothed_accuracy,
+        "cross_entropy_loss_with_perfect_sequence": cross_entropy_loss_with_perfect_sequence
+    }
+    if loss_fn_name not in loss_fns:
+        raise ValueError(f"Loss function {loss_fn_name} not found")
+    loss_fn = loss_fns[loss_fn_name]
+
     print(f"Testing {model_name} with {loss_fn_name}...")
     metrics, validation = test_loss_function(model_name, loss_fn, output_dir=f"saved_data/{model_name}/{loss_fn_name}/")
     return model_name, loss_fn_name, metrics, validation
 
 if __name__ == "__main__":
-    max_workers = 32
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = []
-        for model_name in getAcceptedNamesAndInput().keys():
-            print(f"Testing {model_name}...")
-            for loss_fn_name, loss_fn in {
-                "cross_entropy_loss": cross_entropy_loss,
-                "cross_entropy_loss_smoothed_accuracy": cross_entropy_loss_smoothed_accuracy,
-                "cross_entropy_loss_with_perfect_sequence": cross_entropy_loss_with_perfect_sequence
-            }.items():
-                future = executor.submit(run_test, model_name, loss_fn_name, loss_fn)
-                futures.append(future)
-        
-        for future in as_completed(futures):
-            model_name, loss_fn_name, metrics, validation = future.result()
-            print(f"Completed {model_name} with {loss_fn_name}")
+    run_test()

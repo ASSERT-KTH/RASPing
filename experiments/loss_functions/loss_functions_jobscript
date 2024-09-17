@@ -4,5 +4,22 @@
 #SBATCH -t 24:00:00
 #SBATCH -N 1
 #SBATCH --reservation=1g.10gb
+#SBATCH --array=0-17
 
-apptainer exec --nv ../../container python loss_functions.py
+# Define arrays for model_name and loss_fn_name
+model_names=("reverse" "hist" "sort" "most-freq" "shuffle_dyck1" "shuffle_dyck2")
+loss_fn_names=("cross_entropy_loss" "cross_entropy_loss_smoothed_accuracy" "cross_entropy_loss_with_perfect_sequence")
+
+# Get the current array task ID
+array_index=${SLURM_ARRAY_TASK_ID}
+
+# Calculate model and loss function indices
+model_index=$((array_index / 3))
+loss_fn_index=$((array_index % 3))
+
+# Set the parameters based on the calculated indices
+export MODEL_NAME="${model_names[model_index]}"
+export LOSS_FN_NAME="${loss_fn_names[loss_fn_index]}"
+
+# Run the Python script with the parameters
+apptainer exec --nv ../../container python loss_functions.py --model_name $MODEL_NAME --loss_fn_name $LOSS_FN_NAME
