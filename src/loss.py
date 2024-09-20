@@ -84,5 +84,5 @@ def cross_entropy_loss_smoothed_accuracy(x, y, padToken, forward, accuracy_weigh
     )
 
     accuracy_reward = -jnp.log(sequence_accuracy + 1e-8)
-    loss = jnp.mean(max(ce_loss, accuracy_weight * accuracy_reward))
+    loss = jnp.mean(ce_loss, accuracy_weight * accuracy_reward)
     return loss
