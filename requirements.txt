@@ -11,3 +11,4 @@
  tqdm==4.66.4
  flax==0.8.5
  autoreload==0.1.2
+black==24.8.0

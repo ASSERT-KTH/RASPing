@@ -19,6 +19,9 @@ from tracr.compiler import compiling
 from tracr.compiler import lib
 from tracr.rasp import rasp
 
+from .loss import *
+from .trainer import Trainer
+
 #Global forward functions which gets set to the appropriate function each time it needs to be called from a class instance
 forward = None
 forward_fun = None
@@ -27,125 +30,6 @@ class GridSearchParameters():
     def __init__(self):
         self.epochs = []
 
-class TrainingState(NamedTuple):
-    params: hk.Params
-    opt_state: optax.OptState
-    step: jax.Array
-
-def optimiser(lr) -> optax.GradientTransformation:
-    return optax.chain(
-        optax.clip_by_global_norm(1.0),
-        optax.adam(lr),
-    )
-
-@jax.jit
-def fastEvaluate(params, x, y, padToken):
-    global forward_fun
-    logits = forward_fun.apply(params, jnp.array(x)).unembedded_output
-    pred = jnp.argmax(logits, axis=-1)
-
-    # Mask the first token (BOS)
-    mask = jnp.ones_like(x)
-    mask = mask.at[:, 0].set(0)
-    # Mask the padding tokens
-    padMask = jnp.where(x!=padToken, mask, 0)
-    val = jnp.mean(jnp.all(pred*padMask == y*padMask, axis=[-1]).astype(float))
-    #jax.debug.print("Val: {}", val)
-    return val
-
-# Cross-entropy loss + zero loss on perfect sequence
-# @hk.without_apply_rng
-# @hk.transform
-# def loss_fn(x, y, padToken):
-#     global forward
-#     logits = forward(x).unembedded_output
-#     log_probs = jax.nn.log_softmax(logits)
-#     one_hot_targets = jax.nn.one_hot(y, logits.shape[-1])
-
-#     # Mask the first token (BOS) and padding tokens
-#     mask = jnp.ones_like(y)
-#     mask = mask.at[:, 0].set(0)
-#     # Mask the padding tokens
-#     pad_mask = jnp.where(x != padToken, mask, 0)
-
-#     # Compute cross-entropy loss for each function
-#     ce_loss = -jnp.sum(one_hot_targets * log_probs, axis=-1)
-#     ce_loss = jnp.sum(ce_loss * pad_mask, axis=-1) / jnp.sum(pad_mask, axis=-1)
-
-#     # Check if the predictions are perfect
-#     # Mask the prediction and target for computing the prefect mask
-#     predictions = jnp.argmax(logits, axis=-1)
-#     predictions = predictions * pad_mask
-#     y = y * pad_mask
-#     perfect_mask = jnp.all(predictions == y, axis=-1)
-
-#     # If the predictions are perfect, set the loss to 0.0
-#     loss = jnp.where(perfect_mask, 0.0, ce_loss)
-#     loss = jnp.mean(loss)
-
-#     return loss
-
-# Cross-entropy loss + smoothed accuracy
-# @hk.without_apply_rng
-# @hk.transform
-# def loss_fn(x, y, padToken, accuracy_weight=0.1):
-#     global forward
-#     logits = forward(x).unembedded_output
-#     log_probs = jax.nn.log_softmax(logits)
-#     one_hot_targets = jax.nn.one_hot(y, logits.shape[-1])
-
-#     # Mask the first token (BOS) and padding tokens
-#     mask = jnp.ones_like(y)
-#     mask = mask.at[:, 0].set(0)
-#     # Mask the padding tokens
-#     pad_mask = jnp.where(x != padToken, mask, 0)
-
-#     ce_loss = -jnp.sum(one_hot_targets * log_probs, axis=-1)
-#     ce_loss = jnp.sum(ce_loss * pad_mask, axis=-1) / jnp.sum(pad_mask, axis=-1)
-
-#     predictions = jnp.argmax(logits, axis=-1)
-#     correct_predictions = (predictions == y).astype(jnp.float32) * pad_mask
-#     sequence_accuracy = jnp.sum(correct_predictions, axis=-1) / jnp.sum(pad_mask, axis=-1)
-    
-#     accuracy_reward = -jnp.log(sequence_accuracy + 1e-8)
-#     loss = jnp.mean(ce_loss + accuracy_weight * accuracy_reward)
-#     return loss
-
-@hk.without_apply_rng
-@hk.transform
-def loss_fn(x, y, padToken):
-    global forward
-    # Loss is the average negative log-likelihood per token (excluding the first token)
-    logits = forward(x).unembedded_output
-    log_probs = jax.nn.log_softmax(logits)
-    one_hot_targets = jax.nn.one_hot(y, logits.shape[-1])
-    log_likelihood = jnp.sum(one_hot_targets * log_probs, axis=-1)
-    # Mask the first token (BOS)
-    mask = jnp.ones_like(log_likelihood)
-    mask = mask.at[:, 0].set(0.0)
-    # Mask the padding tokens
-    padMask = jnp.where(x!=padToken, mask, 0.0)
-    # Return the average negative log-likelihood per token
-    return -jnp.mean(log_likelihood * padMask) / jnp.sum(padMask)
-
-@jax.jit
-def update(state: TrainingState, x, y, lr: float, padToken) -> TrainingState:
-    """Learning rule (stochastic gradient descent)."""
-    loss_and_grads_fn = jax.value_and_grad(loss_fn.apply)
-    loss, grads = loss_and_grads_fn(state.params, x, y, padToken)
-    updates, opt_state = optimiser(lr).update(grads, state.opt_state)
-    params = optax.apply_updates(state.params, updates)
-    metrics = {"step": state.step, "loss": loss}
-    return TrainingState(params, opt_state, step=state.step+1), metrics
-
-@jax.jit
-def init(initial_params: hk.Params, lr: float) -> TrainingState:
-    initial_opt_state = optimiser(lr).init(initial_params)
-    return TrainingState(
-        params=initial_params,
-        opt_state=initial_opt_state,
-        step=jnp.array(0),
-    )
 
 #Calculates some weight statistic from a weight counter
 def calculateWeightStatistics(weightCounter: dict, doPrint = False):
@@ -162,6 +46,21 @@ def calculateWeightStatistics(weightCounter: dict, doPrint = False):
           (totalValues, minValue, maxValue, numberOfUniqueValues, zeroPercentage))
     return {"totalValues":totalValues, "maxValue": maxValue, "minValue": minValue, "zeroPercentage": zeroPercentage, "numberOfUniqueValues": numberOfUniqueValues}
 
+
+@jax.jit
+def fastEvaluate(params, x, y, padToken):
+    global forward_fun
+    logits = forward_fun.apply(params, jnp.array(x)).unembedded_output
+    pred = jnp.argmax(logits, axis=-1)
+
+    # Mask the first token (BOS)
+    mask = jnp.ones_like(x)
+    mask = mask.at[:, 0].set(0)
+    # Mask the padding tokens
+    padMask = jnp.where(x!=padToken, mask, 0)
+    val = jnp.mean(jnp.all(pred*padMask == y*padMask, axis=[-1]).astype(float))
+    #jax.debug.print("Val: {}", val)
+    return val
 
 
 #A class which holds the rasp models as well as a few helper functions and some statistics
@@ -365,124 +264,29 @@ class Model:
         self.setForwardFun()
         return forward_fun.apply(self.model.params, x)    
     
-    def train(self, X_train, Y_train, n_epochs=1, batch_size=8, lr=0.0001, plot=False, X_val = None, Y_val = None, valCount = 0, valStep=0):
-        self.setForwardFun()
-        padToken = self.model.input_encoder.encoding_map["compiler_pad"]
+    def train(self, X_train, Y_train, n_epochs=1, batch_size=8, lr=0.0001, plot=False, X_val = None, Y_val = None, valCount = 0, valStep=0, loss_fn = cross_entropy_loss, output_dir: str = None):
+        trainer = Trainer(
+            model=self.model,
+            params=self.model.params,
+            X_train=X_train,
+            Y_train=Y_train,
+            loss_fn=loss_fn,
+            n_epochs=n_epochs,
+            batch_size=batch_size,
+            lr=lr,
+            plot=plot,
+            X_val=X_val,
+            Y_val=Y_val,
+            valCount=valCount,
+            valStep=valStep,
+            output_dir=output_dir,
+        )
 
-        metrics = []  # to store the metrics values
-        validations = []
+        result = trainer.train()
+        self.model.params = trainer.model.params
 
-        #Set up early stopping
-        if valCount:
-            if X_val is None or Y_val is None:
-                print("Error: X_val and Y_val not provided")
-                return -1
-        higherVal = 0
-        latestVal = np.inf
+        return result
 
-        state = init(self.model.params, lr)
-
-        stoppedTraining=False
-        for epoch in tqdm.trange(n_epochs):
-            for i in range(0, len(X_train), batch_size):
-                x = X_train[i:i + batch_size]
-                y = Y_train[i:i + batch_size]
-                state, metric = update(state, x, y, lr, padToken)
-                
-            metrics.append(metric)
-
-            #Early stopping
-            if valCount:
-                x = X_val
-                y = Y_val
-                newVal = loss_fn.apply(state.params, x, y, padToken)    #Validation loss
-
-                if newVal > latestVal:
-                    higherVal += 1
-                    if higherVal == valCount:
-                        print("Stopped training after", epoch, "epochs by early stopping")
-                        stoppedTraining = True
-                        break
-                else:
-                    higherVal = 0
-                latestVal = newVal
-
-            if valStep and epoch % valStep == 0:
-                val = fastEvaluate(state.params, X_val, Y_val, padToken)
-                validations.append(val)        
-
-            if stoppedTraining:
-                break
-
-
-        if plot:
-            # plot the loss values
-            plt.plot([m['step'] for m in metrics], [m['loss'] for m in metrics])
-            plt.xlabel('Step')
-            plt.ylabel('Loss')
-            plt.title('Training Loss')
-            plt.show()
-
-            if valStep:
-                # plot the validation accuracies
-                plt.plot(np.linspace(0, n_epochs, len(validations)), [m for m in validations])
-                plt.xlabel('Epochs')
-                plt.ylabel('Accuracy')
-                plt.title('Validation Accuracy')
-                plt.show()
-
-        self.model.params = state.params
-        if valStep:
-            return metrics, validations
-
-    def testOverTraining(self, X_train, Y_train, X_val, Y_val, valStep = 100, n_epochs=1, batch_size=8, lr=0.0001, plot=False):
-        self.setForwardFun()
-        padToken = self.model.input_encoder.encoding_map["compiler_pad"]
-
-        metrics = []  # to store the metrics values
-        validations = []
-
-        state = init(self.model.params, lr)
-
-        for epoch in tqdm.trange(n_epochs):
-            for i in range(0, len(X_train), batch_size):
-                x = X_train[i:i + batch_size]
-                y = Y_train[i:i + batch_size]
-                state, metric = update(state, x, y, lr, padToken)
-
-                self.model.params = state.params
-                self.setForwardFun()
-                
-            metrics.append(metric)
-
-            if valStep and epoch % valStep == 0:
-                val = fastEvaluate(state.params, X_val, Y_val, padToken)
-                validations.append(val)        
-
-                self.model.params = state.params
-                print(self.evaluateEncoded(X_val, Y_val, doPrint=False, outputArray=False))
-
-
-        if plot:
-            # plot the loss values
-            plt.plot([m['step'] for m in metrics], [m['loss'] for m in metrics])
-            plt.xlabel('Step')
-            plt.ylabel('Loss')
-            plt.title('Training Loss')
-            plt.show()
-
-            if valStep:
-                # plot the loss values
-                plt.plot(np.linspace(0, n_epochs, len(validations)), [m for m in validations])
-                plt.xlabel('Epochs')
-                plt.ylabel('Accuracy')
-                plt.title('Validation Accuracy')
-                plt.show()
-
-        self.model.params = state.params
-        if valStep:
-            return metrics, validations
-    
     #Grid search with the hyperparameters on random weights
     def gridSearch(self, X_train, Y_train, X_test, Y_test, n_epochs_values = [100], batch_size_values = [256], learning_rate_values = [1e-5], 
                    Gaussian_mean_values = [0], Gaussian_std_values = [1], averageCount = 5):
