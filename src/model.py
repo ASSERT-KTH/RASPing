@@ -47,6 +47,22 @@ def calculateWeightStatistics(weightCounter: dict, doPrint = False):
     return {"totalValues":totalValues, "maxValue": maxValue, "minValue": minValue, "zeroPercentage": zeroPercentage, "numberOfUniqueValues": numberOfUniqueValues}
 
 
+@jax.jit
+def fastEvaluate(params, x, y, padToken):
+    global forward_fun
+    logits = forward_fun.apply(params, jnp.array(x)).unembedded_output
+    pred = jnp.argmax(logits, axis=-1)
+
+    # Mask the first token (BOS)
+    mask = jnp.ones_like(x)
+    mask = mask.at[:, 0].set(0)
+    # Mask the padding tokens
+    padMask = jnp.where(x!=padToken, mask, 0)
+    val = jnp.mean(jnp.all(pred*padMask == y*padMask, axis=[-1]).astype(float))
+    #jax.debug.print("Val: {}", val)
+    return val
+
+
 #A class which holds the rasp models as well as a few helper functions and some statistics
 class Model:
     def __init__(self, raspFunction: rasp.SOp, inputs, seqLength: int, name: str):
