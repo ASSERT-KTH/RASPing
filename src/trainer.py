@@ -34,6 +34,7 @@ class Trainer:
         valCount: int = 0,
         valStep: int = 0,
         output_dir: Optional[str] = None,
+        returnAllMetrics: bool = False
     ):
         self.model = model
         self.params = params
@@ -49,6 +50,7 @@ class Trainer:
         self.valCount = valCount
         self.valStep = valStep
         self.output_dir = output_dir
+        self.returnAllMetrics = returnAllMetrics
         self.init()
 
     def init(self):
@@ -121,6 +123,9 @@ class Trainer:
 
         metrics = []
         validations = []
+        if self.returnAllMetrics:
+            metrics = [[],[]]
+            validations = [[],[]]
 
         # Set up early stopping
         if self.valCount:
@@ -137,7 +142,8 @@ class Trainer:
                 y = self.Y_train[i : i + self.batch_size]
                 self.state, metric = self.jit_update(self.state, x, y, padToken)
 
-            metrics.append(metric)
+            if not self.returnAllMetrics:
+                metrics.append(metric)
 
             # Early stopping
             # TODO: fix calling of loss function
@@ -164,7 +170,19 @@ class Trainer:
                 val = self.jit_val_accuracy(
                     self.state.params, self.X_val, self.Y_val, padToken
                 )
-                validations.append(val)
+                if not self.returnAllMetrics:
+                    validations.append(val)
+                else:
+                    #NOTE Returns the training loss as an array of floats instead of the standard which returns an array of dictionaries
+                    #Validations are accuracies and metrics is the loss
+                    validations[0].append(self.jit_val_accuracy(
+                        self.state.params, self.X_train, self.Y_train, padToken))
+                    validations[1].append(val)
+                    metrics[0].append(self.jit_val_loss(
+                        self.state.params, self.X_train, self.Y_train, padToken))
+                    metrics[1].append(self.jit_val_loss(
+                        self.state.params, self.X_val, self.Y_val, padToken))               
+
 
             if stoppedTraining:
                 break
@@ -202,8 +220,14 @@ class Trainer:
             return metrics
 
     def save_metrics(self, metrics, validations):
-        np.save(self.output_dir + "metrics.npy", metrics)
-        np.save(self.output_dir + "validations.npy", validations)
+        if len(metrics)==2: #If saving both training and validation loss/acc
+            np.save(self.output_dir + "metrics_train.npy", metrics[0])
+            np.save(self.output_dir + "validations_train.npy", validations[0])
+            np.save(self.output_dir + "metrics_val.npy", metrics[1])
+            np.save(self.output_dir + "validations_train.npy", validations[1])
+        else:
+            np.save(self.output_dir + "metrics.npy", metrics)
+            np.save(self.output_dir + "validations.npy", validations)
 
     def save_model(self):
         np.save(self.output_dir + "model.npy", self.state.params)

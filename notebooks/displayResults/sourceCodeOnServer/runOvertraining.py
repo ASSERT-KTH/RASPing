@@ -26,7 +26,7 @@ parser.add_argument("-noiseParam", type=float, default=0.1)
 
 parser.add_argument("-randomWeights", type=bool, default=False)
 parser.add_argument("-n_epochs", type=int, default=50000)
-parser.add_argument("-batch_size", type=int, default=256)   
+parser.add_argument("-batch_size", type=int, default=256)
 parser.add_argument("-lr", type=float, default=1e-4)
 parser.add_argument("-valStep", type=int, default=50)
 
@@ -54,7 +54,7 @@ print("batch_size:", args.batch_size)
 print("lr:", args.lr)
 print("valStep:", args.valStep)
 
-print("saveDirectory:", args.saveDirectory) 
+print("saveDirectory:", args.saveDirectory)
 print("trainLossFileName:", args.trainLossFileName)
 print("trainAccFileName:", args.trainAccFileName)
 print("valLossFileName:", args.valLossFileName)
