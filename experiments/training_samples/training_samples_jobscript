@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+#SBATCH -J RASPING-SAMPLES
+#SBATCH -t 48:00:00
+#SBATCH -N 1
+#SBATCH --reservation=1g.10gb
+#SBATCH --array=0-23
+
+# Define arrays for model_name and loss_fn_name
+model_names=("reverse" "hist" "sort" "most-freq" "shuffle_dyck1" "shuffle_dyck2")
+n_samples=(5000 25000 50000 100000)
+
+# Get the current array task ID
+array_index=${SLURM_ARRAY_TASK_ID}
+
+# Calculate model and loss function indices
+model_index=$((array_index / 4))
+n_samples_index=$((array_index % 4))
+
+# Set the parameters based on the calculated indices
+export MODEL_NAME="${model_names[model_index]}"
+export N_SAMPLES="${n_samples[n_samples_index]}"
+
+# Run the Python script with the parameters
+echo "Running training_samples.py with model_name=$MODEL_NAME and n_samples=$N_SAMPLES"
+apptainer exec --nv ../../container python training_samples.py --model_name $MODEL_NAME --n_samples $N_SAMPLES
