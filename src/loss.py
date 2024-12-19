@@ -60,9 +60,9 @@ def cross_entropy_loss_with_perfect_sequence(x, y, padToken, forward):
 # Cross-entropy loss + smoothed accuracy
 @hk.without_apply_rng
 @hk.transform
-def cross_entropy_loss_smoothed_accuracy(x, y, padToken, forward, accuracy_weight=0.1):
+def cross_entropy_loss_smoothed_accuracy(x, y, padToken, forward, accuracy_weight=0.9):
     """
-    Cross-entropy loss + smoothed accuracy
+    Cross-entropy loss + zero loss on perfect sequence
     """
     logits = forward(x).unembedded_output
     log_probs = jax.nn.log_softmax(logits)
@@ -74,15 +74,19 @@ def cross_entropy_loss_smoothed_accuracy(x, y, padToken, forward, accuracy_weigh
     # Mask the padding tokens
     pad_mask = jnp.where(x != padToken, mask, 0)
 
+    # Compute cross-entropy loss for each function
     ce_loss = -jnp.sum(one_hot_targets * log_probs, axis=-1)
     ce_loss = jnp.sum(ce_loss * pad_mask, axis=-1) / jnp.sum(pad_mask, axis=-1)
 
+    # Check if the predictions are perfect
+    # Mask the prediction and target for computing the prefect mask
     predictions = jnp.argmax(logits, axis=-1)
-    correct_predictions = (predictions == y).astype(jnp.float32) * pad_mask
-    sequence_accuracy = jnp.sum(correct_predictions, axis=-1) / jnp.sum(
-        pad_mask, axis=-1
-    )
+    predictions = predictions * pad_mask
+    y = y * pad_mask
+    perfect_mask = jnp.all(predictions == y, axis=-1)
 
-    accuracy_reward = -jnp.log(sequence_accuracy + 1e-8)
-    loss = jnp.mean(max(ce_loss, accuracy_weight * accuracy_reward))
+    # If the predictions are perfect, set the loss to ce_loss - accuracy_weight * ce_loss
+    loss = jnp.where(perfect_mask, ce_loss - accuracy_weight * ce_loss, ce_loss)
+    loss = jnp.mean(loss)
+
     return loss
