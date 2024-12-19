@@ -70,7 +70,7 @@ class Model:
         self.inputs = inputs
         self.seqLength = seqLength
         self.raspFunction = raspFunction
-        self.model = compiling.compile_rasp_to_model(self.raspFunction, self.inputs, self.seqLength, compiler_bos="BOS")
+        self.model = compiling.compile_rasp_to_model(self.raspFunction, self.inputs, self.seqLength, compiler_bos="BOS", mlp_exactness=120)
         self.name = name
 
         #Copy the inital weights in order to reset if required
@@ -173,7 +173,7 @@ class Model:
                     (weightStats["totalValues"], weightStats["minValue"], weightStats["maxValue"], weightStats["numberOfUniqueValues"], weightStats["zeroPercentage"]))
     
     #Returns the boolean result for each case in the data set
-    def evaluateModel(self, data, customName = None, doPrint = True, outputArray = True):
+    def evaluateModel(self, data, customName = None, doPrint = True, outputArray = True, useAssert = False):
         self.setForwardFun()
 
         if doPrint:
@@ -195,6 +195,8 @@ class Model:
             seqLength = len(trueOutputSeq)
             sameToken = np.zeros(seqLength)
             for ii in range(seqLength):
+                if useAssert:
+                    assert outputSeq[ii]==trueOutputSeq[ii]
                 sameToken[ii] = (outputSeq[ii]==trueOutputSeq[ii])
             
             if outputArray:
