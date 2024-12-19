@@ -13,3 +13,6 @@ flax==0.8.5
 autoreload==0.1.2
 black==24.8.0
 click==8.1.7
+parso==0.8.4
+cosmic-ray==8.4.1
+toml==0.10.2
