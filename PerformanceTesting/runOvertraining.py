@@ -16,13 +16,17 @@ import argparse
 parser = argparse.ArgumentParser(description = "Training and save file arguments")
 
 parser.add_argument("-baseModel", type=str, default="sort")
+parser.add_argument("-mutatedModel", type=bool, default=False)
+parser.add_argument("-modelIndex", type=int, default=0)
+parser.add_argument("-mutationPath", type=str, default="savedData/aggregated_mutations.json")
 parser.add_argument("-maxLength", type=int, default=10)
 parser.add_argument("-dataSize", type=int, default=5000)
 parser.add_argument("-seed", type=int, default=666)
 
 parser.add_argument("-noiseType", type=str, default="none")
-parser.add_argument("-noiseAmount", type=int, default=1)
+parser.add_argument("-noiseAmount", type=float, default=1)
 parser.add_argument("-noiseParam", type=float, default=0.1)
+parser.add_argument("-relativeMagnitude", type=bool, default=False)
 
 parser.add_argument("-randomWeights", type=bool, default=False)
 parser.add_argument("-n_epochs", type=int, default=50000)
@@ -40,6 +44,9 @@ args = parser.parse_args()
 
 print("Test run with arguments")
 print("baseModel:", args.baseModel)
+print("mutatedModel:", args.mutatedModel)
+print("modelIndex:", args.modelIndex)
+print("mutationPath:", args.mutationPath)
 print("maxLength:", args.maxLength)
 print("dataSize:", args.dataSize)
 print("seed:", args.seed)
@@ -47,6 +54,7 @@ print("seed:", args.seed)
 print("noiseType:", args.noiseType)
 print("noiseAmount:", args.noiseAmount)
 print("noiseParam:", args.noiseParam)
+print("relativeMagnitude:", args.relativeMagnitude)
 
 print("randomWeights:", args.randomWeights)
 print("n_epochs:", args.n_epochs)
@@ -65,7 +73,11 @@ maxLength = args.maxLength
 name = args.baseModel
 N = args.dataSize
 
-model = generateModel(name, maxLength)
+print("Generating Model")
+if args.mutatedModel:
+    model = getMutatedModel(name, maxLength, args.modelIndex, args.mutationPath)
+else:
+    model = generateModel(name, maxLength)
 
 model.setJaxPRNGKey(args.seed)
 np.random.seed(args.seed)
@@ -85,13 +97,16 @@ print("X shape: train", X_train.shape, ", val", X_val.shape)
 print("Y shape: train", Y_train.shape, ", val", Y_val.shape)
 print("Total unique samples", len(data))
 
+print("Accuracy:", model.fastEvaluateEncoded(X, Y))
+
 noiseTypes = ["bitFlip", "gaussian", "flipFirst"]
 
 #Train model
 if args.randomWeights:
     model.setRandomWeights()
 if args.noiseType in noiseTypes:
-    model.addNoise(args.noiseType, args.noiseAmount, args.noiseParam)
+    model.addNoise(args.noiseType, args.noiseAmount, args.noiseParam, relativeMagnitude=args.relativeMagnitude)
+
 losses, accuracies = model.train(X_train, Y_train, n_epochs=args.n_epochs, batch_size=args.batch_size, lr=args.lr, plot=False, X_val=X_val, Y_val=Y_val, valStep=args.valStep, returnAllMetrics = True)
 
 #Save loss and validation accuracy

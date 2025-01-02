@@ -328,7 +328,7 @@ class Model:
         print(pd.DataFrame(results).to_string())
     
     #Add noise to the model weights according too noiseType, amount and param
-    def addNoise(self, noiseType = "bitFlip", amount=1, param = 0.1, includeEncoding = False):
+    def addNoise(self, noiseType = "bitFlip", amount=1, param = 0.1, includeEncoding = False, relativeMagnitude = False):
         noiseTypes = ["bitFlip", "gaussian", "flipFirst", "temp"]
         if noiseType not in noiseTypes:
             print("Error: noiseType needs to be one of", noiseTypes)
@@ -341,26 +341,25 @@ class Model:
                 #find binary weights in the model
                 #Ensure that the weights are correctly changed before commiting to design. If assignment doesn't work I'll save the keys to access
 
-                #Saves the keys to access all the layers with binary weights as well as the weight statistics for that layer
-                binaryWeights = [] 
-                totalCount = 0
-                for name1, _ in self.weightStatistics.items():
-                    if name1=="total":
-                        continue
-                    for name2, weightStats in self.weightStatistics[name1].items():
-                        if weightStats["numberOfUniqueValues"]==2:
+                if type(amount)==int:
+                    #Saves the keys to access all the applicable layers as well as the weight statistics for that layer
+                    appliedWeights = [] 
+                    totalCount = 0
+                    for name1, _ in self.weightStatistics.items():
+                        if name1=="total":
+                            continue
+                        for name2, weightStats in self.weightStatistics[name1].items():
                             if includeEncoding == False and name2=="embeddings":
                                 continue
-                            binaryWeights.append((name1, name2, weightStats))
+                            appliedWeights.append((name1, name2, weightStats))
                             totalCount+=weightStats["totalValues"]
 
-                if type(amount)==int:
                     #Randomly selects "amount" bits to flip
                     #The probability is equal for all applicable parameters
                     for i in range(amount):
                         #Parameter used to figure out the index where flip happens
                         index = np.random.randint(totalCount)
-                        for name1, name2, stats in binaryWeights:
+                        for name1, name2, stats in appliedWeights:
                             layerShape = self.model.params[name1][name2].shape
                             layerCount = layerShape[0]*layerShape[1]
 
@@ -380,7 +379,19 @@ class Model:
                             break
 
                 elif type(amount)==float:
-                    print("Percentage bitflip not yet implemented")
+                    for name1, _ in self.weightStatistics.items():
+                        if name1=="total":
+                            continue
+                        for name2, weightStats in self.weightStatistics[name1].items():
+                            if name2=="b":
+                                continue
+                            if includeEncoding == False and name2=="embeddings":
+                                continue
+
+                            layerShape = self.model.params[name1][name2].shape
+                            self.model.params[name1][name2] = self.model.params[name1][name2] + np.where(np.random.rand(layerShape[0], layerShape[1])<amount, 
+                                                                       weightStats["maxValue"]-self.model.params[name1][name2] - abs(self.model.params[name1][name2]), 0)
+                            
                     return
                 else:
                     print("Error: amount needs to be int or float")
@@ -403,8 +414,11 @@ class Model:
                                 continue
 
                             layerShape = self.model.params[name1][name2].shape
+                            magnitudeFactor = 1
+                            if relativeMagnitude:
+                                magnitudeFactor = weightStats["maxValue"]
                             self.model.params[name1][name2] = self.model.params[name1][name2] + \
-                                np.where(np.random.rand(layerShape[0], layerShape[1])<amount, np.random.normal(0, param, layerShape), 0)
+                                np.where(np.random.rand(layerShape[0], layerShape[1])<amount, np.random.normal(0, param * magnitudeFactor, layerShape), 0)
                             
                     return
                 else:

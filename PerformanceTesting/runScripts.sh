@@ -3,7 +3,7 @@
 #!/bin/bash
 #
 #SBATCH -J RASPING-NOISE-GAUSSIAN
-#SBATCH -t 16:00:00
+#SBATCH -t 20:00:00
 #SBATCH -N 1
 #SBATCH --reservation=1g.10gb
 #SBATCH --array=0-179
@@ -72,3 +72,102 @@ else
 fi
 
 apptainer exec --nv ../container.sif python runOvertraining.py -baseModel $MODEL_NAME -maxLength $MAX_LENGTH -randomWeights $RANDOM_WEIGHTS -n_epochs 50000 -saveDirectory savedData/overTrainingV2/ -trainLossFileName $TRAIN_LOSS_FILE_NAME -trainAccFileName $TRAIN_ACC_FILE_NAME -valLossFileName $VAL_LOSS_FILE_NAME -valAccFileName $VAL_ACC_FILE_NAME
+
+
+# Mutated models test
+#!/bin/bash
+#
+#SBATCH -J RASPING-MUTATED
+#SBATCH -t 20:00:00
+#SBATCH -N 1
+#SBATCH --reservation=1g.10gb
+#SBATCH --array=0-29
+
+# Define arrays
+model_names=("reverse" "hist" "sort" "most-freq" "shuffle_dyck1" "shuffle_dyck2")
+
+# Get the current array task ID
+array_index=${SLURM_ARRAY_TASK_ID}
+
+# Calculate indices
+model_index=$((array_index / 5))
+model_number=$((array_index % 5))
+
+# Set the parameters based on the calculated indices
+export MODEL_NAME="${model_names[model_index]}"
+export MODEL_NUMBER="${model_number}"
+export TRAIN_LOSS_FILE_NAME="${MODEL_NAME}_train_loss_mutation${model_number}"
+export TRAIN_ACC_FILE_NAME="${MODEL_NAME}_train_acc_mutation${model_number}"
+export VAL_LOSS_FILE_NAME="${MODEL_NAME}_val_loss_mutation${model_number}"
+export VAL_ACC_FILE_NAME="${MODEL_NAME}_val_acc_mutation${model_number}"
+
+apptainer exec --nv ../container2.sif python runOvertraining.py -baseModel $MODEL_NAME -mutatedModel True -modelIndex $MODEL_NUMBER -maxLength 10 -n_epochs 50000 -saveDirectory savedData/mutatedModels1/ -trainLossFileName $TRAIN_LOSS_FILE_NAME -trainAccFileName $TRAIN_ACC_FILE_NAME -valLossFileName $VAL_LOSS_FILE_NAME -valAccFileName $VAL_ACC_FILE_NAME
+
+
+# Bit Flip noise training
+
+#!/bin/bash
+#
+#SBATCH -J RASPING-NOISE-GAUSSIAN
+#SBATCH -t 20:00:00
+#SBATCH -N 1
+#SBATCH --reservation=1g.10gb
+#SBATCH --array=0-179
+
+# Define arrays
+noiseParams=("0.0" "0.02" "0.04" "0.06" "0.08" "0.1")
+model_names=("reverse" "hist" "sort" "most-freq" "shuffle_dyck1" "shuffle_dyck2")
+iterations=(1 2 3 4 5)
+
+# Get the current array task ID
+array_index=${SLURM_ARRAY_TASK_ID}
+
+# Calculate param and itteration indices
+param_index=$(((array_index % 30) / 5))
+model_index=$((array_index / 30))
+iteration_index=$((array_index % 5))
+
+# Set the parameters based on the calculated indices
+export NOISE_PARAM="${noiseParams[param_index]}"
+export MODEL_NAME="${model_names[model_index]}"
+export SEED="${iterations[iteration_index]}"
+export TRAIN_LOSS_FILE_NAME="${MODEL_NAME}_train_loss_bitflip_fliprate_${NOISE_PARAM}_${SEED}"
+export TRAIN_ACC_FILE_NAME="${MODEL_NAME}_train_acc_bitflip_fliprate_${NOISE_PARAM}_${SEED}"
+export VAL_LOSS_FILE_NAME="${MODEL_NAME}_val_loss_bitflip_fliprate_${NOISE_PARAM}_${SEED}"
+export VAL_ACC_FILE_NAME="${MODEL_NAME}_val_acc_bitflip_fliprate_${NOISE_PARAM}_${SEED}"
+
+apptainer exec --nv ../container.sif python runOvertraining.py -baseModel $MODEL_NAME -maxLength 10 -n_epochs 100000 -seed $SEED -noiseType bitFlip -noiseAmount $NOISE_PARAM -saveDirectory savedData/noiseTrainingBitFlip/ -trainLossFileName $TRAIN_LOSS_FILE_NAME -trainAccFileName $TRAIN_ACC_FILE_NAME -valLossFileName $VAL_LOSS_FILE_NAME -valAccFileName $VAL_ACC_FILE_NAME
+
+
+#Final(?) gaussian noise training
+#!/bin/bash
+#
+#SBATCH -J RASPING-NOISE-GAUSSIAN
+#SBATCH -t 20:00:00
+#SBATCH -N 1
+#SBATCH --reservation=1g.10gb
+#SBATCH --array=0-179
+
+# Define arrays
+noiseParams=("0.01" "0.25" "0.50" "0.75" "1.0" "1.25")
+model_names=("reverse" "hist" "sort" "most-freq" "shuffle_dyck1" "shuffle_dyck2")
+iterations=(1 2 3 4 5)
+
+# Get the current array task ID
+array_index=${SLURM_ARRAY_TASK_ID}
+
+# Calculate param and itteration indices
+param_index=$(((array_index % 30) / 5))
+model_index=$((array_index / 30))
+iteration_index=$((array_index % 5))
+
+# Set the parameters based on the calculated indices
+export NOISE_PARAM="${noiseParams[param_index]}"
+export MODEL_NAME="${model_names[model_index]}"
+export SEED="${iterations[iteration_index]}"
+export TRAIN_LOSS_FILE_NAME="${MODEL_NAME}_train_loss_gaussian_std${NOISE_PARAM}_${SEED}"
+export TRAIN_ACC_FILE_NAME="${MODEL_NAME}_train_acc_gaussian_std${NOISE_PARAM}_${SEED}"
+export VAL_LOSS_FILE_NAME="${MODEL_NAME}_val_loss_gaussian_std${NOISE_PARAM}_${SEED}"
+export VAL_ACC_FILE_NAME="${MODEL_NAME}_val_acc_gaussian_std${NOISE_PARAM}_${SEED}"
+
+apptainer exec --nv ../container.sif python runOvertraining.py -baseModel $MODEL_NAME -maxLength 10 -n_epochs 100000 -seed $SEED -noiseType gaussian -noiseParam $NOISE_PARAM -relativeMagnitude True -saveDirectory savedData/noiseTrainingGaussian3/ -trainLossFileName $TRAIN_LOSS_FILE_NAME -trainAccFileName $TRAIN_ACC_FILE_NAME -valLossFileName $VAL_LOSS_FILE_NAME -valAccFileName $VAL_ACC_FILE_NAME

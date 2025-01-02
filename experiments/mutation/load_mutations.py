@@ -12,7 +12,14 @@ if module_paths not in sys.path:
     sys.path.extend(module_paths)
 
 from tracr.rasp import rasp
-from src.functions import generateData, getAcceptedNamesAndInput
+#from src.functions import generateData, getAcceptedNamesAndInput
+def getAcceptedNamesAndInput():
+    return {"reverse": ["a","b","c","d","e"], #Tokens doesn't matter much. Only the quantity influnce the results due to encoding (I think)
+            "hist": ["a","b","c","d"], #Tokens doesn't matter much. Only the quantity influnce the results due to encoding (I think)
+            "sort": [1,2,3,4,5,6], #[0,1,2,3,4,5,6]    Seems to fail sometimes if 0 is included (irrespktive of if 0 is in the failed input or not, don't know why)
+            "most-freq": [1,2,3,4,5],
+            "shuffle_dyck1": ["(",")"],
+            "shuffle_dyck2": ["(",")","{","}"]}
 from src.model import Model
 
 

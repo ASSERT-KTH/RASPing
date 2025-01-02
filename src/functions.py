@@ -2,10 +2,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from tracr.compiler import compiling
 from tracr.compiler import lib
 from tracr.rasp import rasp
+
+from experiments.mutation.load_mutations import load_buggy_models
 
 from .model import Model
 
@@ -338,6 +341,37 @@ def generateModel(name: str, maxLength: int) -> Model:
             print(name, "is not an accepted name the accepted names are",acceptedNamesAndInput)
             return None
 
+    return model
+
+def getMutationJobIDs(name: str, mutationPath: str):
+    df = pd.read_json(mutationPath)
+
+    # Filter for BUGGY_MODEL mutations
+    jobIDs = []
+    for idx, row in df.iterrows():
+        if row["execution_result"].get("status") != "BUGGY_MODEL":
+            continue
+        if row["program_name"] != name:
+            continue
+
+        
+        jobIDs.append(row["job_id"])
+
+    return jobIDs
+
+def getMutatedModel(name: str, maxLength: int, modelIndex: int, mutationPath: str) -> Model:
+    mutatedNameKey = name
+    if mutatedNameKey == "most-freq":
+        mutatedNameKey = "most_freq"
+    elif mutatedNameKey == "shuffle_dyck1":
+        mutatedNameKey = "shuffle_dyck"
+    jobIDs = getMutationJobIDs(mutatedNameKey, mutationPath)
+    if modelIndex >= len(jobIDs)-1:
+        print("Warning: modelIndex (%d) is larger than available mutations (%d) for model %s" % (modelIndex, len(jobIDs), name))
+        exit(0)
+
+    models = load_buggy_models(mutation_path=mutationPath, max_length=maxLength, program_name=mutatedNameKey, job_id=jobIDs[modelIndex])
+    model = list(models.values())[0]
     return model
 
 def make_sort_unique_buggy(vals: rasp.SOp, keys: rasp.SOp) -> rasp.SOp:
