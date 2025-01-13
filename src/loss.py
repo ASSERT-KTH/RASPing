@@ -62,7 +62,7 @@ def cross_entropy_loss_with_perfect_sequence(x, y, padToken, forward):
 @hk.transform
 def cross_entropy_loss_smoothed_accuracy(x, y, padToken, forward, accuracy_weight=0.9):
     """
-    Cross-entropy loss + zero loss on perfect sequence
+    Cross-entropy loss + smoothed zero loss on perfect sequence
     """
     logits = forward(x).unembedded_output
     log_probs = jax.nn.log_softmax(logits)
