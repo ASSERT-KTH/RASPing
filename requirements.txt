@@ -1,18 +1,18 @@
-jax[cuda12]==0.4.31
-jaxlib==0.4.31
-optax==0.2.3
+jax[cuda12]==0.4.38
+jaxlib==0.4.38
+optax==0.2.4
 colour==0.1.5
-notebook==7.2.1
+notebook==7.3.2
 dm-haiku @ git+https://github.com/google-deepmind/dm-haiku@main
 tracr @ git+https://github.com/google-deepmind/tracr@main
-matplotlib==3.9.1
-numpy==2.0.1
-pandas==2.2.2
-tqdm==4.66.4
-flax==0.8.5
+matplotlib==3.10.0
+numpy==2.2.1
+pandas==2.2.3
+tqdm==4.67.1
+flax==0.10.2
 autoreload==0.1.2
-black==24.8.0
-click==8.1.7
+black==24.10.0
+click==8.1.8
 parso==0.8.4
 cosmic-ray==8.4.1
 toml==0.10.2
