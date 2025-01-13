@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: python:3.11.5-bullseye
+From: python:3.13.1-bullseye
 
 %files
     ./requirements.txt
