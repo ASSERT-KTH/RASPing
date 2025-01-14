@@ -77,7 +77,6 @@ def cross_entropy_loss_smoothed_accuracy(x, y, padToken, forward, accuracy_weigh
     # Compute cross-entropy loss for each function
     ce_loss = -jnp.sum(one_hot_targets * log_probs, axis=-1)
     ce_loss = jnp.sum(ce_loss * pad_mask, axis=-1) / jnp.sum(pad_mask, axis=-1)
-    jax.debug.print("ce_loss: {x}", x=ce_loss)
 
     # Check if the predictions are perfect
     # Mask the prediction and target for computing the prefect mask
