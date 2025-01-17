@@ -1,12 +1,10 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-import matplotlib.pyplot as plt
-import tqdm
-import optax
 import pandas as pd
 
-from typing import NamedTuple
+from typing import List
+from enum import Enum
 import haiku as hk
 
 # The default of float16 can lead to discrepancies between outputs of
@@ -62,6 +60,33 @@ def fastEvaluate(params, x, y, padToken):
     #jax.debug.print("Val: {}", val)
     return val
 
+
+class DiffType(Enum):
+    ARCH_DIFF = 1
+    WEIGHT_DIFF = 2
+    NO_DIFF = 3
+
+
+class ModelDiff:
+    def __init__(self, diff_type: DiffType, equal: List, diff: List, diff_str: str):
+        self.diff_type = diff_type
+        self.equal = equal
+        self.diff = diff
+        self.diff_str = diff_str
+
+    def proportion_diff(self) -> float:
+        return len(self.diff) / (len(self.equal) + len(self.diff))
+
+    def to_dict(self) -> dict:
+        return {
+            "diff_type": self.diff_type.name,
+            "equal": self.equal,
+            "diff": self.diff,
+            "diff_str": self.diff_str
+        }
+
+    def __str__(self) -> str:
+        return self.diff_str
 
 #A class which holds the rasp models as well as a few helper functions and some statistics
 class Model:
@@ -446,4 +471,44 @@ class Model:
 
         
         return
-    
+
+    def diff(self, other: "Model") -> ModelDiff:
+        """
+        Implements a diff function for comparing two models.
+        """
+        # Check if the model architectures are the same
+        all_keys = sorted(set(self.model.params.keys()) | set(other.model.params.keys()))
+        diff_str_lines = []
+        same_items = []
+        diff_items = []
+
+        for key in all_keys:
+            if key in self.model.params.keys() and key in other.model.params.keys():
+                same_items.append(key)
+                diff_str_lines.append(f" {key}")
+            elif key in self.model.params.keys():
+                diff_items.append(key)
+                diff_str_lines.append(f"-{key}")
+            else:
+                diff_items.append(key)
+                diff_str_lines.append(f"+{key}")
+
+        if diff_items:
+            return ModelDiff(DiffType.ARCH_DIFF, same_items, diff_items, '\n'.join(diff_str_lines))
+
+        diff_str_lines = []
+
+        # Check if the weights are the same
+        for key in self.model.params.keys():
+            for subkey in self.model.params[key].keys():
+                if not jnp.array_equal(self.model.params[key][subkey], other.model.params[key][subkey]):
+                    diff_items.append((key, subkey))
+                    diff_str_lines.append(f"±{key}/{subkey}")
+                else:
+                    same_items.append((key, subkey))
+                    diff_str_lines.append(f" {key}/{subkey}")
+
+        if diff_items:
+            return ModelDiff(DiffType.WEIGHT_DIFF, same_items, diff_items, '\n'.join(diff_str_lines))
+        else:
+            return ModelDiff(DiffType.NO_DIFF, same_items, diff_items, None)
