@@ -325,13 +325,14 @@ def generateModel(name: str, maxLength: int) -> Model:
             inputs = {t for t in acceptedNamesAndInput[name]}
             model = Model(lib.make_sort(rasp.tokens, rasp.tokens, max_seq_len=maxLength, min_key=min(inputs)), inputs, maxLength, name)
 
-        case "most-freq":
-            inputs = {t for t in acceptedNamesAndInput[name]}
-            model = Model(lib.make_sort_freq(maxLength), inputs, maxLength, name)
+        # HACK: We need to canonicalize the program names
+        case "most-freq" | "most_freq":
+            inputs = {t for t in acceptedNamesAndInput["most-freq"]}
+            model = Model(lib.make_sort_freq(maxLength), inputs, maxLength, "most-freq")
 
-        case "shuffle_dyck1":
-            inputs = {t for t in acceptedNamesAndInput[name]}
-            model = Model(lib.make_shuffle_dyck(["()"]), inputs, maxLength, name)
+        case "shuffle_dyck" | "shuffle_dyck1":
+            inputs = {t for t in acceptedNamesAndInput["shuffle_dyck1"]}
+            model = Model(lib.make_shuffle_dyck(["()"]), inputs, maxLength, "shuffle_dyck1")
         
         case "shuffle_dyck2":
             inputs = {t for t in acceptedNamesAndInput[name]}
