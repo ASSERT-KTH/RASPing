@@ -16,3 +16,4 @@ click==8.1.8
 parso==0.8.4
 cosmic-ray==8.4.1
 toml==0.10.2
+pytest==8.3.4
