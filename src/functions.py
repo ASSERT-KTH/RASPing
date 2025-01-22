@@ -1,3 +1,4 @@
+from typing import Counter
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -32,15 +33,13 @@ def generateData(name: str, maxSeqLength: int, size: int, removeDuplicates = Fal
             acceptedTokens = acceptedNamesAndInput[name]
 
             for i in range(size):
-                inputLength = np.random.randint(2, maxSeqLength+1)  #Uniformly distributed between 2 and max length
+                inputLength = np.random.randint(2, maxSeqLength + 1)  # Uniformly distributed between 2 and max length
 
-                inputSeq = []
-                outputSeq = []
-                for t in np.random.choice(acceptedTokens, inputLength):
-                    inputSeq.append(t)
-                    outputSeq.insert(0,t)
-                inputSeq.insert(0,"BOS")
-                outputSeq.insert(0,"BOS")
+                inputSeq = list(np.random.choice(acceptedTokens, inputLength))
+                outputSeq = inputSeq[::-1]
+
+                inputSeq.insert(0, "BOS")
+                outputSeq.insert(0, "BOS")
 
                 data[i] = (inputSeq, outputSeq)
 
@@ -48,20 +47,13 @@ def generateData(name: str, maxSeqLength: int, size: int, removeDuplicates = Fal
             acceptedTokens = acceptedNamesAndInput[name]  
             
             for i in range(size):
-                inputLength = np.random.randint(2, maxSeqLength+1)  #Uniformly distributed between 2 and max length
+                inputLength = np.random.randint(2, maxSeqLength + 1)
+                inputSeq = np.random.choice(acceptedTokens, inputLength).tolist()
+                tokenCounts = Counter(inputSeq)
+                outputSeq = [tokenCounts[t] for t in inputSeq]
 
-                inputSeq = []
-                tokenCounter = dict(zip(acceptedTokens, [0]*len(acceptedTokens)))   #Counter built during generating input
-                for t in np.random.choice(acceptedTokens, inputLength):
-                    inputSeq.append(t)
-                    tokenCounter[t]+=1
-    
-                outputSeq = []
-                for t in inputSeq:  #Fill output according to token counter
-                    outputSeq.append(tokenCounter[t])
-
-                inputSeq.insert(0,"BOS")
-                outputSeq.insert(0,"BOS")
+                inputSeq.insert(0, "BOS")
+                outputSeq.insert(0, "BOS")
 
                 data[i] = (inputSeq, outputSeq)
 
@@ -69,49 +61,33 @@ def generateData(name: str, maxSeqLength: int, size: int, removeDuplicates = Fal
             acceptedTokens = acceptedNamesAndInput[name]  
             
             for i in range(size):
-                inputLength = np.random.randint(2, maxSeqLength+1)  #Uniformly distributed between 2 and max length
-
-                inputSeq = []
-                outputSeq = []
-                for t in np.random.choice(acceptedTokens, inputLength):
-                    inputSeq.append(t)
-                    outputSeq.append(t)
-    
-                inputSeq.insert(0,"BOS")
-                outputSeq.sort()
-                outputSeq.insert(0,"BOS")
-
-                data[i] = (inputSeq, outputSeq)
+                input_length = np.random.randint(2, maxSeqLength + 1)
+                input_seq = list(np.random.choice(acceptedTokens, input_length))
+                output_seq = sorted(input_seq)
+                
+                data[i] = (["BOS"] + input_seq, ["BOS"] + output_seq)
 
         case "most-freq":   #sort based on most frequent token with original position as tie breaker
+            #Groups the tokens (Apparently not done by the Tracr solution)
+            """
+            outputSeq = []
+            for t in tempSeq:
+                if t not in outputSeq:
+                    for ii in range(tokenCounter[t]):
+                        outputSeq.append(t)
+            """
+
             acceptedTokens = acceptedNamesAndInput[name]  
 
             for i in range(size):
-                inputLength = np.random.randint(2, maxSeqLength+1)  #Uniformly distributed between 2 and max length
+                inputLength = np.random.randint(2, maxSeqLength + 1)  # Uniformly distributed between 2 and max length
 
-                inputSeq = []
-                tempSeq = []
-                tokenCounter = dict(zip(acceptedTokens, [0]*len(acceptedTokens)))   #Counter built during generating input
-                for t in np.random.choice(acceptedTokens, inputLength):
-                    inputSeq.append(t)
-                    tokenCounter[t]+=1
-                    tempSeq.append(t)    
-                
-                tempSeq.sort(key = (lambda x: -tokenCounter[x]))  #Sort the list in descending order of frequency
+                inputSeq = list(np.random.choice(acceptedTokens, inputLength))
+                tokenCounts = Counter(inputSeq)
+                outputSeq = sorted(inputSeq, key=lambda x: -tokenCounts[x])
 
-                outputSeq = tempSeq
-
-                #Groups the tokens (Apparently not done by the Tracr solution)
-                """
-                outputSeq = []
-                for t in tempSeq:
-                    if t not in outputSeq:
-                        for ii in range(tokenCounter[t]):
-                            outputSeq.append(t)
-                """
-
-                inputSeq.insert(0,"BOS")
-                outputSeq.insert(0,"BOS")
+                inputSeq.insert(0, "BOS")
+                outputSeq.insert(0, "BOS")
 
                 data[i] = (inputSeq, outputSeq)
 
