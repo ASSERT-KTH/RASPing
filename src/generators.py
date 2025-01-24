@@ -1,6 +1,7 @@
 from typing import Counter
 import numpy as np
 from collections import Counter
+import itertools
 
 
 def generate_reverse(acceptedTokens, maxSeqLength):
@@ -225,11 +226,143 @@ def generate_shuffle_dyck2(acceptedTokens, maxSeqLength):
     return (inputSeq, outputSeq)
 
 
+def generate_reverse_exhaustive(acceptedTokens, maxSeqLength):
+    all_pairs = []
+    for length in range(2, maxSeqLength + 1):
+        # Generate all possible combinations for current length
+        for seq in itertools.product(acceptedTokens, repeat=length):
+            inputSeq = list(seq)
+            outputSeq = inputSeq[::-1]
+
+            # Add BOS token
+            inputSeq.insert(0, "BOS")
+            outputSeq.insert(0, "BOS")
+
+            all_pairs.append((inputSeq, outputSeq))
+
+    return all_pairs
+
+
+def generate_hist_exhaustive(acceptedTokens, maxSeqLength):
+    all_pairs = []
+    for length in range(2, maxSeqLength + 1):
+        for seq in itertools.product(acceptedTokens, repeat=length):
+            inputSeq = list(seq)
+            tokenCounts = Counter(inputSeq)
+            outputSeq = [tokenCounts[t] for t in inputSeq]
+
+            inputSeq.insert(0, "BOS")
+            outputSeq.insert(0, "BOS")
+
+            all_pairs.append((inputSeq, outputSeq))
+
+    return all_pairs
+
+
+def generate_sort_exhaustive(acceptedTokens, maxSeqLength):
+    all_pairs = []
+    for length in range(2, maxSeqLength + 1):
+        for seq in itertools.product(acceptedTokens, repeat=length):
+            inputSeq = list(seq)
+            outputSeq = sorted(inputSeq)
+
+            inputSeq.insert(0, "BOS")
+            outputSeq.insert(0, "BOS")
+
+            all_pairs.append((inputSeq, outputSeq))
+
+    return all_pairs
+
+
+def generate_most_freq_exhaustive(acceptedTokens, maxSeqLength):
+    all_pairs = []
+    for length in range(2, maxSeqLength + 1):
+        for seq in itertools.product(acceptedTokens, repeat=length):
+            inputSeq = list(seq)
+            tokenCounts = Counter(inputSeq)
+            outputSeq = sorted(inputSeq, key=lambda x: (-tokenCounts[x], x))
+
+            inputSeq.insert(0, "BOS")
+            outputSeq.insert(0, "BOS")
+
+            all_pairs.append((inputSeq, outputSeq))
+
+    return all_pairs
+
+
+def generate_shuffle_dyck1_exhaustive(acceptedTokens, maxSeqLength):
+    all_pairs = []
+    for length in range(
+        2, maxSeqLength + 1, 2
+    ):  # Only even lengths for balanced sequences
+        for seq in itertools.product(["(", ")"], repeat=length):
+            # Check if sequence is balanced
+            balance = 0
+            valid = True
+            for t in seq:
+                balance += 1 if t == "(" else -1
+                if balance < 0:
+                    valid = False
+                    break
+
+            if valid and balance == 0:
+                inputSeq = list(seq)
+                outputSeq = [1] * len(inputSeq)  # All 1s for balanced sequence
+
+                inputSeq.insert(0, "BOS")
+                outputSeq.insert(0, "BOS")
+
+                all_pairs.append((inputSeq, outputSeq))
+
+    return all_pairs
+
+
+def generate_shuffle_dyck2_exhaustive(acceptedTokens, maxSeqLength):
+    all_pairs = []
+    for length in range(
+        2, maxSeqLength + 1, 2
+    ):  # Only even lengths for balanced sequences
+        for seq in itertools.product(["(", ")", "{", "}"], repeat=length):
+            # Check if sequence is balanced for both types of brackets
+            balance1 = balance2 = 0
+            valid = True
+            for t in seq:
+                if t == "(":
+                    balance1 += 1
+                elif t == ")":
+                    balance1 -= 1
+                elif t == "{":
+                    balance2 += 1
+                else:  # t == '}'
+                    balance2 -= 1
+
+                if balance1 < 0 or balance2 < 0:
+                    valid = False
+                    break
+
+            if valid and balance1 == 0 and balance2 == 0:
+                inputSeq = list(seq)
+                outputSeq = [1] * len(inputSeq)  # All 1s for balanced sequence
+
+                inputSeq.insert(0, "BOS")
+                outputSeq.insert(0, "BOS")
+
+                all_pairs.append((inputSeq, outputSeq))
+
+    return all_pairs
+
+
 GENERATORS = {
     "reverse": generate_reverse,
+    "reverse_exhaustive": generate_reverse_exhaustive,
     "hist": generate_hist,
+    "hist_exhaustive": generate_hist_exhaustive,
     "sort": generate_sort,
+    "sort_exhaustive": generate_sort_exhaustive,
     "most-freq": generate_most_freq,
+    "most-freq_exhaustive": generate_most_freq_exhaustive,
     "shuffle_dyck1": generate_shuffle_dyck1,
+    "shuffle_dyck1_exhaustive": generate_shuffle_dyck1_exhaustive,
     "shuffle_dyck2": generate_shuffle_dyck2,
+    "shuffle_dyck2_exhaustive": generate_shuffle_dyck2_exhaustive,
 }
