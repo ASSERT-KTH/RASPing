@@ -17,3 +17,5 @@ parso==0.8.4
 cosmic-ray==8.4.1
 toml==0.10.2
 pytest==8.3.4
+python-dotenv==1.0.1
+backoff==2.2.1
