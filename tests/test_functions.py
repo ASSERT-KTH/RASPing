@@ -1,5 +1,12 @@
 import pytest
-from ..src.functions import generateData, generateModel, getAcceptedNamesAndInput
+import tempfile
+from src.functions import (
+    generateData,
+    generateModel,
+    getAcceptedNamesAndInput,
+    set_cache_dir,
+)
+from pathlib import Path
 
 ACCEPTED_NAMES = list(getAcceptedNamesAndInput().keys())
 TEST_SIZE = 50_000
@@ -10,6 +17,14 @@ MAX_SEQ_LENGTH = 10
 @pytest.fixture
 def program_names():
     return ACCEPTED_NAMES
+
+
+@pytest.fixture(autouse=True)
+def temp_cache_dir():
+    """Create a temporary directory for cache during tests"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        set_cache_dir(tmpdir)
+        yield tmpdir
 
 
 @pytest.mark.parametrize("name", ACCEPTED_NAMES)
@@ -68,6 +83,41 @@ def test_data_uniqueness():
     assert len(data_unique) == len(data_unique_set)
     # Check that unique data might be smaller than requested size due to duplicates
     assert len(data_unique) <= SMALL_TEST_SIZE
+
+
+@pytest.mark.parametrize("name", ACCEPTED_NAMES)
+def test_exhaustive_generation(name, temp_cache_dir):
+    """Test exhaustive data generation and caching"""
+    # Test with small max length to keep test runtime reasonable
+    small_max_length = 3
+
+    # Generate exhaustive data
+    data1 = generateData(name, small_max_length, size=1000, exhaustive=True)
+
+    # Verify data is cached
+    cache_path = Path(temp_cache_dir) / f"{name}_maxlen{small_max_length}.jsonl"
+    assert cache_path.exists(), "Cache file was not created"
+
+    # Load from cache and verify it matches
+    data2 = generateData(name, small_max_length, size=1000, exhaustive=True)
+    assert len(data1) == len(data2), "Cached data length mismatch"
+
+    # Verify all sequences are within length bounds
+    for input_seq, output_seq in data1:
+        assert len(input_seq) <= small_max_length + 1  # +1 for BOS token
+        assert len(output_seq) <= small_max_length + 1
+        assert input_seq[0] == "BOS"
+        assert output_seq[0] == "BOS"
+
+
+@pytest.mark.parametrize("name", ACCEPTED_NAMES)
+def test_exhaustive_size_limit(name):
+    """Test that size parameter works with exhaustive data"""
+    max_length = 3
+    size = 2
+
+    data = generateData(name, max_length, size=size, exhaustive=True)
+    assert len(data) <= size, f"Generated data exceeds requested size {size}"
 
 
 if __name__ == "__main__":
