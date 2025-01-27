@@ -1,19 +1,54 @@
-from typing import Counter
-import jax
+import math
 import jax.numpy as jnp
-import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
+import json
+from pathlib import Path
 
-from tracr.compiler import compiling
 from tracr.compiler import lib
 from tracr.rasp import rasp
 
-from ..experiments.mutation.load_mutations import load_buggy_models
+# Change relative import to absolute
+from experiments.mutation.load_mutations import load_buggy_models
 
-from .model import Model
-from .generators import GENERATORS
+from src.model import Model
+from src.generators import GENERATORS
 import time
+
+# Default cache directory
+CACHE_DIR = Path("data/exhaustive")
+
+
+def set_cache_dir(path: str | Path) -> None:
+    """Set the directory to use for caching exhaustive data."""
+    global CACHE_DIR
+    CACHE_DIR = Path(path)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _get_cache_path(name: str, maxSeqLength: int) -> Path:
+    """Get the path for cached exhaustive data."""
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return CACHE_DIR / f"{name}_maxlen{maxSeqLength}.jsonl"
+
+
+def _save_exhaustive_data(data, cache_path: Path):
+    """Save exhaustive data to cache in JSONL format."""
+    with open(cache_path, "w") as f:
+        for pair in data:
+            # Convert input/output sequences to JSON-serializable format
+            entry = {"input": pair[0], "output": pair[1]}
+            f.write(json.dumps(entry) + "\n")
+
+
+def _load_exhaustive_data(cache_path: Path):
+    """Load exhaustive data from JSONL cache."""
+    data = []
+    with open(cache_path, "r") as f:
+        for line in f:
+            entry = json.loads(line)
+            # Convert back to tuple format
+            data.append((entry["input"], entry["output"]))
+    return data
 
 
 # Return all the accepted model names and their corresponding accepted inputs
@@ -48,7 +83,12 @@ def getAcceptedNamesAndInput():
 
 # Generate a data set based on "name" with "size" samples and a max sequence length of "maxSeqLength"
 def generateData(
-    name: str, maxSeqLength: int, size: int, removeDuplicates=False, timeout=10
+    name: str,
+    maxSeqLength: int,
+    size: int = math.inf,
+    removeDuplicates=False,
+    timeout=10,
+    exhaustive=False,
 ):
     acceptedNamesAndInput = getAcceptedNamesAndInput()
 
@@ -57,6 +97,18 @@ def generateData(
             f"{name} is not an accepted name. The accepted names are {acceptedNamesAndInput}"
         )
         return None
+
+    if exhaustive:
+        cache_path = _get_cache_path(name, maxSeqLength)
+        if cache_path.exists():
+            data = _load_exhaustive_data(cache_path)
+            return data[:size] if size < len(data) else data
+
+        generator = GENERATORS[f"{name}_exhaustive"]
+        acceptedTokens = acceptedNamesAndInput[name]
+        data = generator(acceptedTokens, maxSeqLength)
+        _save_exhaustive_data(data, cache_path)
+        return data[:size] if size < len(data) else data
 
     generator = GENERATORS[name]
     acceptedTokens = acceptedNamesAndInput[name]
