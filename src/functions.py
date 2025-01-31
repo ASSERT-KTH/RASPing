@@ -1,7 +1,9 @@
 import math
 import jax.numpy as jnp
+import numpy as np
 import pandas as pd
 import json
+import random
 from pathlib import Path
 
 from tracr.compiler import lib
@@ -13,42 +15,6 @@ from experiments.mutation.load_mutations import load_buggy_models
 from src.model import Model
 from src.generators import GENERATORS
 import time
-
-# Default cache directory
-CACHE_DIR = Path("data/exhaustive")
-
-
-def set_cache_dir(path: str | Path) -> None:
-    """Set the directory to use for caching exhaustive data."""
-    global CACHE_DIR
-    CACHE_DIR = Path(path)
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def _get_cache_path(name: str, maxSeqLength: int) -> Path:
-    """Get the path for cached exhaustive data."""
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    return CACHE_DIR / f"{name}_maxlen{maxSeqLength}.jsonl"
-
-
-def _save_exhaustive_data(data, cache_path: Path):
-    """Save exhaustive data to cache in JSONL format."""
-    with open(cache_path, "w") as f:
-        for pair in data:
-            # Convert input/output sequences to JSON-serializable format
-            entry = {"input": pair[0], "output": pair[1]}
-            f.write(json.dumps(entry) + "\n")
-
-
-def _load_exhaustive_data(cache_path: Path):
-    """Load exhaustive data from JSONL cache."""
-    data = []
-    with open(cache_path, "r") as f:
-        for line in f:
-            entry = json.loads(line)
-            # Convert back to tuple format
-            data.append((entry["input"], entry["output"]))
-    return data
 
 
 # Return all the accepted model names and their corresponding accepted inputs
@@ -99,15 +65,9 @@ def generateData(
         return None
 
     if exhaustive:
-        cache_path = _get_cache_path(name, maxSeqLength)
-        if cache_path.exists():
-            data = _load_exhaustive_data(cache_path)
-            return data[:size] if size < len(data) else data
-
         generator = GENERATORS[f"{name}_exhaustive"]
         acceptedTokens = acceptedNamesAndInput[name]
         data = generator(acceptedTokens, maxSeqLength)
-        _save_exhaustive_data(data, cache_path)
         return data[:size] if size < len(data) else data
 
     generator = GENERATORS[name]
@@ -379,3 +339,77 @@ def checkDyckBalance(data):
     print("Percentage of data which is:")
     print("Of odd length:", oddLength)
     print("Balanced:", balanced)
+
+
+def load_dataset(data_dir: str | Path, program_name: str, split_name: str = "train"):
+    """Load a dataset from a JSONL file.
+
+    Args:
+        data_dir: Directory containing the dataset files
+        program_name: Name of the program (e.g., 'reverse', 'sort')
+        split_name: Which split to load ('train', 'val', or 'test')
+
+    Returns:
+        List of (input_seq, output_seq) tuples
+    """
+    data_path = Path(data_dir) / f"{program_name}_{split_name}.jsonl"
+    if not data_path.exists():
+        raise FileNotFoundError(f"Dataset file not found: {data_path}")
+
+    data = []
+    with open(data_path) as f:
+        for line in f:
+            sample = json.loads(line)
+            data.append((sample["input"], sample["output"]))
+    return data
+
+
+def split_train_val_test(data, train_pct=0.8, val_pct=0.1):
+    """Split data into train, validation and test sets.
+
+    Args:
+        data: List of data samples
+        train_pct: Percentage of data for training (default: 0.8)
+        val_pct: Percentage of data for validation (default: 0.1)
+
+    Returns:
+        Tuple of (train_data, val_data, test_data)
+    """
+    # Convert to list and shuffle deterministically
+    random.seed(42)
+    data = list(data)
+    random.shuffle(data)
+
+    # Calculate split indices
+    total = len(data)
+    train_idx = int(train_pct * total)
+    val_idx = int((train_pct + val_pct) * total)
+
+    return (data[:train_idx], data[train_idx:val_idx], data[val_idx:])
+
+
+def save_dataset(data_dir: str | Path, program_name: str, split_name: str, data):
+    """Save dataset samples to a JSONL file.
+
+    Args:
+        data_dir: Directory containing the dataset files
+        program_name: Name of the program (e.g., 'reverse', 'sort')
+        split_name: Which split to save ('train', 'val', or 'test')
+        data: List of (input_seq, output_seq) tuples
+    """
+    data_dir = Path(data_dir)
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    output_path = data_dir / f"{program_name}_{split_name}.jsonl"
+    with open(output_path, "w") as f:
+        for input_seq, output_seq in data:
+            entry = {"input": input_seq, "output": output_seq}
+            json.dump(entry, f, cls=CustomJSONEncoder)
+            f.write("\n")
+
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        return super().default(obj)
