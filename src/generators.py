@@ -292,9 +292,7 @@ def generate_most_freq_exhaustive(acceptedTokens, maxSeqLength):
 
 def generate_shuffle_dyck1_exhaustive(acceptedTokens, maxSeqLength):
     all_pairs = []
-    for length in range(
-        2, maxSeqLength + 1, 2
-    ):  # Only even lengths for balanced sequences
+    for length in range(2, maxSeqLength + 1):  # Allow all lengths
         for seq in itertools.product(["(", ")"], repeat=length):
             # Check if sequence is balanced
             balance = 0
@@ -305,23 +303,21 @@ def generate_shuffle_dyck1_exhaustive(acceptedTokens, maxSeqLength):
                     valid = False
                     break
 
-            if valid and balance == 0:
-                inputSeq = list(seq)
-                outputSeq = [1] * len(inputSeq)  # All 1s for balanced sequence
+            inputSeq = list(seq)
+            # Set output to 1s only if sequence is valid and balanced, otherwise 0s
+            outputSeq = [1 if valid and balance == 0 else 0] * len(inputSeq)
 
-                inputSeq.insert(0, "BOS")
-                outputSeq.insert(0, "BOS")
+            inputSeq.insert(0, "BOS")
+            outputSeq.insert(0, "BOS")
 
-                all_pairs.append((inputSeq, outputSeq))
+            all_pairs.append((inputSeq, outputSeq))
 
     return all_pairs
 
 
 def generate_shuffle_dyck2_exhaustive(acceptedTokens, maxSeqLength):
     all_pairs = []
-    for length in range(
-        2, maxSeqLength + 1, 2
-    ):  # Only even lengths for balanced sequences
+    for length in range(2, maxSeqLength + 1):  # Allow all lengths
         for seq in itertools.product(["(", ")", "{", "}"], repeat=length):
             # Check if sequence is balanced for both types of brackets
             balance1 = balance2 = 0
@@ -340,14 +336,16 @@ def generate_shuffle_dyck2_exhaustive(acceptedTokens, maxSeqLength):
                     valid = False
                     break
 
-            if valid and balance1 == 0 and balance2 == 0:
-                inputSeq = list(seq)
-                outputSeq = [1] * len(inputSeq)  # All 1s for balanced sequence
+            inputSeq = list(seq)
+            # Set output to 1s only if sequence is valid and both balances are 0
+            outputSeq = [1 if valid and balance1 == 0 and balance2 == 0 else 0] * len(
+                inputSeq
+            )
 
-                inputSeq.insert(0, "BOS")
-                outputSeq.insert(0, "BOS")
+            inputSeq.insert(0, "BOS")
+            outputSeq.insert(0, "BOS")
 
-                all_pairs.append((inputSeq, outputSeq))
+            all_pairs.append((inputSeq, outputSeq))
 
     return all_pairs
 
