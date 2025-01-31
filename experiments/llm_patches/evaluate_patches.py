@@ -6,12 +6,11 @@ from dataclasses import dataclass
 from typing import Dict, Any, Optional
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
+import numpy as np
 
 import re
-import os
 import sys
 import ast
-import json
 
 module_paths = [
     str(Path(Path(__file__).parent.resolve(), "..", "..").resolve().absolute())
@@ -187,27 +186,129 @@ def evaluate_patches_for_mutation(
     }
 
 
+def pass_at_k(n: int, c: int, k: int):
+    """Compute pass@k metric.
+
+    Args:
+        n: total number of samples
+        c: number of correct samples
+        k: k in pass@k
+    """
+    if n - c < k:
+        return 1.0
+    else:
+        return 1.0 - np.prod(1.0 - k / np.arange(n - c + 1, n + 1))
+
+
+def generate_program_summary(
+    results_dir: Path, program_name: str, output_file: Path
+) -> None:
+    """Generate a summary of all mutation results for a specific program."""
+    program_results = []
+    for result_file in results_dir.glob(f"{program_name}_*.jsonl"):
+        mutation_result = next(stream_jsonl(str(result_file)))
+        program_results.append(mutation_result)
+
+    total_mutations = len(program_results)
+    fixed_mutations = sum(
+        1
+        for result in program_results
+        if any(patch["passed"] for patch in result["patch_results"])
+    )
+
+    # Count total patches and correct patches across all mutations
+    total_patches = sum(len(result["patch_results"]) for result in program_results)
+    correct_patches = sum(
+        sum(1 for patch in result["patch_results"] if patch["passed"])
+        for result in program_results
+    )
+
+    # Calculate pass@1 using total numbers
+    pass_at_1 = pass_at_k(total_patches, correct_patches, 1)
+
+    summary = {
+        "program_name": program_name,
+        "total_mutations": total_mutations,
+        "fixed_mutations": fixed_mutations,
+        "total_patches": total_patches,
+        "correct_patches": correct_patches,
+        "pass_at_1": pass_at_1,
+    }
+    write_jsonl(str(output_file), [summary])
+
+
+def generate_overall_summary(summaries_dir: Path, output_file: Path) -> None:
+    """Generate an overall summary of all program results."""
+    program_summaries = []
+    for summary_file in summaries_dir.glob("*_summary.jsonl"):
+        program_summary = next(stream_jsonl(str(summary_file)))
+        program_summaries.append(program_summary)
+
+    total_mutations = sum(summary["total_mutations"] for summary in program_summaries)
+    total_fixed = sum(summary["fixed_mutations"] for summary in program_summaries)
+
+    # Sum all patches and correct patches across all programs
+    total_patches = sum(summary["total_patches"] for summary in program_summaries)
+    total_correct = sum(summary["correct_patches"] for summary in program_summaries)
+
+    # Calculate overall pass@1
+    pass_at_1 = pass_at_k(total_patches, total_correct, 1)
+
+    overall_summary = {
+        "total_programs": len(program_summaries),
+        "total_mutations": total_mutations,
+        "total_fixed_mutations": total_fixed,
+        "total_patches": total_patches,
+        "correct_patches": total_correct,
+        "pass_at_1": pass_at_1,
+    }
+    write_jsonl(str(output_file), [overall_summary])
+
+
 def evaluate_all_patches(
-    patches_dir: str, output_file: str, max_length: int = 10
+    patches_dir: str, output_dir: str, max_length: int = 10
 ) -> None:
     """Evaluate all patches and compute aggregate metrics.
 
     Args:
         patches_dir: Directory containing patch JSON files
-        output_file: Path to save evaluation results
+        output_dir: Directory to save evaluation results
         max_length: Maximum sequence length for testing
     """
     patches_path = Path(patches_dir)
+    output_path = Path(output_dir)
+    results_dir = output_path / "mutation_results"
+    summaries_dir = output_path / "program_summaries"
+
+    # Create necessary directories
+    results_dir.mkdir(parents=True, exist_ok=True)
+    summaries_dir.mkdir(parents=True, exist_ok=True)
+
     patch_files = list(patches_path.glob("*.jsonl"))
-    results = []
+    program_results = {}
 
     # Process patch files sequentially but parallelize patch evaluation within each file
     for patch_file in tqdm(patch_files, desc="Processing patch files"):
         result = evaluate_patches_for_mutation(patch_file, max_length)
-        results.append(result)
+        program_name = result["program_name"]
 
-    # Save results as JSONL
-    write_jsonl(output_file, [{"individual_results": results}])
+        # Save individual mutation result
+        output_file = results_dir / f"{program_name}_{result['job_id']}.jsonl"
+        write_jsonl(str(output_file), [result])
+
+        # Collect results by program
+        if program_name not in program_results:
+            program_results[program_name] = []
+        program_results[program_name].append(result)
+
+    # Generate program summaries
+    for program_name in program_results:
+        summary_file = summaries_dir / f"{program_name}_summary.jsonl"
+        generate_program_summary(results_dir, program_name, summary_file)
+
+    # Generate overall summary
+    overall_summary_file = output_path / "overall_summary.jsonl"
+    generate_overall_summary(summaries_dir, overall_summary_file)
 
 
 if __name__ == "__main__":
@@ -220,9 +321,9 @@ if __name__ == "__main__":
         help="Directory containing patch JSON files",
     )
     parser.add_argument(
-        "--output-file",
-        default=str(Path(__file__).parent / "evaluation_results.json"),
-        help="Path to save evaluation results",
+        "--output-dir",
+        default=str(Path(__file__).parent / "evaluation_results"),
+        help="Directory to save evaluation results",
     )
     parser.add_argument(
         "--max-length", type=int, default=10, help="Maximum sequence length for testing"
@@ -231,6 +332,6 @@ if __name__ == "__main__":
 
     evaluate_all_patches(
         patches_dir=args.patches_dir,
-        output_file=args.output_file,
+        output_dir=args.output_dir,
         max_length=args.max_length,
     )
