@@ -86,8 +86,7 @@ def evaluate_patch(patch: str, program_name: str, max_length: int) -> Evaluation
             test_data = load_dataset(root_dir / "data", program_name_key, "test")
 
             # Test the model on actual test data
-            # accuracy = model.evaluateModel(test_data, doPrint=False, outputArray=False)
-            accuracy = 1.0
+            accuracy = model.evaluateModel(test_data, doPrint=False, outputArray=False)
             return EvaluationResult(passed=accuracy == 1.0, accuracy=accuracy)
 
         except Exception as e:
