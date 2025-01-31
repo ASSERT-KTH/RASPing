@@ -10,6 +10,7 @@ from tqdm import tqdm
 import click
 from dotenv import load_dotenv
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 # Load environment variables
 load_dotenv()
@@ -22,6 +23,7 @@ if module_paths not in sys.path:
 
 from experiments.mutation.load_mutations import load_mutation
 from experiments.llm_patches.prompts import build_prompt
+from src.jsonl import write_jsonl
 
 
 class OpenRouterClient:
@@ -59,6 +61,9 @@ def generate_patches_for_mutation(
     api_key: str,
     mutation: Dict[str, Any],
     n_patches: int = 1,
+    model_name: str = "deepseek/deepseek-r1",
+    provider: str = "DeepSeek",
+    temperature: float = 0.2,
 ) -> list[Dict[str, Any]]:
     """Generate patches for a single mutation using the OpenRouter API."""
     prompt = build_prompt(
@@ -70,12 +75,13 @@ def generate_patches_for_mutation(
     for _ in range(n_patches):
         try:
             response = client._completions_with_backoff(
-                model="deepseek/deepseek-r1",
+                model=model_name,
                 messages=[{"role": "user", "content": prompt}],
+                temperature=temperature,
                 provider={
-                    "require_parameters": True,
+                    "require_parameters": False,
                     "allow_fallbacks": False,
-                    "order": ["DeepSeek"],
+                    "order": [provider],
                 },
                 include_reasoning=True,
             )
@@ -87,6 +93,48 @@ def generate_patches_for_mutation(
     return responses
 
 
+def process_single_mutation(args):
+    """Process a single mutation with its arguments."""
+    (
+        idx,
+        mutation,
+        api_key,
+        n_patches,
+        output_path,
+        model_name,
+        provider,
+        temperature,
+    ) = args
+    result = generate_patches_for_mutation(
+        api_key,
+        mutation,
+        n_patches,
+        model_name=model_name,
+        provider=provider,
+        temperature=temperature,
+    )
+
+    # Save results immediately after generation as JSONL
+    output_file = output_path / f"{mutation['program_name']}_{mutation['job_id']}.jsonl"
+    write_jsonl(
+        str(output_file),
+        [
+            {
+                "mutation_id": idx,
+                "program_name": mutation["program_name"],
+                "job_id": mutation["job_id"],
+                "responses": result,
+                "prompt": build_prompt(mutation["program_source_after"]),
+                "model_name": model_name,
+                "provider": provider,
+                "temperature": temperature,
+            }
+        ],
+    )
+
+    return idx, result
+
+
 def generate_all_patches(
     mutation_path: str,
     output_dir: str,
@@ -94,33 +142,45 @@ def generate_all_patches(
     n_patches: int = 1,
     program_name: str = None,
     job_id: str = None,
+    model_name: str = "deepseek/deepseek-r1",
+    provider: str = "DeepSeek",
+    temperature: float = 0.2,
 ) -> None:
     """Generate patches for all mutations matching the filters."""
     mutations = load_mutation(mutation_path, program_name, job_id)
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    results = []
-    for idx, mutation in tqdm(mutations.items()):
-        result = generate_patches_for_mutation(api_key, mutation, n_patches)
-        results.append(result)
-
-        # Save results immediately after generation
-        output_file = (
-            output_path / f"{mutation['program_name']}_{mutation['job_id']}.json"
+    # Prepare arguments for parallel processing
+    args_list = [
+        (
+            idx,
+            mutation,
+            api_key,
+            n_patches,
+            output_path,
+            model_name,
+            provider,
+            temperature,
         )
-        with open(output_file, "w") as f:
-            json.dump(
-                {
-                    "mutation_id": idx,
-                    "program_name": mutation["program_name"],
-                    "job_id": mutation["job_id"],
-                    "responses": result,
-                    "prompt": build_prompt(mutation["program_source_after"]),
-                },
-                f,
-                indent=2,
+        for idx, mutation in mutations.items()
+    ]
+
+    # Use ThreadPoolExecutor for parallel processing
+    # Number of workers is min of CPU count and number of mutations
+    max_workers = min(len(args_list), os.cpu_count() or 1)
+
+    results = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Use tqdm to show progress
+        futures = list(
+            tqdm(
+                executor.map(process_single_mutation, args_list),
+                total=len(args_list),
+                desc="Generating patches",
             )
+        )
+        results.extend(futures)
 
 
 @click.command()
@@ -146,8 +206,31 @@ def generate_all_patches(
     default=lambda: str(Path(__file__).parent / "results"),
     help="Directory to save generated patches",
 )
+@click.option(
+    "--model-name",
+    default="deepseek/deepseek-r1",
+    help="Model name to use for generation",
+)
+@click.option(
+    "--provider",
+    default="DeepSeek",
+    help="Provider to use for generation",
+)
+@click.option(
+    "--temperature",
+    default=0.2,
+    help="Temperature for generation",
+    type=float,
+)
 def main(
-    n_patches: int, program_name: str, job_id: str, mutation_path: str, output_dir: str
+    n_patches: int,
+    program_name: str,
+    job_id: str,
+    mutation_path: str,
+    output_dir: str,
+    model_name: str,
+    provider: str,
+    temperature: float,
 ) -> None:
     """Generate patches for mutations using OpenRouter API."""
     # Use API key from environment if not provided via CLI
@@ -164,6 +247,9 @@ def main(
         n_patches=n_patches,
         program_name=program_name,
         job_id=job_id,
+        model_name=model_name,
+        provider=provider,
+        temperature=temperature,
     )
 
 

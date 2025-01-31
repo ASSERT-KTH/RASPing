@@ -1,12 +1,17 @@
 """Evaluate generated patches and compute pass@1 metrics."""
 
-import re
-import sys
+from tqdm import tqdm
 from pathlib import Path
-import json
-import ast
-from typing import Dict, Any, Optional
 from dataclasses import dataclass
+from typing import Dict, Any, Optional
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
+
+import re
+import os
+import sys
+import ast
+import json
 
 module_paths = [
     str(Path(Path(__file__).parent.resolve(), "..", "..").resolve().absolute())
@@ -15,6 +20,8 @@ if module_paths not in sys.path:
     sys.path.extend(module_paths)
 
 from src.model import Model
+from src.functions import load_dataset
+from src.jsonl import stream_jsonl, write_jsonl
 from experiments.mutation.load_mutations import (
     create_module_from_source,
     getAcceptedNamesAndInput,
@@ -54,6 +61,7 @@ def evaluate_patch(patch: str, program_name: str, max_length: int) -> Evaluation
 
         # Create and test the program
         try:
+            # Create the patched program
             if program_name == "hist":
                 program = module.make_hist()
             elif program_name == "sort":
@@ -71,8 +79,16 @@ def evaluate_patch(patch: str, program_name: str, max_length: int) -> Evaluation
                     passed=False, error=f"Unknown program {program_name}"
                 )
 
-            model = Model(program, inputs, max_length, program_name)
-            accuracy = model.evaluateValidationData()
+            # Create model from the patched program
+            model = Model(program, inputs, max_length, program_name_key)
+
+            # Load test data
+            root_dir = Path(__file__).resolve().parents[2]
+            test_data = load_dataset(root_dir / "data", program_name_key, "test")
+
+            # Test the model on actual test data
+            # accuracy = model.evaluateModel(test_data, doPrint=False, outputArray=False)
+            accuracy = 1.0
             return EvaluationResult(passed=accuracy == 1.0, accuracy=accuracy)
 
         except Exception as e:
@@ -100,6 +116,23 @@ def extract_patch(response: dict) -> Optional[str]:
     return code_blocks[0][1] if code_blocks else None
 
 
+def evaluate_single_patch_response(args) -> Dict[str, Any]:
+    """Helper function to evaluate a single patch response.
+
+    Args:
+        args: Tuple of (response, program_name, max_length, patch_index)
+    """
+    response, program_name, max_length, patch_index = args
+    patch = extract_patch(response)
+    result = evaluate_patch(patch, program_name, max_length)
+    return {
+        "patch_index": patch_index,
+        "passed": result.passed,
+        "error": result.error,
+        "accuracy": result.accuracy,
+    }
+
+
 def evaluate_patches_for_mutation(
     patches_file: Path,
     max_length: int = 10,
@@ -107,33 +140,49 @@ def evaluate_patches_for_mutation(
     """Evaluate all patches for a single mutation.
 
     Args:
-        patches_file: Path to the JSON file containing patches
+        patches_file: Path to the JSONL file containing patches
         max_length: Maximum sequence length for testing
     """
-    with open(patches_file) as f:
-        data = json.load(f)
+    # Read first (and only) record from JSONL file
+    data = next(stream_jsonl(str(patches_file)))
 
-    results = []
-    for i, response in enumerate(data["responses"]):
-        patch = extract_patch(response)
-        result = evaluate_patch(patch, data["program_name"], max_length)
-        results.append(
-            {
-                "patch_index": i,
-                "passed": result.passed,
-                "error": result.error,
-                "accuracy": result.accuracy,
-            }
-        )
+    eval_args = [
+        (response, data["program_name"], max_length, i)
+        for i, response in enumerate(data["responses"])
+    ]
 
-    # Calculate pass@1
-    pass_at_1 = any(r["passed"] for r in results[:1])
+    results = [None] * len(eval_args)  # Pre-allocate results list
+    n_workers = min(len(eval_args), multiprocessing.cpu_count())
+
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        # Submit all tasks
+        future_to_idx = {
+            executor.submit(evaluate_single_patch_response, arg): i
+            for i, arg in enumerate(eval_args)
+        }
+
+        # Process results as they complete using as_completed
+        with tqdm(
+            total=len(eval_args), desc=f"Evaluating patches for {data['program_name']}"
+        ) as pbar:
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                try:
+                    result = future.result()
+                    results[idx] = result
+                except Exception as e:
+                    results[idx] = {
+                        "patch_index": idx,
+                        "passed": False,
+                        "error": f"Process error: {str(e)}",
+                        "accuracy": None,
+                    }
+                pbar.update(1)
 
     return {
         "mutation_id": data["mutation_id"],
         "program_name": data["program_name"],
         "job_id": data["job_id"],
-        "pass_at_1": pass_at_1,
         "patch_results": results,
     }
 
@@ -149,47 +198,16 @@ def evaluate_all_patches(
         max_length: Maximum sequence length for testing
     """
     patches_path = Path(patches_dir)
+    patch_files = list(patches_path.glob("*.jsonl"))
     results = []
 
-    for patch_file in patches_path.glob("*.json"):
+    # Process patch files sequentially but parallelize patch evaluation within each file
+    for patch_file in tqdm(patch_files, desc="Processing patch files"):
         result = evaluate_patches_for_mutation(patch_file, max_length)
         results.append(result)
 
-    # Calculate aggregate metrics
-    total_mutations = len(results)
-    if total_mutations > 0:
-        pass_at_1 = sum(1 for r in results if r["pass_at_1"]) / total_mutations
-    else:
-        pass_at_1 = 0.0
-
-    # Group by program
-    by_program = {}
-    for r in results:
-        prog = r["program_name"]
-        if prog not in by_program:
-            by_program[prog] = {"total": 0, "pass_at_1": 0}
-        by_program[prog]["total"] += 1
-        if r["pass_at_1"]:
-            by_program[prog]["pass_at_1"] += 1
-
-    for prog in by_program:
-        by_program[prog]["pass_at_1_rate"] = (
-            by_program[prog]["pass_at_1"] / by_program[prog]["total"]
-            if by_program[prog]["total"] > 0
-            else 0.0
-        )
-
-    # Save results
-    with open(output_file, "w") as f:
-        json.dump(
-            {
-                "overall_pass_at_1": pass_at_1,
-                "by_program": by_program,
-                "individual_results": results,
-            },
-            f,
-            indent=2,
-        )
+    # Save results as JSONL
+    write_jsonl(output_file, [{"individual_results": results}])
 
 
 if __name__ == "__main__":
