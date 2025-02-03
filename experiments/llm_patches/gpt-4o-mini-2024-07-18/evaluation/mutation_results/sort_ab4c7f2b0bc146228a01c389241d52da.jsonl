@@ -1,0 +1,1 @@
+{"mutation_id": 690, "program_name": "sort", "job_id": "ab4c7f2b0bc146228a01c389241d52da", "patch_results": [{"patch_index": 0, "passed": false, "error": "make_sort() missing 2 required positional arguments: 'vals' and 'keys'", "accuracy": null}]}

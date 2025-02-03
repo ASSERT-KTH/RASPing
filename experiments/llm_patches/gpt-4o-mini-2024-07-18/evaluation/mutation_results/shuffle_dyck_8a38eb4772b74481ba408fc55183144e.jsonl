@@ -1,0 +1,1 @@
+{"mutation_id": 307, "program_name": "shuffle_dyck", "job_id": "8a38eb4772b74481ba408fc55183144e", "patch_results": [{"patch_index": 0, "passed": false, "error": "module 'patch_shuffle_dyck' has no attribute 'make_shuffle_dyck'", "accuracy": null}]}
