@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 import json
 from typing import Dict, Any
-import requests
+import openai
 import backoff
 from tqdm import tqdm
 import click
@@ -26,69 +26,39 @@ from experiments.llm_patches.prompts import build_prompt
 from src.jsonl import write_jsonl
 
 
-class OpenRouterClient:
-    def __init__(self, api_key: str):
-        self.openrouter_api_key = api_key
-
-    @backoff.on_exception(
-        backoff.expo,
-        (requests.exceptions.RequestException, json.JSONDecodeError, Exception),
-        max_tries=5,
-        raise_on_giveup=False,
-    )
-    def _completions_with_backoff(self, **kwargs):
-        response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self.openrouter_api_key}",
-                # For including your app on openrouter.ai rankings.
-                "HTTP-Referer": f"https://repairbench.github.io/",
-                # Shows in rankings on openrouter.ai.
-                "X-Title": f"RepairBench",
-            },
-            data=json.dumps(kwargs),
-        )
-
-        response = response.json()
-
-        if "error" in response:
-            raise Exception(response["error"])
-
-        return response
+@backoff.on_exception(
+    backoff.expo,
+    Exception,
+    max_tries=5,
+    raise_on_giveup=False,
+)
+def generate_completion(client, **kwargs):
+    """Generate completion with backoff retry logic."""
+    return client.chat.completions.create(**kwargs)
 
 
 def generate_patches_for_mutation(
     api_key: str,
     mutation: Dict[str, Any],
     n_patches: int = 1,
-    model_name: str = "deepseek/deepseek-r1",
-    provider: str = "DeepSeek",
+    model_name: str = "gpt-4o-mini-2024-07-18",
     temperature: float = 0.2,
 ) -> list[Dict[str, Any]]:
-    """Generate patches for a single mutation using the OpenRouter API."""
+    """Generate patches for a single mutation using the OpenAI API."""
     prompt = build_prompt(
         buggy_program=mutation["program_source_after"],
     )
 
-    client = OpenRouterClient(api_key)
+    client = openai.OpenAI(api_key=api_key)
     responses = []
-    for _ in range(n_patches):
-        try:
-            response = client._completions_with_backoff(
-                model=model_name,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                provider={
-                    "require_parameters": False,
-                    "allow_fallbacks": False,
-                    "order": [provider],
-                },
-                include_reasoning=True,
-            )
-            responses.append(response)
-        except Exception as e:
-            print(f"Failed to generate patch: {str(e)}")
-            responses.append({"error": str(e)})
+    completion = generate_completion(
+        client,
+        model=model_name,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        n=n_patches,
+    )
+    responses.append(completion.to_dict())
 
     return responses
 
@@ -102,7 +72,6 @@ def process_single_mutation(args):
         n_patches,
         output_path,
         model_name,
-        provider,
         temperature,
     ) = args
     result = generate_patches_for_mutation(
@@ -110,7 +79,6 @@ def process_single_mutation(args):
         mutation,
         n_patches,
         model_name=model_name,
-        provider=provider,
         temperature=temperature,
     )
 
@@ -126,7 +94,6 @@ def process_single_mutation(args):
                 "responses": result,
                 "prompt": build_prompt(mutation["program_source_after"]),
                 "model_name": model_name,
-                "provider": provider,
                 "temperature": temperature,
             }
         ],
@@ -142,8 +109,7 @@ def generate_all_patches(
     n_patches: int = 1,
     program_name: str = None,
     job_id: str = None,
-    model_name: str = "deepseek/deepseek-r1",
-    provider: str = "DeepSeek",
+    model_name: str = "gpt-4o-mini-2024-07-18",
     temperature: float = 0.2,
 ) -> None:
     """Generate patches for all mutations matching the filters."""
@@ -160,7 +126,6 @@ def generate_all_patches(
             n_patches,
             output_path,
             model_name,
-            provider,
             temperature,
         )
         for idx, mutation in mutations.items()
@@ -208,13 +173,8 @@ def generate_all_patches(
 )
 @click.option(
     "--model-name",
-    default="deepseek/deepseek-r1",
+    default="gpt-3.5-turbo",
     help="Model name to use for generation",
-)
-@click.option(
-    "--provider",
-    default="DeepSeek",
-    help="Provider to use for generation",
 )
 @click.option(
     "--temperature",
@@ -229,15 +189,14 @@ def main(
     mutation_path: str,
     output_dir: str,
     model_name: str,
-    provider: str,
     temperature: float,
 ) -> None:
-    """Generate patches for mutations using OpenRouter API."""
+    """Generate patches for mutations using OpenAI API."""
     # Use API key from environment if not provided via CLI
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise click.UsageError(
-            "API key must be provided via OPENROUTER_API_KEY environment variable"
+            "API key must be provided via OPENAI_API_KEY environment variable"
         )
 
     generate_all_patches(
@@ -248,7 +207,6 @@ def main(
         program_name=program_name,
         job_id=job_id,
         model_name=model_name,
-        provider=provider,
         temperature=temperature,
     )
 
