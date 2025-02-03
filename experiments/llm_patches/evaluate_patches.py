@@ -43,6 +43,9 @@ def evaluate_patch(patch: str, program_name: str, max_length: int) -> Evaluation
         max_length: Maximum sequence length for the model
     """
     try:
+        # Preprend import in case it is missing
+        patch = f"from tracr.rasp import rasp\n\n{patch}"
+
         # First validate the patch is valid Python code
         ast.parse(patch)
 
@@ -98,10 +101,7 @@ def evaluate_patch(patch: str, program_name: str, max_length: int) -> Evaluation
         return EvaluationResult(passed=False, error=str(e))
 
 
-def extract_patch(response: dict) -> Optional[str]:
-    # Get message from response object
-    message = response["choices"][0]["message"]["content"]
-
+def extract_patch(message: dict) -> Optional[str]:
     # Pattern to match code blocks with or without language specifier
     pattern = re.compile(r"```(\w*)\n([\s\S]*?)\n```")
 
@@ -145,8 +145,8 @@ def evaluate_patches_for_mutation(
     data = next(stream_jsonl(str(patches_file)))
 
     eval_args = [
-        (response, data["program_name"], max_length, i)
-        for i, response in enumerate(data["responses"])
+        (response["message"]["content"], data["program_name"], max_length, i)
+        for i, response in enumerate(data["responses"][0]["choices"])
     ]
 
     results = [None] * len(eval_args)  # Pre-allocate results list

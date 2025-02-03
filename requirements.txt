@@ -19,3 +19,4 @@ toml==0.10.2
 pytest==8.3.4
 python-dotenv==1.0.1
 backoff==2.2.1
+openai==1.61.0
