@@ -411,6 +411,7 @@ Keep in mind:
 - Provide functional, complete Python code, not pseudo-code or placeholders.
 
 Also Note:
+- Do not import rasp. It is already imported. You should also not try to import the rasp components individually.
 - Aggregate functions should always have None as the default (meaning you should leave the default as is.) This is because we want to compile these functions later, which only works with a default of None.
 - Again, do not use any functions from the example without defining them yourself. You cannot assume any function from the examples is already defined.
 - If your `make_x()` functions have additional parameters like `make_x(n)` or `make_x(threshold)`, you should always have a default value like `make_x(threshold = 2)`
@@ -427,4 +428,4 @@ Here is the RASP program that you need to repair:
 
 # Output format
 
-The output should be the complete repaired RASP program, provided inside a Markdown code block.
+The output should be the repaired RASP program, provided inside a Markdown code block.
