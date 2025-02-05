@@ -1,0 +1,1 @@
+{"mutation_id": 155, "program_name": "reverse", "job_id": "d725acb839b946dfa03eadc4d0690d48", "patch_results": [{"patch_index": 0, "passed": false, "error": "make_reverse() missing 1 required positional argument: 'sop'", "accuracy": null}]}

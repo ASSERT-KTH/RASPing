@@ -1,0 +1,1 @@
+{"mutation_id": 313, "program_name": "shuffle_dyck", "job_id": "21228f159cd8486ca478516f2607cfe6", "patch_results": [{"patch_index": 0, "passed": false, "error": "could not broadcast input array from shape (320,101) into shape (320,13)", "accuracy": null}]}

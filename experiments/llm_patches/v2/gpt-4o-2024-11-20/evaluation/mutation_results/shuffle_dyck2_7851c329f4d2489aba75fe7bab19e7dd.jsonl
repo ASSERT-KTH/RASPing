@@ -1,0 +1,1 @@
+{"mutation_id": 488, "program_name": "shuffle_dyck2", "job_id": "7851c329f4d2489aba75fe7bab19e7dd", "patch_results": [{"patch_index": 0, "passed": false, "error": null, "accuracy": 0.9934}]}
