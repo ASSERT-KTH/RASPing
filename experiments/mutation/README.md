@@ -14,7 +14,7 @@ cd operators && pip install -e . && cd ..
 module-path = "source/reverse.py"
 timeout = 10.0
 excluded-modules = []
-test-command = "hammett tests/test_reverse.py"
+test-command = "pytest -sxv tests/test_reverse.py"
 
 [cosmic-ray.distributor]
 name = "local"
