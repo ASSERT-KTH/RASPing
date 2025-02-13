@@ -1,7 +1,7 @@
 from tracr.rasp import rasp
 
 from pathlib import Path
-from abc import ABC, abstractmethod
+from abc import ABC
 import pytest
 import sys
 
@@ -12,7 +12,7 @@ module_paths = [
 if module_paths not in sys.path:
     sys.path.extend(module_paths)
 
-from src.functions import generateData, getAcceptedNamesAndInput
+from src.functions import getAcceptedNamesAndInput, load_dataset
 from src.model import Model
 
 
@@ -24,7 +24,9 @@ class Test(ABC):
         self.model = model
         self.name = name
         self.inputs = {t for t in getAcceptedNamesAndInput()[self.name]}
-        self.testing_data = generateData(self.name, self.maxLength, 500)
+        # Load test data instead of generating it
+        data_dir = Path(__file__).parent.resolve().parent.parent.parent / "data"
+        self.testing_data = load_dataset(data_dir, self.name, "test")
 
     @pytest.mark.skip(reason="This is not a test")
     def test(self):
