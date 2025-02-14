@@ -16,7 +16,7 @@ def create_config(source_file: str) -> str:
     config = {
         "cosmic-ray": {
             "module-path": f"source/{os.path.basename(source_file)}",
-            "timeout": 120.0,
+            "timeout": 60.0,
             "excluded-modules": [],
             "test-command": f"pytest -s tests/test_{base_name}.py",
             "distributor": {"name": "local"},

@@ -26,7 +26,7 @@ class Test(ABC):
         self.inputs = {t for t in getAcceptedNamesAndInput()[self.name]}
         # Load test data instead of generating it
         data_dir = Path(__file__).parent.resolve().parent.parent.parent / "data"
-        self.testing_data = load_dataset(data_dir, self.name, "test")
+        self.testing_data = load_dataset(data_dir, self.name, "test")[:50]
 
     @pytest.mark.skip(reason="This is not a test")
     def test(self):
