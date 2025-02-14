@@ -38,7 +38,7 @@ def make_sort_unique(vals: rasp.SOp, keys: rasp.SOp) -> rasp.SOp:
 
 
 def make_sort(
-    vals: rasp.SOp, keys: rasp.SOp, *, max_seq_len: int, min_key: float
+    vals: rasp.SOp, keys: rasp.SOp, /, max_seq_len: int, min_key: float
 ) -> rasp.SOp:
     """Returns vals sorted by < relation on keys, which don't need to be unique.
 
