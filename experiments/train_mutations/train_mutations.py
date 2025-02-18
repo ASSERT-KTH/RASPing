@@ -15,13 +15,12 @@ from experiments.mutation.load_mutations import load_buggy_models
 def train_mutated_model(
     model_name: str, 
     program_name: str, 
-    job_id: int, 
+    job_id: str,
     max_len: int = 10, 
     n_epochs: int = 50000, 
     batch_size: int = 256, 
     learning_rate: float = 1e-04, 
     output_dir: str = None,
-    use_wandb: bool = False
 ):
     # Load the buggy model
     model = load_buggy_models(program_name, job_id)[0]
@@ -47,22 +46,20 @@ def train_mutated_model(
         valCount=0,
         valStep=10,
         output_dir=output_dir,
-        use_wandb=use_wandb,
-        wandb_project="RASPing-mutations",
-        wandb_name=f"{program_name}_job{job_id}"
+        use_wandb=True,
+        wandb_project="dpr-mutation-training",
+        wandb_name=f"{program_name}_job_{job_id}"
     )
 
+    # Trainer will train the model log metrics, and save metrics and results to output_dir
     trainer.train()
-    trainer.save_metrics()
-    trainer.save_model()
 
 
 @click.command()
 @click.option("--model_name", type=str, help="The name of the model architecture to use")
 @click.option("--program_name", type=str, help="The name of the program to load buggy models from")
-@click.option("--job_id", type=int, help="The job ID for loading the specific buggy model")
-@click.option("--use_wandb", is_flag=True, help="Enable Weights & Biases logging")
-def run_test(model_name, program_name, job_id, use_wandb):
+@click.option("--job_id", type=str, help="The job ID for loading the specific buggy model")
+def run_test(model_name, program_name, job_id):
     print(f"Training mutated model {program_name} (job {job_id}) with architecture {model_name}...")
     output_dir = f"saved_data/{program_name}/job_{job_id}/"
     train_mutated_model(
@@ -70,7 +67,6 @@ def run_test(model_name, program_name, job_id, use_wandb):
         program_name=program_name,
         job_id=job_id,
         output_dir=output_dir,
-        use_wandb=use_wandb
     )
 
 if __name__ == "__main__":

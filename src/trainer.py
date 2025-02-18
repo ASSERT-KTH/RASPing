@@ -35,7 +35,6 @@ class Trainer:
         valCount: int = 0,
         valStep: int = 0,
         output_dir: Optional[str] = None,
-        returnAllMetrics: bool = False,
         use_wandb: bool = False,
         wandb_project: Optional[str] = None,
         wandb_name: Optional[str] = None,
@@ -54,7 +53,6 @@ class Trainer:
         self.valCount = valCount
         self.valStep = valStep
         self.output_dir = output_dir
-        self.returnAllMetrics = returnAllMetrics
         self.use_wandb = use_wandb
 
         if self.use_wandb:
@@ -139,11 +137,11 @@ class Trainer:
     def train(self):
         padToken = self.model.input_encoder.encoding_map["compiler_pad"]
 
-        metrics = []
-        validations = []
-        if self.returnAllMetrics:
-            metrics = [[], []]
-            validations = [[], []]
+        # Initialize metrics arrays to store training and validation metrics
+        train_losses = []
+        train_accs = []
+        val_losses = []
+        val_accs = []
 
         # Set up early stopping
         if self.valCount:
@@ -166,8 +164,13 @@ class Trainer:
                 n_batches += 1
 
             avg_epoch_loss = epoch_loss / n_batches
-            if not self.returnAllMetrics:
-                metrics.append({"step": self.state.step, "loss": avg_epoch_loss})
+            train_losses.append(avg_epoch_loss)
+
+            # Calculate training accuracy
+            train_acc = self.jit_val_accuracy(
+                self.state.params, self.X_train, self.Y_train, padToken
+            )
+            train_accs.append(train_acc)
 
             # Early stopping and validation
             if self.valCount or self.valStep:
@@ -176,30 +179,15 @@ class Trainer:
                     val_loss = self.jit_val_loss(
                         self.state.params, self.X_val, self.Y_val, padToken
                     )
+                    val_losses.append(val_loss)
                     val_metrics["val_loss"] = val_loss
 
                     if self.valStep and epoch % self.valStep == 0:
                         val_acc = self.jit_val_accuracy(
                             self.state.params, self.X_val, self.Y_val, padToken
                         )
+                        val_accs.append(val_acc)
                         val_metrics["val_accuracy"] = val_acc
-                        if not self.returnAllMetrics:
-                            validations.append(val_acc)
-                        else:
-                            train_acc = self.jit_val_accuracy(
-                                self.state.params, self.X_train, self.Y_train, padToken
-                            )
-                            validations[0].append(train_acc)
-                            validations[1].append(val_acc)
-                            metrics[0].append(
-                                self.jit_val_loss(
-                                    self.state.params,
-                                    self.X_train,
-                                    self.Y_train,
-                                    padToken,
-                                )
-                            )
-                            metrics[1].append(val_loss)
 
                     # Early stopping check
                     if self.valCount:
@@ -219,6 +207,7 @@ class Trainer:
                     wandb_metrics = {
                         "epoch": epoch,
                         "train_loss": avg_epoch_loss,
+                        "train_accuracy": train_acc,
                         **val_metrics,
                     }
                     wandb.log(wandb_metrics)
@@ -227,49 +216,54 @@ class Trainer:
                 break
 
         if self.plot:
-            # plot the loss values
-            plt.plot([m["step"] for m in metrics], [m["loss"] for m in metrics])
-            plt.xlabel("Step")
+            # Plot training and validation loss
+            plt.figure(figsize=(10, 4))
+            plt.subplot(1, 2, 1)
+            plt.plot(train_losses, label="Training Loss")
+            if val_losses:
+                plt.plot(val_losses, label="Validation Loss")
+            plt.xlabel("Epoch")
             plt.ylabel("Loss")
-            plt.title("Training Loss")
-            plt.show()
+            plt.title("Training and Validation Loss")
+            plt.legend()
 
-            if self.valStep:
-                # plot the validation accuracies
-                plt.plot(
-                    np.linspace(0, self.n_epochs, len(validations)),
-                    [m for m in validations],
-                )
-                plt.xlabel("Epochs")
-                plt.ylabel("Accuracy")
-                plt.title("Validation Accuracy")
-                plt.show()
+            # Plot training and validation accuracy
+            plt.subplot(1, 2, 2)
+            plt.plot(train_accs, label="Training Accuracy")
+            if val_accs:
+                plt.plot(val_accs, label="Validation Accuracy")
+            plt.xlabel("Epoch")
+            plt.ylabel("Accuracy")
+            plt.title("Training and Validation Accuracy")
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
 
         self.model.params = self.state.params
 
         if self.output_dir:
             if not os.path.exists(self.output_dir):
                 os.makedirs(self.output_dir, exist_ok=True)
-            self.save_metrics(metrics, validations)
+            self.save_metrics(train_losses, train_accs, val_losses, val_accs)
             self.save_model()
 
         if self.use_wandb:
             wandb.finish()
 
-        if self.valStep:
-            return metrics, validations
-        else:
-            return metrics
+        return {
+            "train_losses": train_losses,
+            "train_accs": train_accs,
+            "val_losses": val_losses,
+            "val_accs": val_accs,
+        }
 
-    def save_metrics(self, metrics, validations):
-        if len(metrics) == 2:  # If saving both training and validation loss/acc
-            np.save(self.output_dir + "metrics_train.npy", metrics[0])
-            np.save(self.output_dir + "validations_train.npy", validations[0])
-            np.save(self.output_dir + "metrics_val.npy", metrics[1])
-            np.save(self.output_dir + "validations_train.npy", validations[1])
-        else:
-            np.save(self.output_dir + "metrics.npy", metrics)
-            np.save(self.output_dir + "validations.npy", validations)
+    def save_metrics(self, train_losses, train_accs, val_losses, val_accs):
+        np.save(self.output_dir + "train_losses.npy", train_losses)
+        np.save(self.output_dir + "train_accs.npy", train_accs)
+        if val_losses:
+            np.save(self.output_dir + "val_losses.npy", val_losses)
+        if val_accs:
+            np.save(self.output_dir + "val_accs.npy", val_accs)
 
     def save_model(self):
         np.save(self.output_dir + "model.npy", self.state.params)
