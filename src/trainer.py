@@ -4,6 +4,7 @@ import optax
 import haiku as hk
 import numpy as np
 import jax.numpy as jnp
+import wandb
 
 import tqdm
 import matplotlib.pyplot as plt
@@ -34,7 +35,10 @@ class Trainer:
         valCount: int = 0,
         valStep: int = 0,
         output_dir: Optional[str] = None,
-        returnAllMetrics: bool = False
+        returnAllMetrics: bool = False,
+        use_wandb: bool = False,
+        wandb_project: Optional[str] = None,
+        wandb_name: Optional[str] = None,
     ):
         self.model = model
         self.params = params
@@ -51,6 +55,20 @@ class Trainer:
         self.valStep = valStep
         self.output_dir = output_dir
         self.returnAllMetrics = returnAllMetrics
+        self.use_wandb = use_wandb
+
+        if self.use_wandb:
+            wandb.init(
+                project=wandb_project or "RASPing",
+                name=wandb_name,
+                config={
+                    "learning_rate": lr,
+                    "batch_size": batch_size,
+                    "n_epochs": n_epochs,
+                    "val_step": valStep,
+                },
+            )
+
         self.init()
 
     def init(self):
@@ -124,8 +142,8 @@ class Trainer:
         metrics = []
         validations = []
         if self.returnAllMetrics:
-            metrics = [[],[]]
-            validations = [[],[]]
+            metrics = [[], []]
+            validations = [[], []]
 
         # Set up early stopping
         if self.valCount:
@@ -137,52 +155,73 @@ class Trainer:
 
         stoppedTraining = False
         for epoch in tqdm.trange(self.n_epochs):
+            epoch_loss = 0
+            n_batches = 0
+
             for i in range(0, len(self.X_train), self.batch_size):
                 x = self.X_train[i : i + self.batch_size]
                 y = self.Y_train[i : i + self.batch_size]
                 self.state, metric = self.jit_update(self.state, x, y, padToken)
+                epoch_loss += metric["loss"]
+                n_batches += 1
 
+            avg_epoch_loss = epoch_loss / n_batches
             if not self.returnAllMetrics:
-                metrics.append(metric)
+                metrics.append({"step": self.state.step, "loss": avg_epoch_loss})
 
-            # Early stopping
-            # TODO: fix calling of loss function
-            if self.valCount:
-                x = self.X_val
-                y = self.Y_val
-                newVal = self.jit_val_loss(
-                    self.state.params, x, y, padToken
-                )  # Validation loss
+            # Early stopping and validation
+            if self.valCount or self.valStep:
+                val_metrics = {}
+                if self.X_val is not None and self.Y_val is not None:
+                    val_loss = self.jit_val_loss(
+                        self.state.params, self.X_val, self.Y_val, padToken
+                    )
+                    val_metrics["val_loss"] = val_loss
 
-                if newVal > latestVal:
-                    higherVal += 1
-                    if higherVal == self.valCount:
-                        print(
-                            "Stopped training after", epoch, "epochs by early stopping"
+                    if self.valStep and epoch % self.valStep == 0:
+                        val_acc = self.jit_val_accuracy(
+                            self.state.params, self.X_val, self.Y_val, padToken
                         )
-                        stoppedTraining = True
-                        break
-                else:
-                    higherVal = 0
-                latestVal = newVal
+                        val_metrics["val_accuracy"] = val_acc
+                        if not self.returnAllMetrics:
+                            validations.append(val_acc)
+                        else:
+                            train_acc = self.jit_val_accuracy(
+                                self.state.params, self.X_train, self.Y_train, padToken
+                            )
+                            validations[0].append(train_acc)
+                            validations[1].append(val_acc)
+                            metrics[0].append(
+                                self.jit_val_loss(
+                                    self.state.params,
+                                    self.X_train,
+                                    self.Y_train,
+                                    padToken,
+                                )
+                            )
+                            metrics[1].append(val_loss)
 
-            if self.valStep and epoch % self.valStep == 0:
-                val = self.jit_val_accuracy(
-                    self.state.params, self.X_val, self.Y_val, padToken
-                )
-                if not self.returnAllMetrics:
-                    validations.append(val)
-                else:
-                    #NOTE Returns the training loss as an array of floats instead of the standard which returns an array of dictionaries
-                    #Validations are accuracies and metrics is the loss
-                    validations[0].append(self.jit_val_accuracy(
-                        self.state.params, self.X_train, self.Y_train, padToken))
-                    validations[1].append(val)
-                    metrics[0].append(self.jit_val_loss(
-                        self.state.params, self.X_train, self.Y_train, padToken))
-                    metrics[1].append(self.jit_val_loss(
-                        self.state.params, self.X_val, self.Y_val, padToken))               
+                    # Early stopping check
+                    if self.valCount:
+                        if val_loss > latestVal:
+                            higherVal += 1
+                            if higherVal == self.valCount:
+                                print(
+                                    f"Stopped training after {epoch} epochs by early stopping"
+                                )
+                                stoppedTraining = True
+                        else:
+                            higherVal = 0
+                        latestVal = val_loss
 
+                # Log metrics to wandb
+                if self.use_wandb:
+                    wandb_metrics = {
+                        "epoch": epoch,
+                        "train_loss": avg_epoch_loss,
+                        **val_metrics,
+                    }
+                    wandb.log(wandb_metrics)
 
             if stoppedTraining:
                 break
@@ -214,13 +253,16 @@ class Trainer:
             self.save_metrics(metrics, validations)
             self.save_model()
 
+        if self.use_wandb:
+            wandb.finish()
+
         if self.valStep:
             return metrics, validations
         else:
             return metrics
 
     def save_metrics(self, metrics, validations):
-        if len(metrics)==2: #If saving both training and validation loss/acc
+        if len(metrics) == 2:  # If saving both training and validation loss/acc
             np.save(self.output_dir + "metrics_train.npy", metrics[0])
             np.save(self.output_dir + "validations_train.npy", validations[0])
             np.save(self.output_dir + "metrics_val.npy", metrics[1])

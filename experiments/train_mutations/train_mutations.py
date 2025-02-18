@@ -12,7 +12,17 @@ from src.functions import load_dataset
 from src.loss import cross_entropy_loss
 from experiments.mutation.load_mutations import load_buggy_models
 
-def train_mutated_model(model_name: str, program_name: str, job_id: int, max_len: int = 10, n_epochs: int = 50000, batch_size: int = 256, learning_rate: float = 1e-04, output_dir: str = None):
+def train_mutated_model(
+    model_name: str, 
+    program_name: str, 
+    job_id: int, 
+    max_len: int = 10, 
+    n_epochs: int = 50000, 
+    batch_size: int = 256, 
+    learning_rate: float = 1e-04, 
+    output_dir: str = None,
+    use_wandb: bool = False
+):
     # Load the buggy model
     model = load_buggy_models(program_name, job_id)[0]
     train_dataset = load_dataset(model_name, max_len, split_name="train")
@@ -37,6 +47,9 @@ def train_mutated_model(model_name: str, program_name: str, job_id: int, max_len
         valCount=0,
         valStep=10,
         output_dir=output_dir,
+        use_wandb=use_wandb,
+        wandb_project="RASPing-mutations",
+        wandb_name=f"{program_name}_job{job_id}"
     )
 
     trainer.train()
@@ -48,14 +61,16 @@ def train_mutated_model(model_name: str, program_name: str, job_id: int, max_len
 @click.option("--model_name", type=str, help="The name of the model architecture to use")
 @click.option("--program_name", type=str, help="The name of the program to load buggy models from")
 @click.option("--job_id", type=int, help="The job ID for loading the specific buggy model")
-def run_test(model_name, program_name, job_id):
+@click.option("--use_wandb", is_flag=True, help="Enable Weights & Biases logging")
+def run_test(model_name, program_name, job_id, use_wandb):
     print(f"Training mutated model {program_name} (job {job_id}) with architecture {model_name}...")
     output_dir = f"saved_data/{program_name}/job_{job_id}/"
     train_mutated_model(
         model_name=model_name,
         program_name=program_name,
         job_id=job_id,
-        output_dir=output_dir
+        output_dir=output_dir,
+        use_wandb=use_wandb
     )
 
 if __name__ == "__main__":
