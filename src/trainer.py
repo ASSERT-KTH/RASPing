@@ -10,6 +10,7 @@ import tqdm
 import matplotlib.pyplot as plt
 from typing import NamedTuple, Optional, Any
 
+
 class TrainingState(NamedTuple):
     params: hk.Params
     opt_state: optax.OptState
