@@ -48,13 +48,16 @@ def run_in_container(
     repo_root = Path(__file__).parent.parent.parent
     container_path = repo_root / "container.sif"
 
+    # Get full path to train_mutations.py
+    train_mutations_path = Path(__file__).parent / "train_mutations.py"
+
     cmd = [
         "apptainer",
         "exec",
         "--nv",
         str(container_path),
         "python",
-        "train_mutations.py",
+        str(train_mutations_path),
         "--model_name",
         model_name,
         "--program_name",
@@ -71,9 +74,10 @@ def run_in_container(
         str(learning_rate),
     ]
 
-    # Add output directory if specified
+    # Add output directory if specified, using full path
     if output_dir:
-        cmd.extend(["--output_dir", output_dir])
+        full_output_dir = repo_root / output_dir
+        cmd.extend(["--output_dir", str(full_output_dir)])
 
     try:
         subprocess.run(
@@ -81,7 +85,6 @@ def run_in_container(
             check=True,
             capture_output=True,
             text=True,
-            cwd=Path(__file__).parent,  # Run in same directory as this script
         )
     except subprocess.CalledProcessError as e:
         print(f"Error running container for {program_name} (job {job_id}):")
