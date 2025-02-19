@@ -82,7 +82,7 @@ def load_mutation(
         if job_id and row["job_id"] != job_id:
             continue
 
-        buggy_mutations[idx] = row.to_dict()
+        buggy_mutations[row["job_id"]] = row.to_dict()
 
     return buggy_mutations
 
