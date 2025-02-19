@@ -59,7 +59,7 @@ def run_in_container(
 
     # Add output directory if specified, using full path
     if output_dir:
-        full_output_dir = repo_root / output_dir
+        full_output_dir = Path(__file__).parent / output_dir
         cmd.extend(["--output_dir", str(full_output_dir)])
 
     try:
