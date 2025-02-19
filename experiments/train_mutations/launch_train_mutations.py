@@ -4,17 +4,6 @@ import subprocess
 import pandas as pd
 
 from pathlib import Path
-from typing import Tuple, List
-
-# Program names and their corresponding job IDs from test_load_mutations.py
-PROGRAM_CONFIGS: List[Tuple[str, str]] = [
-    ("sort", "f35ba7e838874bba8335cd9ca5db2aa7"),
-    ("reverse", "9db50f10314547858e52a5aff4bc2be4"),
-    ("hist", "45728e11fb1043829d4057c016b549b9"),
-    ("most_freq", "14ac16fe5f49412aa1ee30461b5769a0"),
-    ("shuffle_dyck", "8940b2d2299f45c08b474d151c6d760b"),
-    ("shuffle_dyck2", "739a764b78784fc3b4b6f80006eac399"),
-]
 
 
 def get_executor() -> submitit.AutoExecutor:
@@ -97,8 +86,20 @@ def main():
     # Create a list of jobs to run
     jobs = []
 
-    for program_name, job_id in PROGRAM_CONFIGS:
+    # Load the dataframe
+    mutation_path = (
+        Path(__file__).parent / "../mutation/results/aggregated_mutations.json"
+    )
+    df = pd.read_json(mutation_path)
+
+    for _, row in df.iterrows():
+        # We only train buggy models
+        if row["execution_result"].get("status") != "BUGGY_MODEL":
+            continue
+
         # Create the job using the container wrapper
+        program_name = row["program_name"]
+        job_id = row["job_id"]
         job = executor.submit(
             run_in_container,
             program_name=program_name,
