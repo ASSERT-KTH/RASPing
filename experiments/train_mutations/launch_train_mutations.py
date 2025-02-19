@@ -34,7 +34,6 @@ def get_executor() -> submitit.AutoExecutor:
 
 
 def run_in_container(
-    model_name: str,
     program_name: str,
     job_id: str,
     max_len: int = 10,
@@ -58,8 +57,6 @@ def run_in_container(
         str(container_path),
         "python",
         str(train_mutations_path),
-        "--model_name",
-        model_name,
         "--program_name",
         program_name,
         "--job_id",
@@ -104,13 +101,9 @@ def main():
     jobs = []
 
     for program_name, job_id in PROGRAM_CONFIGS:
-        # The model_name is the same as program_name for our datasets
-        model_name = program_name
-
         # Create the job using the container wrapper
         job = executor.submit(
             run_in_container,
-            model_name=model_name,
             program_name=program_name,
             job_id=job_id,
             max_len=10,
