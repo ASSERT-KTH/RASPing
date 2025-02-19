@@ -3,17 +3,17 @@ import os
 import numpy as np
 import jax.numpy as jnp
 
-module_path = os.path.abspath(os.path.join('..'))
+module_path = os.path.abspath(os.path.join(".."))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
 from src.model import Model
 from src.functions import *
 
-#Argument parsing
+# Argument parsing
 import argparse
 
-parser = argparse.ArgumentParser(description = "Training and save file arguments")
+parser = argparse.ArgumentParser(description="Training and save file arguments")
 
 parser.add_argument("-baseModel", type=str, default="sort")
 parser.add_argument("-maxLength", type=int, default=10)
@@ -60,7 +60,7 @@ print("trainAccFileName:", args.trainAccFileName)
 print("valLossFileName:", args.valLossFileName)
 print("valAccFileName:", args.valAccFileName)
 
-#Set up model and data
+# Set up model and data
 maxLength = args.maxLength
 name = args.baseModel
 N = args.dataSize
@@ -75,7 +75,7 @@ split = int(len(data) * 0.85)
 data_train, data_val = data[:split], data[split:]
 X, Y = encodeAndPadData(data, model.raspFunction, model.inputs, maxLength)
 
-#Split data
+# Split data
 split = int(X.shape[0] * 0.85)
 X_train, X_val = X[:split], X[split:]
 Y_train, Y_val = Y[:split], Y[split:]
@@ -87,18 +87,31 @@ print("Total unique samples", len(data))
 
 noiseTypes = ["bitFlip", "gaussian", "flipFirst"]
 
-#Train model
+# Train model
 if args.randomWeights:
     model.setRandomWeights()
 if args.noiseType in noiseTypes:
     model.addNoise(args.noiseType, args.noiseAmount, args.noiseParam)
-losses, accuracies = model.train(X_train, Y_train, n_epochs=args.n_epochs, batch_size=args.batch_size, lr=args.lr, plot=False, X_val=X_val, Y_val=Y_val, valStep=args.valStep, returnAllMetrics = True)
+losses, accuracies = model.train(
+    X_train,
+    Y_train,
+    n_epochs=args.n_epochs,
+    batch_size=args.batch_size,
+    lr=args.lr,
+    plot=False,
+    X_val=X_val,
+    Y_val=Y_val,
+    valStep=args.valStep,
+    returnAllMetrics=True,
+)
 
-#Save loss and validation accuracy
+
+# Save loss and validation accuracy
 def saveArray(array, fileName="temp"):
     file = open(fileName, "wb")
     np.save(file, array)
     file.close()
+
 
 saveDirectory = args.saveDirectory
 saveArray(losses[0], saveDirectory + args.trainLossFileName)

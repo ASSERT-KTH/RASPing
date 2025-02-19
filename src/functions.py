@@ -356,7 +356,9 @@ def load_dataset(data_dir: str | Path, program_name: str, split_name: str = "tra
     if not data_path.exists():
         raise FileNotFoundError(f"Dataset file not found: {data_path}")
 
-    return [(sample["input"], sample["output"]) for sample in stream_jsonl(str(data_path))]
+    return [
+        (sample["input"], sample["output"]) for sample in stream_jsonl(str(data_path))
+    ]
 
 
 def split_train_val_test(data, train_pct=0.8, val_pct=0.1):
@@ -396,8 +398,11 @@ def save_dataset(data_dir: str | Path, program_name: str, split_name: str, data)
     data_dir.mkdir(parents=True, exist_ok=True)
 
     output_path = data_dir / f"{program_name}_{split_name}.jsonl"
-    records = [{"input": input_seq, "output": output_seq} for input_seq, output_seq in data]
+    records = [
+        {"input": input_seq, "output": output_seq} for input_seq, output_seq in data
+    ]
     write_jsonl(str(output_path), records)
+
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):

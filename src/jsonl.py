@@ -9,6 +9,7 @@ Code from HumanEval:
 https://github.com/openai/human-eval/blob/312c5e5532f0e0470bf47f77a6243e02a61da530/human_eval/data.py
 """
 
+
 class NumpyJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -20,6 +21,7 @@ class NumpyJSONEncoder(json.JSONEncoder):
         if isinstance(obj, np.bool_):
             return bool(obj)
         return super().default(obj)
+
 
 def stream_jsonl(filename: str) -> Iterable[Dict]:
     """
@@ -51,7 +53,9 @@ def write_jsonl(filename: str, data: Iterable[Dict], append: bool = False):
         with open(filename, mode) as fp:
             with gzip.GzipFile(fileobj=fp, mode="wb") as gzfp:
                 for x in data:
-                    gzfp.write((json.dumps(x, cls=NumpyJSONEncoder) + "\n").encode("utf-8"))
+                    gzfp.write(
+                        (json.dumps(x, cls=NumpyJSONEncoder) + "\n").encode("utf-8")
+                    )
     else:
         with open(filename, mode) as fp:
             for x in data:

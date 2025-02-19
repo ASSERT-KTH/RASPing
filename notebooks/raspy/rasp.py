@@ -10,10 +10,11 @@ Raw = int
 SOpLike = Union["SOp", List[Raw], str, int, float]
 EXAMPLE = "hello"
 
-#NOTE Added function allowing toggling between sum and mean aggregation
+# NOTE Added function allowing toggling between sum and mean aggregation
 aggType = "sum"
 
-def setAggType(newType = None):
+
+def setAggType(newType=None):
     types = ["sum", "mean"]
     global aggType
 
@@ -21,15 +22,14 @@ def setAggType(newType = None):
         print("Current type:", aggType)
         print("Available types: ", end="")
         for type in types:
-            print(type, end = " ")
+            print(type, end=" ")
         print()
         return
 
     if newType in types:
         aggType = newType
     else:
-        print(newType, ', is not an accepted type')
-
+        print(newType, ", is not an accepted type")
 
 
 class Seq:
@@ -325,17 +325,18 @@ def select(
 
     return Selector(ret)
 
-#NOTE Added an optional mean aggregation
+
+# NOTE Added an optional mean aggregation
 def mean(x: List[int], default: Raw = 0) -> int:
     if len(x) == 0:
         return default
     if len(x) == 1:
         return x[0]
-    
+
     if aggType == "sum":
-        return sum(x) 
+        return sum(x)
     elif aggType == "mean":
-        return sum(x)  / len(x)
+        return sum(x) / len(x)
     else:
         print("Error, aggType not accepted")
         raise TypeError
@@ -349,7 +350,9 @@ def mean(x: List[int], default: Raw = 0) -> int:
 #     return sum(x), len(x)
 
 
-def aggregate(sel: Selector, vallike: SOpLike, default: Any = 0, name: str = "") -> SOp:    #NOTE
+def aggregate(
+    sel: Selector, vallike: SOpLike, default: Any = 0, name: str = ""
+) -> SOp:  # NOTE
     val = wrap(vallike)
 
     def fn(x: Seq) -> Seq:
