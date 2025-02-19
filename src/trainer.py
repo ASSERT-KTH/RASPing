@@ -10,7 +10,6 @@ import tqdm
 import matplotlib.pyplot as plt
 from typing import NamedTuple, Optional, Any
 
-
 class TrainingState(NamedTuple):
     params: hk.Params
     opt_state: optax.OptState
@@ -21,8 +20,7 @@ class Trainer:
 
     def __init__(
         self,
-        model: Any,
-        params: hk.Params,
+        model,
         X_train: jnp.ndarray,
         Y_train: jnp.ndarray,
         loss_fn: Any,
@@ -39,8 +37,8 @@ class Trainer:
         wandb_project: Optional[str] = None,
         wandb_name: Optional[str] = None,
     ):
-        self.model = model
-        self.params = params
+        self.model = model.model
+        self.params = model.model.params
         self.X_train = X_train
         self.Y_train = Y_train
         self.loss_fn = loss_fn
