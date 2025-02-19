@@ -26,9 +26,6 @@ def get_executor() -> submitit.AutoExecutor:
         slurm_additional_parameters={
             "reservation": "1g.10gb",
         },
-        mem_gb=10,
-        cpus_per_task=1,
-        gpus_per_node=1,
     )
     return executor
 
