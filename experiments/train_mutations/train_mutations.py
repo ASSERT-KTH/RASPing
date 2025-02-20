@@ -22,6 +22,8 @@ def train_mutated_model(
     n_epochs: int = 50000,
     batch_size: int = 256,
     learning_rate: float = 1e-04,
+    early_stopping_patience: int = 10,
+    early_stopping_min_delta: float = 1e-4,
     output_dir: str = None,
 ):
     # Load the buggy model
@@ -59,7 +61,8 @@ def train_mutated_model(
         plot=False,
         X_val=X_val,
         Y_val=Y_val,
-        valCount=0,
+        early_stopping_patience=early_stopping_patience,
+        early_stopping_min_delta=early_stopping_min_delta,
         valStep=10,
         output_dir=output_dir,
         use_wandb=True,
@@ -82,9 +85,29 @@ def train_mutated_model(
 @click.option("--n_epochs", type=int, default=50000, help="Number of training epochs")
 @click.option("--batch_size", type=int, default=256, help="Training batch size")
 @click.option("--learning_rate", type=float, default=1e-04, help="Learning rate")
+@click.option(
+    "--early_stopping_patience",
+    type=int,
+    default=50,
+    help="Number of epochs to wait before early stopping",
+)
+@click.option(
+    "--early_stopping_min_delta",
+    type=float,
+    default=1e-4,
+    help="Minimum change in monitored value to qualify as an improvement",
+)
 @click.option("--output_dir", type=str, help="Directory to save training outputs")
 def run_test(
-    program_name, job_id, max_len, n_epochs, batch_size, learning_rate, output_dir
+    program_name,
+    job_id,
+    max_len,
+    n_epochs,
+    batch_size,
+    learning_rate,
+    early_stopping_patience,
+    early_stopping_min_delta,
+    output_dir,
 ):
     print(f"Training mutated model {program_name} (job {job_id})...")
     if not output_dir:
@@ -96,6 +119,8 @@ def run_test(
         n_epochs=n_epochs,
         batch_size=batch_size,
         learning_rate=learning_rate,
+        early_stopping_patience=early_stopping_patience,
+        early_stopping_min_delta=early_stopping_min_delta,
         output_dir=output_dir,
     )
 

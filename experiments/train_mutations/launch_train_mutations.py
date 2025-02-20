@@ -105,7 +105,7 @@ def main():
             program_name=program_name,
             job_id=job_id,
             max_len=10,
-            n_epochs=50000,
+            n_epochs=10000,
             batch_size=256,
             learning_rate=1e-04,
             output_dir=f"saved_data/{program_name}/job_{job_id}/",

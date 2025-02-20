@@ -9,6 +9,7 @@ import wandb
 import tqdm
 import matplotlib.pyplot as plt
 from typing import NamedTuple, Optional, Any
+from .early_stopping import EarlyStopping
 
 
 class TrainingState(NamedTuple):
@@ -31,7 +32,8 @@ class Trainer:
         plot: bool = False,
         X_val: Optional[jnp.ndarray] = None,
         Y_val: Optional[jnp.ndarray] = None,
-        valCount: int = 0,
+        early_stopping_patience: int = 0,
+        early_stopping_min_delta: float = 0.0,
         valStep: int = 0,
         output_dir: Optional[str] = None,
         use_wandb: bool = False,
@@ -49,7 +51,15 @@ class Trainer:
         self.plot = plot
         self.X_val = X_val
         self.Y_val = Y_val
-        self.valCount = valCount
+        self.early_stopper = (
+            EarlyStopping(
+                patience=early_stopping_patience,
+                min_delta=early_stopping_min_delta,
+                mode="min",
+            )
+            if early_stopping_patience > 0
+            else None
+        )
         self.valStep = valStep
         self.output_dir = output_dir
         self.use_wandb = use_wandb
@@ -63,6 +73,8 @@ class Trainer:
                     "batch_size": batch_size,
                     "n_epochs": n_epochs,
                     "val_step": valStep,
+                    "early_stopping_patience": early_stopping_patience,
+                    "early_stopping_min_delta": early_stopping_min_delta,
                 },
             )
 
@@ -142,13 +154,13 @@ class Trainer:
         val_losses = []
         val_accs = []
 
-        # Set up early stopping
-        if self.valCount:
+        # Set up early stopping validation requirements
+        if self.early_stopper is not None:
             if self.X_val is None or self.Y_val is None:
-                print("Error: X_val and Y_val not provided")
+                print(
+                    "Error: X_val and Y_val must be provided when using early stopping"
+                )
                 return -1
-        higherVal = 0
-        latestVal = np.inf
 
         stoppedTraining = False
         for epoch in tqdm.trange(self.n_epochs):
@@ -171,8 +183,8 @@ class Trainer:
             )
             train_accs.append(train_acc)
 
-            # Early stopping and validation
-            if self.valCount or self.valStep:
+            # Validation and early stopping
+            if self.early_stopper is not None or self.valStep:
                 val_metrics = {}
                 if self.X_val is not None and self.Y_val is not None:
                     val_loss = self.jit_val_loss(
@@ -188,18 +200,11 @@ class Trainer:
                         val_accs.append(val_acc)
                         val_metrics["val_accuracy"] = val_acc
 
-                    # Early stopping check
-                    if self.valCount:
-                        if val_loss > latestVal:
-                            higherVal += 1
-                            if higherVal == self.valCount:
-                                print(
-                                    f"Stopped training after {epoch} epochs by early stopping"
-                                )
-                                stoppedTraining = True
-                        else:
-                            higherVal = 0
-                        latestVal = val_loss
+                    # Early stopping check with current parameters
+                    if self.early_stopper is not None:
+                        if self.early_stopper(val_loss, self.state.params):
+                            print(f"Early stopping triggered after {epoch + 1} epochs")
+                            stoppedTraining = True
 
                 # Log metrics to wandb
                 if self.use_wandb:
@@ -212,6 +217,17 @@ class Trainer:
                     wandb.log(wandb_metrics)
 
             if stoppedTraining:
+                # Restore best model parameters
+                if (
+                    self.early_stopper is not None
+                    and self.early_stopper.best_params is not None
+                ):
+                    print("Restoring best model parameters...")
+                    self.state = TrainingState(
+                        params=self.early_stopper.best_params,
+                        opt_state=self.state.opt_state,
+                        step=self.state.step,
+                    )
                 break
 
         if self.plot:
