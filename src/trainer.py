@@ -273,12 +273,12 @@ class Trainer:
         }
 
     def save_metrics(self, train_losses, train_accs, val_losses, val_accs):
-        np.save(self.output_dir + "train_losses.npy", train_losses)
-        np.save(self.output_dir + "train_accs.npy", train_accs)
+        np.save(self.output_dir / "train_losses.npy", train_losses)
+        np.save(self.output_dir / "train_accs.npy", train_accs)
         if val_losses:
-            np.save(self.output_dir + "val_losses.npy", val_losses)
+            np.save(self.output_dir / "val_losses.npy", val_losses)
         if val_accs:
-            np.save(self.output_dir + "val_accs.npy", val_accs)
+            np.save(self.output_dir / "val_accs.npy", val_accs)
 
     def save_model(self):
-        np.save(self.output_dir + "model.npy", self.state.params)
+        np.save(self.output_dir / "model.npy", self.state.params)
