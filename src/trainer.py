@@ -7,6 +7,7 @@ import jax.numpy as jnp
 import wandb
 
 import tqdm
+from pathlib import Path
 import matplotlib.pyplot as plt
 from typing import NamedTuple, Optional, Any
 from .early_stopping import EarlyStopping
@@ -61,7 +62,7 @@ class Trainer:
             else None
         )
         self.valStep = valStep
-        self.output_dir = output_dir
+        self.output_dir = Path(output_dir)
         self.use_wandb = use_wandb
 
         if self.use_wandb:
