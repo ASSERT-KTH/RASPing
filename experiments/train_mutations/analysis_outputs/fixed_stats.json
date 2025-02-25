@@ -1,0 +1,98 @@
+{
+  "0.0": {
+    "sort": {
+      "fixed": 6,
+      "total": 39,
+      "percentage": 15.384615384615385
+    },
+    "hist": {
+      "fixed": 3,
+      "total": 9,
+      "percentage": 33.33333333333333
+    },
+    "most_freq": {
+      "fixed": 0,
+      "total": 63,
+      "percentage": 0.0
+    },
+    "shuffle_dyck": {
+      "fixed": 0,
+      "total": 92,
+      "percentage": 0.0
+    },
+    "shuffle_dyck2": {
+      "fixed": 3,
+      "total": 121,
+      "percentage": 2.479338842975207
+    },
+    "reverse": {
+      "fixed": 12,
+      "total": 35,
+      "percentage": 34.285714285714285
+    }
+  },
+  "0.001": {
+    "sort": {
+      "fixed": 11,
+      "total": 39,
+      "percentage": 28.205128205128204
+    },
+    "hist": {
+      "fixed": 3,
+      "total": 9,
+      "percentage": 33.33333333333333
+    },
+    "most_freq": {
+      "fixed": 0,
+      "total": 63,
+      "percentage": 0.0
+    },
+    "shuffle_dyck": {
+      "fixed": 0,
+      "total": 92,
+      "percentage": 0.0
+    },
+    "shuffle_dyck2": {
+      "fixed": 6,
+      "total": 121,
+      "percentage": 4.958677685950414
+    },
+    "reverse": {
+      "fixed": 19,
+      "total": 35,
+      "percentage": 54.285714285714285
+    }
+  },
+  "0.01": {
+    "sort": {
+      "fixed": 20,
+      "total": 39,
+      "percentage": 51.28205128205128
+    },
+    "hist": {
+      "fixed": 3,
+      "total": 9,
+      "percentage": 33.33333333333333
+    },
+    "most_freq": {
+      "fixed": 0,
+      "total": 63,
+      "percentage": 0.0
+    },
+    "shuffle_dyck": {
+      "fixed": 3,
+      "total": 92,
+      "percentage": 3.260869565217391
+    },
+    "shuffle_dyck2": {
+      "fixed": 121,
+      "total": 121,
+      "percentage": 100.0
+    },
+    "reverse": {
+      "fixed": 20,
+      "total": 35,
+      "percentage": 57.14285714285714
+    }
+  }
+}
