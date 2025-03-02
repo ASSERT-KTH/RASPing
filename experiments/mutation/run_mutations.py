@@ -131,11 +131,7 @@ def main():
 
     # Get all Python files in source directory
     source_dir = Path("source")
-    source_files = [
-        f
-        for f in source_dir.glob("*.py")
-        if f.name != "__init__.py" and "hist" in f.name
-    ]
+    source_files = [f for f in source_dir.glob("*.py") if f.name != "__init__.py"]
 
     # Clean results directories if requested
     if args.clean:
