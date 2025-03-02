@@ -58,9 +58,10 @@ def process_file_with_order(args: Tuple[Path, int, tqdm]) -> Optional[str]:
     """
     source_file, mutation_order, progress_bar = args
     process_id = os.getpid()
+    program_name = source_file.stem
 
     try:
-        progress_bar.set_description(f"PID {process_id}: {source_file.name} (order={mutation_order})")
+        progress_bar.set_description(f"Processing {program_name} (order={mutation_order}, PID={process_id})")
         
         # Get the base filename without extension
         base_name = source_file.stem
@@ -78,14 +79,14 @@ def process_file_with_order(args: Tuple[Path, int, tqdm]) -> Optional[str]:
         html_file = results_dir / f"report_{base_name}_order={mutation_order}.html"
 
         # Initialize the session
-        subprocess.run(
+        init_result = subprocess.run(
             ["cosmic-ray", "init", str(config_file), str(sqlite_file)], 
             check=True,
             capture_output=True
         )
-
+        
         # Run the mutations
-        subprocess.run(
+        exec_result = subprocess.run(
             ["cosmic-ray", "exec", str(config_file), str(sqlite_file)], 
             check=True,
             capture_output=True
@@ -93,7 +94,7 @@ def process_file_with_order(args: Tuple[Path, int, tqdm]) -> Optional[str]:
 
         # Dump to JSON
         with open(jsonl_file, "w") as f:
-            subprocess.run(
+            dump_result = subprocess.run(
                 ["cosmic-ray", "dump", str(sqlite_file)], 
                 stdout=f, 
                 check=True,
@@ -102,7 +103,7 @@ def process_file_with_order(args: Tuple[Path, int, tqdm]) -> Optional[str]:
 
         # Generate HTML report
         with open(html_file, "w") as f:
-            subprocess.run(
+            html_result = subprocess.run(
                 ["cr-html", str(sqlite_file)], 
                 stdout=f, 
                 check=True,
@@ -113,7 +114,17 @@ def process_file_with_order(args: Tuple[Path, int, tqdm]) -> Optional[str]:
         return None
 
     except subprocess.CalledProcessError as e:
-        error_msg = f"PID {process_id}: Error processing {source_file} with order {mutation_order}: {e}"
+        error_msg = f"ERROR in {program_name} (order={mutation_order}, PID={process_id}): {e}\n"
+        error_msg += f"Command: {e.cmd}\n"
+        if e.stdout:
+            error_msg += f"STDOUT: {e.stdout.decode('utf-8')}\n"
+        if e.stderr:
+            error_msg += f"STDERR: {e.stderr.decode('utf-8')}\n"
+        progress_bar.write(error_msg)
+        progress_bar.update(1)
+        return error_msg
+    except Exception as e:
+        error_msg = f"EXCEPTION in {program_name} (order={mutation_order}, PID={process_id}): {e}"
         progress_bar.write(error_msg)
         progress_bar.update(1)
         return error_msg
@@ -126,18 +137,19 @@ def process_file(source_file: Path) -> Optional[str]:
     return process_file_with_order((source_file, 1, pbar))
 
 
-def process_program_sequentially(program_tasks: List[Tuple[Path, int]], pbar: tqdm) -> List[Optional[str]]:
+def process_program_sequentially(program_tasks_info: Tuple[Path, List[Tuple[Path, int]], tqdm]) -> List[Optional[str]]:
     """Process all tasks for a single program sequentially.
     
     Args:
-        program_tasks: List of (source_file, mutation_order) tuples for a single program
-        pbar: Progress bar to update
+        program_tasks_info: Tuple containing (source_file, list_of_tasks, progress_bar)
     
     Returns:
         List of error messages, if any
     """
+    source_file, tasks, pbar = program_tasks_info
     errors = []
-    for source_file, mutation_order in program_tasks:
+    for task in tasks:
+        source_file, mutation_order = task
         error = process_file_with_order((source_file, mutation_order, pbar))
         if error:
             errors.append(error)
@@ -187,16 +199,15 @@ def main():
     total_tasks = sum(len(tasks) for tasks in program_tasks.values())
     
     # Create progress bar
-    pbar = tqdm(total=total_tasks, position=0, desc="Mutation Testing Progress")
+    pbar = tqdm(total=total_tasks, position=0, desc="Mutation Testing Progress", 
+                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
     
     # Process each program's tasks in parallel (but tasks within a program sequentially)
-    all_program_tasks = [(file, tasks) for file, tasks in program_tasks.items()]
+    pool_input = [(file, tasks, pbar) for file, tasks in program_tasks.items()]
+    
+    # Use multiprocessing to process different programs in parallel
     with Pool() as pool:
-        # Map each program's task list to the sequential processing function
-        results = pool.starmap(
-            lambda file, tasks: process_program_sequentially(tasks, pbar), 
-            all_program_tasks
-        )
+        results = pool.map(process_program_sequentially, pool_input)
     
     # Flatten the results and filter out None values
     errors = [err for sublist in results for err in sublist if err]
@@ -208,8 +219,9 @@ def main():
         print("\nErrors encountered during mutation testing:")
         for error in errors:
             print(error)
+        print(f"\nTotal errors: {len(errors)} out of {total_tasks} tasks")
     else:
-        print("\nAll mutation tests completed successfully!")
+        print(f"\nAll {total_tasks} mutation tests completed successfully!")
 
 
 if __name__ == "__main__":
