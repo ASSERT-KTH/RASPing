@@ -14,7 +14,7 @@ autoreload==0.1.2
 black==24.10.0
 click==8.1.8
 parso==0.8.4
-cosmic-ray==8.4.1
+cosmic-ray @ git+https://github.com/andre15silva/cosmic-ray.git@feature/higher-order-mutants
 toml==0.10.2
 pytest==8.3.4
 python-dotenv==1.0.1
