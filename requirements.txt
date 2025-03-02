@@ -22,3 +22,4 @@ backoff==2.2.1
 openai==1.61.0
 wandb==0.19.6
 submitit==1.5.2
+tqdm==4.67.1

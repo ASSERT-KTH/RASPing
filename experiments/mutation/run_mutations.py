@@ -2,10 +2,12 @@ import os
 import shutil
 import toml
 import subprocess
+import time
 from pathlib import Path
 from multiprocessing import Pool
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict
 import argparse
+from tqdm import tqdm
 
 
 def create_config(source_file: str, mutation_order: int = 1) -> str:
@@ -48,17 +50,18 @@ def create_config(source_file: str, mutation_order: int = 1) -> str:
     return config_file
 
 
-def process_file_with_order(args: Tuple[Path, int]) -> Optional[str]:
+def process_file_with_order(args: Tuple[Path, int, tqdm]) -> Optional[str]:
     """Process a single source file with cosmic-ray using specified mutation order.
 
     Args:
-        args: Tuple containing (source_file, mutation_order)
+        args: Tuple containing (source_file, mutation_order, progress_bar)
     """
-    source_file, mutation_order = args
+    source_file, mutation_order, progress_bar = args
+    process_id = os.getpid()
 
     try:
-        print(f"Processing {source_file} with mutation order {mutation_order}...")
-
+        progress_bar.set_description(f"PID {process_id}: {source_file.name} (order={mutation_order})")
+        
         # Get the base filename without extension
         base_name = source_file.stem
 
@@ -76,37 +79,69 @@ def process_file_with_order(args: Tuple[Path, int]) -> Optional[str]:
 
         # Initialize the session
         subprocess.run(
-            ["cosmic-ray", "init", str(config_file), str(sqlite_file)], check=True
+            ["cosmic-ray", "init", str(config_file), str(sqlite_file)], 
+            check=True,
+            capture_output=True
         )
 
         # Run the mutations
         subprocess.run(
-            ["cosmic-ray", "exec", str(config_file), str(sqlite_file)], check=True
+            ["cosmic-ray", "exec", str(config_file), str(sqlite_file)], 
+            check=True,
+            capture_output=True
         )
 
         # Dump to JSON
         with open(jsonl_file, "w") as f:
             subprocess.run(
-                ["cosmic-ray", "dump", str(sqlite_file)], stdout=f, check=True
+                ["cosmic-ray", "dump", str(sqlite_file)], 
+                stdout=f, 
+                check=True,
+                capture_output=True
             )
 
         # Generate HTML report
         with open(html_file, "w") as f:
-            subprocess.run(["cr-html", str(sqlite_file)], stdout=f, check=True)
+            subprocess.run(
+                ["cr-html", str(sqlite_file)], 
+                stdout=f, 
+                check=True,
+                capture_output=True
+            )
 
-        print(
-            f"Completed mutation testing for {source_file} with order {mutation_order}"
-        )
+        progress_bar.update(1)
         return None
 
     except subprocess.CalledProcessError as e:
-        return f"Error processing {source_file} with order {mutation_order}: {e}"
+        error_msg = f"PID {process_id}: Error processing {source_file} with order {mutation_order}: {e}"
+        progress_bar.write(error_msg)
+        progress_bar.update(1)
+        return error_msg
 
 
 def process_file(source_file: Path) -> Optional[str]:
     """Process a single source file with cosmic-ray."""
     # This function is kept for backward compatibility
-    return process_file_with_order((source_file, 1))
+    pbar = tqdm(total=1, position=0)
+    return process_file_with_order((source_file, 1, pbar))
+
+
+def process_program_sequentially(program_tasks: List[Tuple[Path, int]], pbar: tqdm) -> List[Optional[str]]:
+    """Process all tasks for a single program sequentially.
+    
+    Args:
+        program_tasks: List of (source_file, mutation_order) tuples for a single program
+        pbar: Progress bar to update
+    
+    Returns:
+        List of error messages, if any
+    """
+    errors = []
+    for source_file, mutation_order in program_tasks:
+        error = process_file_with_order((source_file, mutation_order, pbar))
+        if error:
+            errors.append(error)
+    return errors
 
 
 def main():
@@ -141,19 +176,40 @@ def main():
                 print(f"Cleaning {results_dir}...")
                 shutil.rmtree(results_dir)
 
-    # Create a list of (source_file, mutation_order) tuples for all combinations
-    tasks: List[Tuple[Path, int]] = []
+    # Group tasks by program (source file)
+    program_tasks: Dict[Path, List[Tuple[Path, int]]] = {}
     for source_file in source_files:
+        program_tasks[source_file] = []
         for order in args.orders:
-            tasks.append((source_file, order))
+            program_tasks[source_file].append((source_file, order))
 
-    # Process files in parallel
+    # Calculate total number of tasks for progress bar
+    total_tasks = sum(len(tasks) for tasks in program_tasks.values())
+    
+    # Create progress bar
+    pbar = tqdm(total=total_tasks, position=0, desc="Mutation Testing Progress")
+    
+    # Process each program's tasks in parallel (but tasks within a program sequentially)
+    all_program_tasks = [(file, tasks) for file, tasks in program_tasks.items()]
     with Pool() as pool:
-        errors = list(filter(None, pool.map(process_file_with_order, tasks)))
-
-    # Print any errors that occurred
-    for error in errors:
-        print(error)
+        # Map each program's task list to the sequential processing function
+        results = pool.starmap(
+            lambda file, tasks: process_program_sequentially(tasks, pbar), 
+            all_program_tasks
+        )
+    
+    # Flatten the results and filter out None values
+    errors = [err for sublist in results for err in sublist if err]
+    
+    pbar.close()
+    
+    # Print a summary of errors at the end
+    if errors:
+        print("\nErrors encountered during mutation testing:")
+        for error in errors:
+            print(error)
+    else:
+        print("\nAll mutation tests completed successfully!")
 
 
 if __name__ == "__main__":
