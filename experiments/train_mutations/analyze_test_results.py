@@ -88,41 +88,6 @@ def plot_fix_rates(fixed_stats, output_file=None):
     return plt
 
 
-def plot_accuracy_distribution(results, output_file=None):
-    """Plot the distribution of test accuracies by program"""
-    # Create DataFrame for easier plotting
-    df = pd.DataFrame(results)
-
-    plt.figure(figsize=(12, 8))
-
-    # Box plot
-    plt.subplot(2, 1, 1)
-    sns.boxplot(x="program_name", y="test_accuracy", data=df)
-    plt.xlabel("Program")
-    plt.ylabel("Test Accuracy")
-    plt.title("Distribution of Test Accuracies by Program")
-
-    # Histogram/density plot
-    plt.subplot(2, 1, 2)
-    for program in df["program_name"].unique():
-        program_data = df[df["program_name"] == program]
-        sns.kdeplot(program_data["test_accuracy"], label=program)
-
-    plt.xlabel("Test Accuracy")
-    plt.ylabel("Density")
-    plt.title("Density Plot of Test Accuracies")
-    plt.legend()
-
-    plt.tight_layout()
-
-    # Save the plot if an output file is specified
-    if output_file:
-        plt.savefig(output_file, dpi=300, bbox_inches="tight")
-        print(f"Accuracy distribution plot saved to {output_file}")
-
-    return plt
-
-
 @click.command()
 @click.option(
     "--results-file",
@@ -168,15 +133,8 @@ def main(results_file, output_dir, epsilons):
     fix_rates_plot = plot_fix_rates(fixed_stats, output_path / "fix_rates.png")
     plt.close()
 
-    # Plot accuracy distribution
-    print("Plotting accuracy distribution...")
-    acc_dist_plot = plot_accuracy_distribution(
-        results, output_path / "accuracy_distribution.png"
-    )
-    plt.close()
-
     # Generate summary table
-    summary_file = output_path / "summary.txt"
+    summary_file = output_path / "summary.md"
     with open(summary_file, "w") as f:
         f.write("# Test Results Summary\n\n")
         f.write("## Fix Rates by Epsilon\n\n")
