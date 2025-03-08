@@ -31,7 +31,7 @@ def create_config(source_file: str, mutation_order: int = 1) -> str:
             # Add higher-order mutation parameters
             "mutation-order": mutation_order,
             "specific-order": mutation_order,  # Only generate mutations of this exact order
-            "mutation-limit": 50,  # Limit the number of mutations to avoid explosion
+            "mutation-limit": 200,  # Limit the number of mutations to avoid explosion
             "disable-overlapping-mutations": True,  # Prevent mutations from overlapping
         }
     }

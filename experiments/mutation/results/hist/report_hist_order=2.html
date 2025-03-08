@@ -1,0 +1,2080 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" /><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous" /><title>Cosmic Ray Report</title></head><body><div class="container"><h1><p class="text-dark">Cosmic Ray Report</p></h1></div><div class="container"><div class="mb-1" id="summary_info___accordion"><div class="card"><a data-toggle="collapse" data-target="#summary_info___collapse_1" aria-expanded="true" aria-controls="summary_info___collapse_1" href="#"><div class="card-header" id="summary_info___heading_1"><button class="btn btn-outline-dark"><h4 class="m-0">Summary info</h4></button></div></a><div aria-labelledby="summary_info___heading_1" data-parent="#summary_info___accordion" class="collapse show" id="summary_info___collapse_1"><div class="card-body"><p>Date time: 07/03/2025 09:58:32</p><p>Total jobs: 33</p><p>Complete: 33 (100.00%)</p><p>Surviving mutants: 1 (3.03%)</p></div></div></div></div><div class="mb-1" id="job_list___accordion"><div class="card"><a data-toggle="collapse" data-target="#job_list___collapse_1" aria-expanded="false" aria-controls="job_list___collapse_1" href="#"><div class="card-header" id="job_list___heading_1"><button class="btn btn-outline-dark"><h4 class="m-0">Job list</h4></button></div></a><div aria-labelledby="job_list___heading_1" data-parent="#job_list___accordion" class="collapse" id="job_list___collapse_1"><div class="card-body"><div class="text-right mb-1"><div class="mx-1" id="job_item_expand_all"><a href="#" onclick="$('div.job_list___sub_multi_collapse').collapse('show');"><button class="btn btn-outline-dark"><span>Expand All</span></button></a></div><div class="mx-1" id="job_item_collapse_all"><a href="#" onclick="$('div.job_list___sub_multi_collapse').collapse('hide');"><button class="btn btn-outline-dark"><span>Collapse All</span></button></a></div></div><div class="mb-1" id="job_list___sub_accordion_1"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_1_1" aria-expanded="false" aria-controls="job_list___sub_collapse_1_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_1_1"><button class="btn btn-outline-success"><span class="job_id">1 : Job ID a21d748f698b485d982d303710afbb73</span></button></div></a><div aria-labelledby="job_list___sub_heading_1_1" data-parent="#job_list___sub_accordion_1" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_1_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 0</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 4), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-return-stmt, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.LT).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f510943fa00&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f510943fa00&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.51s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_2"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_2_1" aria-expanded="false" aria-controls="job_list___sub_collapse_2_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_2_1"><button class="btn btn-outline-success"><span class="job_id">2 : Job ID 2cfcf3e5072f4c4b8fd5fb994d8b638d</span></button></div></a><div aria-labelledby="job_list___sub_heading_2_1" data-parent="#job_list___sub_accordion_2" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_2_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 0</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens * -1, rasp.tokens, rasp.Comparison.LT).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f7b882f3af0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f7b882f3af0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.90s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_3"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_3_1" aria-expanded="false" aria-controls="job_list___sub_collapse_3_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_3_1"><button class="btn btn-outline-success"><span class="job_id">3 : Job ID 0532b1914bc2417486ac590b6672afb5</span></button></div></a><div aria-labelledby="job_list___sub_heading_3_1" data-parent="#job_list___sub_accordion_3" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_3_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 0</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 1</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens * -1, rasp.Comparison.LT).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7ff6b713ba30&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7ff6b713ba30&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.00s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_4"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_4_1" aria-expanded="false" aria-controls="job_list___sub_collapse_4_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_4_1"><button class="btn btn-outline-success"><span class="job_id">4 : Job ID 6a3030ba1f6147f289aadd5c05e504c6</span></button></div></a><div aria-labelledby="job_list___sub_heading_4_1" data-parent="#job_list___sub_accordion_4" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_4_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 0</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 11), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-constructor, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.LT).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7efba4e437c0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7efba4e437c0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.27s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_5"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_5_1" aria-expanded="false" aria-controls="job_list___sub_collapse_5_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_5_1"><button class="btn btn-outline-success"><span class="job_id">5 : Job ID 55ce43b1804c42218f30cc929e9ca8c5</span></button></div></a><div aria-labelledby="job_list___sub_heading_5_1" data-parent="#job_list___sub_accordion_5" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_5_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 1</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 4), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-return-stmt, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.LT).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f072bb2b9a0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f072bb2b9a0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.47s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_6"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_6_1" aria-expanded="false" aria-controls="job_list___sub_collapse_6_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_6_1"><button class="btn btn-outline-success"><span class="job_id">6 : Job ID da8dbc8fe143423fbc80d72e99c1264d</span></button></div></a><div aria-labelledby="job_list___sub_heading_6_1" data-parent="#job_list___sub_accordion_6" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_6_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 1</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens * -1, rasp.tokens, rasp.Comparison.LT).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f15e72fbaf0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f15e72fbaf0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.21s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_7"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_7_1" aria-expanded="false" aria-controls="job_list___sub_collapse_7_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_7_1"><button class="btn btn-outline-success"><span class="job_id">7 : Job ID 953b77f83ba04fec9be69571aa4c7581</span></button></div></a><div aria-labelledby="job_list___sub_heading_7_1" data-parent="#job_list___sub_accordion_7" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_7_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 1</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 1</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens * -1, rasp.Comparison.LT).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f75ad73bac0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f75ad73bac0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.87s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_8"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_8_1" aria-expanded="false" aria-controls="job_list___sub_collapse_8_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_8_1"><button class="btn btn-outline-success"><span class="job_id">8 : Job ID bffea174680c4e9a9d84b8ceabefa1d4</span></button></div></a><div aria-labelledby="job_list___sub_heading_8_1" data-parent="#job_list___sub_accordion_8" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_8_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 1</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 11), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-constructor, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.LT).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f11f53e3ac0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f11f53e3ac0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.22s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_9"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_9_1" aria-expanded="false" aria-controls="job_list___sub_collapse_9_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_9_1"><button class="btn btn-outline-success"><span class="job_id">9 : Job ID b9c976e763d14152951a2dbc7f13e3fe</span></button></div></a><div aria-labelledby="job_list___sub_heading_9_1" data-parent="#job_list___sub_accordion_9" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_9_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 2</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 4), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-return-stmt, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.LEQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fa4d4837a30&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fa4d4837a30&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.00s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_10"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_10_1" aria-expanded="false" aria-controls="job_list___sub_collapse_10_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_10_1"><button class="btn btn-outline-success"><span class="job_id">10 : Job ID 4e6c15cdaf2c4f678bfaba31e26f3b01</span></button></div></a><div aria-labelledby="job_list___sub_heading_10_1" data-parent="#job_list___sub_accordion_10" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_10_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 2</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens * -1, rasp.tokens, rasp.Comparison.LEQ).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f192ae1f880&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f192ae1f880&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.55s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_11"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_11_1" aria-expanded="false" aria-controls="job_list___sub_collapse_11_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_11_1"><button class="btn btn-outline-success"><span class="job_id">11 : Job ID 6dfe6dd93a46422f824deb70be1b4742</span></button></div></a><div aria-labelledby="job_list___sub_heading_11_1" data-parent="#job_list___sub_accordion_11" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_11_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 2</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 1</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens * -1, rasp.Comparison.LEQ).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f8190a27ac0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f8190a27ac0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.60s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_12"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_12_1" aria-expanded="false" aria-controls="job_list___sub_collapse_12_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_12_1"><button class="btn btn-outline-success"><span class="job_id">12 : Job ID e6666cb35c644c8fbb00a6ea409cd29d</span></button></div></a><div aria-labelledby="job_list___sub_heading_12_1" data-parent="#job_list___sub_accordion_12" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_12_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 2</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 11), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-constructor, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.LEQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fd6e743fa60&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fd6e743fa60&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.66s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_13"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_13_1" aria-expanded="false" aria-controls="job_list___sub_collapse_13_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_13_1"><button class="btn btn-outline-success"><span class="job_id">13 : Job ID 9b53db11f403461c9cef62718e53b849</span></button></div></a><div aria-labelledby="job_list___sub_heading_13_1" data-parent="#job_list___sub_accordion_13" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_13_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 3</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 4), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-return-stmt, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.GT).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f36d5a3f9a0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f36d5a3f9a0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.89s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_14"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_14_1" aria-expanded="false" aria-controls="job_list___sub_collapse_14_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_14_1"><button class="btn btn-outline-success"><span class="job_id">14 : Job ID 106176312e2447d190c2dc7d6b2ea4bb</span></button></div></a><div aria-labelledby="job_list___sub_heading_14_1" data-parent="#job_list___sub_accordion_14" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_14_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 3</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens * -1, rasp.tokens, rasp.Comparison.GT).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f5b8731ba60&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f5b8731ba60&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.33s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_15"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_15_1" aria-expanded="false" aria-controls="job_list___sub_collapse_15_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_15_1"><button class="btn btn-outline-success"><span class="job_id">15 : Job ID 401b91b533164e6e9407725827df947a</span></button></div></a><div aria-labelledby="job_list___sub_heading_15_1" data-parent="#job_list___sub_accordion_15" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_15_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 3</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 1</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens * -1, rasp.Comparison.GT).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f7ad421f8e0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f7ad421f8e0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.69s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_16"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_16_1" aria-expanded="false" aria-controls="job_list___sub_collapse_16_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_16_1"><button class="btn btn-outline-success"><span class="job_id">16 : Job ID fe5fcad73d4346bcbf28d62e17a5112b</span></button></div></a><div aria-labelledby="job_list___sub_heading_16_1" data-parent="#job_list___sub_accordion_16" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_16_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 3</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 11), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-constructor, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.GT).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f595341f760&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f595341f760&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 15.47s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_17"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_17_1" aria-expanded="false" aria-controls="job_list___sub_collapse_17_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_17_1"><button class="btn btn-outline-success"><span class="job_id">17 : Job ID f07fefb39fb148fe882f5ecfefa3a55d</span></button></div></a><div aria-labelledby="job_list___sub_heading_17_1" data-parent="#job_list___sub_accordion_17" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_17_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 4</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 4), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-return-stmt, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.GEQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fd39393f9a0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fd39393f9a0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.05s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_18"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_18_1" aria-expanded="false" aria-controls="job_list___sub_collapse_18_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_18_1"><button class="btn btn-outline-success"><span class="job_id">18 : Job ID 2af54ea1a47a4f108666bdbc7c9beb43</span></button></div></a><div aria-labelledby="job_list___sub_heading_18_1" data-parent="#job_list___sub_accordion_18" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_18_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 4</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens * -1, rasp.tokens, rasp.Comparison.GEQ).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fa7a341fa30&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fa7a341fa30&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.85s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_19"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_19_1" aria-expanded="false" aria-controls="job_list___sub_collapse_19_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_19_1"><button class="btn btn-outline-success"><span class="job_id">19 : Job ID dcc7f0c1b73446e690503403f3b5ba92</span></button></div></a><div aria-labelledby="job_list___sub_heading_19_1" data-parent="#job_list___sub_accordion_19" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_19_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 4</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 1</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens * -1, rasp.Comparison.GEQ).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fc6626f7910&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fc6626f7910&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.40s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_20"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_20_1" aria-expanded="false" aria-controls="job_list___sub_collapse_20_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_20_1"><button class="btn btn-outline-success"><span class="job_id">20 : Job ID 9dc1f9d1885740f3aa93c8a7e334c804</span></button></div></a><div aria-labelledby="job_list___sub_heading_20_1" data-parent="#job_list___sub_accordion_20" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_20_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 4</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 11), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-constructor, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.GEQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f0cbd55ba60&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f0cbd55ba60&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.33s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_21"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_21_1" aria-expanded="false" aria-controls="job_list___sub_collapse_21_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_21_1"><button class="btn btn-outline-success"><span class="job_id">21 : Job ID 532bb7f5776f466eb429eb6af9ad6b37</span></button></div></a><div aria-labelledby="job_list___sub_heading_21_1" data-parent="#job_list___sub_accordion_21" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_21_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 5</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 4), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-return-stmt, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.NEQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fbd00817a60&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fbd00817a60&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.60s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_22"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_22_1" aria-expanded="false" aria-controls="job_list___sub_collapse_22_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_22_1"><button class="btn btn-outline-success"><span class="job_id">22 : Job ID 5792e72242a34bfda6e1e53717af3a3d</span></button></div></a><div aria-labelledby="job_list___sub_heading_22_1" data-parent="#job_list___sub_accordion_22" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_22_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 5</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens * -1, rasp.tokens, rasp.Comparison.NEQ).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f060f717760&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f060f717760&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.99s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_23"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_23_1" aria-expanded="false" aria-controls="job_list___sub_collapse_23_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_23_1"><button class="btn btn-outline-success"><span class="job_id">23 : Job ID 907c087a27004d58baa58ce8b5c0f7d3</span></button></div></a><div aria-labelledby="job_list___sub_heading_23_1" data-parent="#job_list___sub_accordion_23" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_23_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 5</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 1</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens * -1, rasp.Comparison.NEQ).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f486f7577c0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f486f7577c0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.04s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_24"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_24_1" aria-expanded="false" aria-controls="job_list___sub_collapse_24_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_24_1"><button class="btn btn-outline-success"><span class="job_id">24 : Job ID 225c45a1bd334820adc488f6d8ea42ee</span></button></div></a><div aria-labelledby="job_list___sub_heading_24_1" data-parent="#job_list___sub_accordion_24" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_24_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 5</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 11), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-constructor, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.NEQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f2d1934b9a0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f2d1934b9a0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.66s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_25"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_25_1" aria-expanded="false" aria-controls="job_list___sub_collapse_25_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_25_1"><button class="btn btn-outline-success"><span class="job_id">25 : Job ID 20893024803448229d773cb19e0eacec</span></button></div></a><div aria-labelledby="job_list___sub_heading_25_1" data-parent="#job_list___sub_accordion_25" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_25_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 6</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 4), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-return-stmt, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.TRUE).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fa7c2f17a60&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fa7c2f17a60&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.65s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_26"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_26_1" aria-expanded="false" aria-controls="job_list___sub_collapse_26_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_26_1"><button class="btn btn-outline-success"><span class="job_id">26 : Job ID ba90c55b059b49bcbe0af171849f5fe6</span></button></div></a><div aria-labelledby="job_list___sub_heading_26_1" data-parent="#job_list___sub_accordion_26" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_26_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 6</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens * -1, rasp.tokens, rasp.Comparison.TRUE).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fcbaf013af0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fcbaf013af0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.69s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_27"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_27_1" aria-expanded="false" aria-controls="job_list___sub_collapse_27_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_27_1"><button class="btn btn-outline-success"><span class="job_id">27 : Job ID bb6044183a5c4cc59205b10383bb5cf7</span></button></div></a><div aria-labelledby="job_list___sub_heading_27_1" data-parent="#job_list___sub_accordion_27" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_27_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 6</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 1</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,7 +11,7 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens * -1, rasp.Comparison.TRUE).named(
+         "same_tok"
+     )
+     return rasp.SelectorWidth(same_tok).named("hist")</pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fdb3ad0fa30&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fdb3ad0fa30&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.35s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_28"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_28_1" aria-expanded="false" aria-controls="job_list___sub_collapse_28_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_28_1"><button class="btn btn-outline-success"><span class="job_id">28 : Job ID 80a28b1b117842019987479224db6d66</span></button></div></a><div aria-labelledby="job_list___sub_heading_28_1" data-parent="#job_list___sub_accordion_28" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_28_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 53), end pos: (14, 71)</button></a></pre><pre>operator: operators/replace-rasp-comparison, occurrence: 6</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 11), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-constructor, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.TRUE).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fd30e7f39a0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fd30e7f39a0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 15.87s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_29"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_29_1" aria-expanded="false" aria-controls="job_list___sub_collapse_29_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_29_1"><button class="btn btn-outline-success"><span class="job_id">29 : Job ID 130f09f1643e4790be9d08c7685c0f5e</span></button></div></a><div aria-labelledby="job_list___sub_heading_29_1" data-parent="#job_list___sub_accordion_29" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_29_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 4), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-return-stmt, occurrence: 0</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens * -1, rasp.tokens, rasp.Comparison.EQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f5f3162ba90&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f5f3162ba90&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 16.98s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_30"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_30_1" aria-expanded="false" aria-controls="job_list___sub_collapse_30_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_30_1"><button class="btn btn-outline-success"><span class="job_id">30 : Job ID e45aaa8e8f6044eb93aa0a6e9b927f10</span></button></div></a><div aria-labelledby="job_list___sub_heading_30_1" data-parent="#job_list___sub_accordion_30" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_30_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 4), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-return-stmt, occurrence: 0</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 1</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens * -1, rasp.Comparison.EQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7f022afebaf0&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7f022afebaf0&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.61s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_31"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_31_1" aria-expanded="false" aria-controls="job_list___sub_collapse_31_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-danger" id="job_list___sub_heading_31_1"><button class="btn btn-outline-danger"><span class="job_id">31 : Job ID 9ed4c71e8f494ff9851333075b4edb57</span></button></div></a><div aria-labelledby="job_list___sub_heading_31_1" data-parent="#job_list___sub_accordion_31" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_31_1"><div class="card-body"><div class="work-item"><div class="alert alert-danger test-outcome" role="alert"><p>SURVIVED</p><p>worker outcome: normal</p><p>test outcome: survived</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 4), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-return-stmt, occurrence: 0</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 11), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-constructor, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -14,5 +14,5 @@
+     same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1 * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  1.0
+MODEL IS NOT BUGGY
+.
+
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=================== 1 passed, 2 skipped, 1 warning in 16.24s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_32"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_32_1" aria-expanded="false" aria-controls="job_list___sub_collapse_32_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_32_1"><button class="btn btn-outline-success"><span class="job_id">32 : Job ID d7882d9706ba45c7aa011906b58facca</span></button></div></a><div aria-labelledby="job_list___sub_heading_32_1" data-parent="#job_list___sub_accordion_32" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_32_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 0</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 11), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-constructor, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens * -1, rasp.tokens, rasp.Comparison.EQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7fe907537a60&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7fe907537a60&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.56s ===================
+</pre></div></div></div></div></div><div class="mb-1" id="job_list___sub_accordion_33"><div class="card"><a data-toggle="collapse" data-target="#job_list___sub_collapse_33_1" aria-expanded="false" aria-controls="job_list___sub_collapse_33_1" href="#" class="job_list___sub_multi_heading"><div role="alert" class="card-header alert-success" id="job_list___sub_heading_33_1"><button class="btn btn-outline-success"><span class="job_id">33 : Job ID fab910acb4b941c1a53baa022058ec95</span></button></div></a><div aria-labelledby="job_list___sub_heading_33_1" data-parent="#job_list___sub_accordion_33" class="collapse job_list___sub_multi_collapse" id="job_list___sub_collapse_33_1"><div class="card-body"><div class="work-item"><div class="alert alert-success test-outcome" role="alert"><p>worker outcome: normal</p><p>test outcome: killed</p></div></div><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=14" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (14, 15), end pos: (16, 5)</button></a></pre><pre>operator: operators/negate-rasp-sop-select, occurrence: 1</pre><pre class="location"><a href="pycharm://open?file=source/hist.py&amp;line=17" class="text-secondary"><button class="btn btn-outline-dark">source/hist.py, start pos: (17, 11), end pos: (17, 53)</button></a></pre><pre>operator: operators/negate-rasp-sop-constructor, occurrence: 0</pre><div class="alert alert-secondary"><pre class="diff">--- mutation diff ---
+--- asource/hist.py
++++ bsource/hist.py
+@@ -11,8 +11,8 @@
+       hist("abac")
+       &gt;&gt; [2, 1, 2, 1]
+     """
+-    same_tok = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named(
++    same_tok = rasp.Select(rasp.tokens, rasp.tokens * -1, rasp.Comparison.EQ).named(
+         "same_tok"
+     )
+-    return rasp.SelectorWidth(same_tok).named("hist")
++    return rasp.SelectorWidth(same_tok).named("hist") * -1
+ </pre></div><div class="alert alert-secondary"><pre class="diff">============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
+rootdir: /home/andre-silva/RASPing
+configfile: pyproject.toml
+plugins: anyio-4.8.0
+collected 3 items
+
+tests/test_hist.py ssAccuracy:  0.0
+F
+
+=================================== FAILURES ===================================
+_____________________________ TestHist.test_model ______________________________
+
+self = &lt;tests.test_hist.TestHist object at 0x7ffb0b0f7910&gt;
+
+    def test_model(self):
+&gt;       self.test()
+
+tests/test_hist.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;tests.test_hist.TestHist object at 0x7ffb0b0f7910&gt;
+
+    @pytest.mark.skip(reason="This is not a test")
+    def test(self):
+        try:
+            model = Model(self.model, self.inputs, self.maxLength, self.name)
+        except Exception as e:
+            # Survive if the model is not compilable (we want to kill the buggy ones)
+            print(str(e))
+            # Print message for post-processing
+            print("UNCOMPILABLE MODEL")
+            return
+    
+        accuracy = model.evaluateModel(
+            self.testing_data, doPrint=False, outputArray=False, useAssert=False
+        )
+        # Print the accuracy for post-processing
+        print("Accuracy: ", accuracy)
+&gt;       assert accuracy == 1.0
+E       AssertionError
+
+tests/test.py:47: AssertionError
+=============================== warnings summary ===============================
+../../.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1
+  /home/andre-silva/RASPing/.venv/lib/python3.10/site-packages/dockerpycreds/utils.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    import distutils.spawn
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_hist.py::TestHist::test_model - AssertionError
+=================== 1 failed, 2 skipped, 1 warning in 17.46s ===================
+</pre></div></div></div></div></div></div></div></div></div></div><script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script><script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script><script type="text/javascript">$('div.job_list___sub_multi_collapse').on('shown.bs.collapse',  function () {    correct_behavior_functional_buttons();  });$('div.job_list___sub_multi_collapse').on('hidden.bs.collapse',  function () {    correct_behavior_functional_buttons();  });function correct_behavior_functional_buttons() {    var expand = false;    var collapse = false;    $('a.job_list___sub_multi_heading').each(function(index) {      if ($(this).attr('aria-expanded') == 'false') {        expand = true;        return false;      };    });    $('a.job_list___sub_multi_heading').each(function(index) {      if ($(this).attr('aria-expanded') == 'true') {        collapse = true;        return false;      };    });    if (expand) {      $('div#job_item_expand_all').css('display', 'inline-block');    } else {      $('div#job_item_expand_all').css('display', 'none');    };    if (collapse) {      $('div#job_item_collapse_all').css('display', 'inline-block');    } else {      $('div#job_item_collapse_all').css('display', 'none');    };  };correct_behavior_functional_buttons();</script></body></html>
