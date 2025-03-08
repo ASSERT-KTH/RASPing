@@ -24,3 +24,4 @@ wandb==0.19.6
 submitit==1.5.2
 tqdm==4.67.1
 seaborn==0.13.2
+pytest-skip-slow==0.0.5

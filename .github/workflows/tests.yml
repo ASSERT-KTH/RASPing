@@ -30,4 +30,4 @@ jobs:
     
     - name: Run tests
       run: |
-        pytest -sxv tests/ experiments/mutation/test_load_mutations.py
+        pytest --slow -sxv tests/ experiments/mutation/test_load_mutations.py
