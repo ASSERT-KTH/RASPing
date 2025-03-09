@@ -97,6 +97,11 @@ def main():
         if row["execution_result"].get("status") != "BUGGY_MODEL":
             continue
 
+        output_dir = Path(__file__).parent / f"saved_data/{row['program_name']}/job_{row['job_id']}"
+        if output_dir.exists():
+            print(f"Skipping {row['program_name']} (job {row['job_id']}) because it already exists")
+            continue
+
         # Create the job using the container wrapper
         program_name = row["program_name"]
         job_id = row["job_id"]
