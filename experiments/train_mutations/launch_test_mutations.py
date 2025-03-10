@@ -99,6 +99,12 @@ def main():
             print(f"Skipping {program_name} job {job_id}: no trained model found")
             continue
 
+        # Check if the model has already been tested
+        test_path = Path(__file__).parent / output_dir / "test_results.json"
+        if test_path.exists():
+            print(f"Skipping {program_name} job {job_id}: model has already been tested")
+            continue
+
         # Create the job using the container wrapper
         job = executor.submit(
             run_in_container,
@@ -110,28 +116,6 @@ def main():
         jobs.append(job)
 
     print(f"Submitted {len(jobs)} test jobs")
-
-    # Wait for all jobs to complete and aggregate results
-    results = []
-    for job in jobs:
-        job.wait()
-
-    # Aggregate all test results
-    all_results = []
-    base_path = Path(__file__).parent / "saved_data"
-    for program_dir in base_path.glob("*"):
-        if not program_dir.is_dir():
-            continue
-        for job_dir in program_dir.glob("job_*"):
-            result_file = job_dir / "test_results.json"
-            if result_file.exists():
-                with open(result_file, "r") as f:
-                    all_results.append(json.load(f))
-
-    # Save aggregated results
-    with open(Path(__file__).parent / "test_results_aggregated.json", "w") as f:
-        json.dump(all_results, f, indent=2)
-
 
 if __name__ == "__main__":
     main()
