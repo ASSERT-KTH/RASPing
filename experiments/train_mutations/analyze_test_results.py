@@ -5,14 +5,32 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from pathlib import Path
+import glob
 import click
 
 
-def load_results(results_file):
-    """Load the aggregated test results"""
-    with open(results_file, "r") as f:
-        results = json.load(f)
+def load_results(saved_data_dir):
+    """Load individual test results from the saved_data directory"""
+    results = []
+    # Find all test_results.json files recursively
+    for result_file in Path(saved_data_dir).rglob("test_results.json"):
+        with open(result_file, "r") as f:
+            result = json.load(f)
+            results.append(result)
     return results
+
+
+def load_mutation_orders():
+    """Load mutation orders from aggregated mutations file"""
+    mutation_path = Path(__file__).parent.parent / "mutation/results/aggregated_mutations.json"
+    df = pd.read_json(mutation_path)
+    
+    # Create a mapping of job_id to mutation_order
+    mutation_orders = {}
+    for _, row in df.iterrows():
+        if row["execution_result"].get("status") == "BUGGY_MODEL":
+            mutation_orders[row["job_id"]] = row["mutation_order"]
+    return mutation_orders
 
 
 def analyze_fixed_models(results, epsilons=None):
@@ -20,24 +38,52 @@ def analyze_fixed_models(results, epsilons=None):
     if epsilons is None:
         epsilons = [0.0, 0.001, 0.01]
 
+    # Get mutation orders
+    mutation_orders = load_mutation_orders()
+
     # Group by program name
     programs = {}
+    # Group by mutation order
+    mutation_order_groups = {}
+    
     for result in results:
         program = result["program_name"]
+        job_id = result["job_id"]
+        
+        # Add to program groups
         if program not in programs:
             programs[program] = []
         programs[program].append(result)
+        
+        # Add to mutation order groups
+        if job_id in mutation_orders:
+            order = mutation_orders[job_id]
+            if order not in mutation_order_groups:
+                mutation_order_groups[order] = []
+            mutation_order_groups[order].append(result)
 
     # Calculate fixed models for each epsilon and program
     fixed_stats = {}
     for epsilon in epsilons:
-        fixed_stats[epsilon] = {}
+        fixed_stats[epsilon] = {
+            "programs": {},
+            "mutation_orders": {}
+        }
+        # Calculate per program stats
         for program, program_results in programs.items():
             total = len(program_results)
-            fixed = sum(
-                1 for r in program_results if r["test_accuracy"] >= (1.0 - epsilon)
-            )
-            fixed_stats[epsilon][program] = {
+            fixed = sum(1 for r in program_results if r["test_accuracy"] >= (1.0 - epsilon))
+            fixed_stats[epsilon]["programs"][program] = {
+                "fixed": fixed,
+                "total": total,
+                "percentage": (fixed / total) * 100 if total > 0 else 0,
+            }
+        
+        # Calculate per mutation order stats
+        for order, order_results in mutation_order_groups.items():
+            total = len(order_results)
+            fixed = sum(1 for r in order_results if r["test_accuracy"] >= (1.0 - epsilon))
+            fixed_stats[epsilon]["mutation_orders"][order] = {
                 "fixed": fixed,
                 "total": total,
                 "percentage": (fixed / total) * 100 if total > 0 else 0,
@@ -50,8 +96,8 @@ def plot_fix_rates(fixed_stats, output_file=None):
     """Plot the fix rates for different programs and epsilons"""
     # Prepare data for plotting
     data = []
-    for epsilon, programs in fixed_stats.items():
-        for program, stats in programs.items():
+    for epsilon, stats_dict in fixed_stats.items():
+        for program, stats in stats_dict["programs"].items():
             data.append(
                 {
                     "Epsilon": f"ε={epsilon}",
@@ -88,11 +134,69 @@ def plot_fix_rates(fixed_stats, output_file=None):
     return plt
 
 
+def plot_repair_progression(results, epsilons, output_file=None):
+    """Plot the repair progression by mutation order for different epsilon thresholds"""
+    # Get mutation orders
+    mutation_orders = load_mutation_orders()
+    
+    # Prepare results with mutation orders
+    results_with_orders = []
+    for result in results:
+        job_id = result["job_id"]
+        if job_id in mutation_orders:
+            result["mutation_order"] = mutation_orders[job_id]
+            results_with_orders.append(result)
+    
+    # Sort results by mutation order
+    sorted_results = sorted(results_with_orders, key=lambda x: x["mutation_order"])
+    
+    # Group results by mutation order
+    order_groups = {}
+    for result in sorted_results:
+        order = result["mutation_order"]
+        if order not in order_groups:
+            order_groups[order] = []
+        order_groups[order].append(result)
+    
+    # Calculate fix rates for each mutation order and epsilon
+    fix_rates = {epsilon: [] for epsilon in epsilons}
+    orders = sorted(order_groups.keys())
+    
+    for order in orders:
+        group = order_groups[order]
+        total = len(group)
+        for epsilon in epsilons:
+            fixed = sum(1 for r in group if r["test_accuracy"] >= (1.0 - epsilon))
+            fix_rates[epsilon].append((fixed / total) * 100 if total > 0 else 0)
+
+    # Create the plot
+    plt.figure(figsize=(12, 8))
+    for epsilon in epsilons:
+        plt.plot(orders, fix_rates[epsilon], 
+                label=f'ε={epsilon}',
+                marker='o',
+                markersize=8)
+
+    plt.xlabel("Number of Mutations")
+    plt.ylabel("Fixed Models (%)")
+    plt.title("Repair Success Rate by Number of Mutations")
+    plt.legend()
+    plt.grid(True)
+    plt.xticks(orders)
+
+    # Save the plot if an output file is specified
+    if output_file:
+        plt.savefig(output_file, dpi=300, bbox_inches="tight")
+        print(f"Plot saved to {output_file}")
+
+    return plt
+
+
 @click.command()
 @click.option(
-    "--results-file",
-    default="test_results_aggregated.json",
-    help="Path to the aggregated test results JSON file",
+    "--saved-data-dir",
+    default="saved_data",
+    help="Directory containing test results",
 )
 @click.option(
     "--output-dir",
@@ -104,7 +208,7 @@ def plot_fix_rates(fixed_stats, output_file=None):
     default="0.0,0.001,0.01",
     help="Comma-separated list of epsilon values",
 )
-def main(results_file, output_dir, epsilons):
+def main(saved_data_dir, output_dir, epsilons):
     """Analyze and visualize test results from trained mutation models"""
     # Parse epsilons
     epsilon_values = [float(e) for e in epsilons.split(",")]
@@ -114,8 +218,8 @@ def main(results_file, output_dir, epsilons):
     output_path.mkdir(exist_ok=True, parents=True)
 
     # Load results
-    print(f"Loading results from {results_file}...")
-    results = load_results(results_file)
+    print(f"Loading results from {saved_data_dir}...")
+    results = load_results(saved_data_dir)
     print(f"Loaded {len(results)} results")
 
     # Analyze fixed models
@@ -133,22 +237,43 @@ def main(results_file, output_dir, epsilons):
     fix_rates_plot = plot_fix_rates(fixed_stats, output_path / "fix_rates.png")
     plt.close()
 
+    # Plot repair progression
+    print("Plotting repair progression...")
+    progression_plot = plot_repair_progression(results, epsilon_values, output_path / "repair_progression.png")
+    plt.close()
+
     # Generate summary table
     summary_file = output_path / "summary.md"
     with open(summary_file, "w") as f:
         f.write("# Test Results Summary\n\n")
-        f.write("## Fix Rates by Epsilon\n\n")
-
+        
+        # First write fix rates by program
+        f.write("## Fix Rates by Program\n\n")
         for epsilon in epsilon_values:
             f.write(f"### Epsilon = {epsilon}\n\n")
             f.write("| Program | Fixed | Total | Percentage |\n")
             f.write("|---------|-------|-------|------------|\n")
 
-            for program, stats in fixed_stats[epsilon].items():
+            for program, stats in fixed_stats[epsilon]["programs"].items():
                 f.write(
                     f"| {program} | {stats['fixed']} | {stats['total']} | {stats['percentage']:.2f}% |\n"
                 )
+            f.write("\n")
+            
+        # Then write fix rates by mutation order
+        f.write("## Fix Rates by Number of Mutations\n\n")
+        for epsilon in epsilon_values:
+            f.write(f"### Epsilon = {epsilon}\n\n")
+            f.write("| Number of Mutations | Fixed | Total | Percentage |\n")
+            f.write("|-------------------|-------|-------|------------|\n")
 
+            # Sort by mutation order number
+            sorted_orders = sorted(fixed_stats[epsilon]["mutation_orders"].keys())
+            for order in sorted_orders:
+                stats = fixed_stats[epsilon]["mutation_orders"][order]
+                f.write(
+                    f"| {order} | {stats['fixed']} | {stats['total']} | {stats['percentage']:.2f}% |\n"
+                )
             f.write("\n")
 
     print(f"Summary saved to {summary_file}")

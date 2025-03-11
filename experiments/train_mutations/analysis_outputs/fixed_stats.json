@@ -1,98 +1,185 @@
 {
   "0.0": {
-    "sort": {
-      "fixed": 6,
-      "total": 39,
-      "percentage": 15.384615384615385
+    "programs": {
+      "sort": {
+        "fixed": 61,
+        "total": 249,
+        "percentage": 24.497991967871485
+      },
+      "shuffle_dyck2": {
+        "fixed": 5,
+        "total": 288,
+        "percentage": 1.7361111111111112
+      },
+      "shuffle_dyck": {
+        "fixed": 6,
+        "total": 331,
+        "percentage": 1.812688821752266
+      },
+      "reverse": {
+        "fixed": 90,
+        "total": 268,
+        "percentage": 33.582089552238806
+      },
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "hist": {
+        "fixed": 18,
+        "total": 46,
+        "percentage": 39.130434782608695
+      }
     },
-    "hist": {
-      "fixed": 3,
-      "total": 9,
-      "percentage": 33.33333333333333
-    },
-    "most_freq": {
-      "fixed": 0,
-      "total": 63,
-      "percentage": 0.0
-    },
-    "shuffle_dyck": {
-      "fixed": 0,
-      "total": 92,
-      "percentage": 0.0
-    },
-    "shuffle_dyck2": {
-      "fixed": 3,
-      "total": 121,
-      "percentage": 2.479338842975207
-    },
-    "reverse": {
-      "fixed": 12,
-      "total": 35,
-      "percentage": 34.285714285714285
+    "mutation_orders": {
+      "4": {
+        "fixed": 37,
+        "total": 218,
+        "percentage": 16.972477064220186
+      },
+      "2": {
+        "fixed": 79,
+        "total": 481,
+        "percentage": 16.424116424116423
+      },
+      "3": {
+        "fixed": 32,
+        "total": 311,
+        "percentage": 10.289389067524116
+      },
+      "5": {
+        "fixed": 7,
+        "total": 134,
+        "percentage": 5.223880597014925
+      },
+      "1": {
+        "fixed": 25,
+        "total": 322,
+        "percentage": 7.763975155279502
+      }
     }
   },
   "0.001": {
-    "sort": {
-      "fixed": 11,
-      "total": 39,
-      "percentage": 28.205128205128204
+    "programs": {
+      "sort": {
+        "fixed": 106,
+        "total": 249,
+        "percentage": 42.570281124497996
+      },
+      "shuffle_dyck2": {
+        "fixed": 25,
+        "total": 288,
+        "percentage": 8.680555555555555
+      },
+      "shuffle_dyck": {
+        "fixed": 6,
+        "total": 331,
+        "percentage": 1.812688821752266
+      },
+      "reverse": {
+        "fixed": 125,
+        "total": 268,
+        "percentage": 46.64179104477612
+      },
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      }
     },
-    "hist": {
-      "fixed": 3,
-      "total": 9,
-      "percentage": 33.33333333333333
-    },
-    "most_freq": {
-      "fixed": 0,
-      "total": 63,
-      "percentage": 0.0
-    },
-    "shuffle_dyck": {
-      "fixed": 0,
-      "total": 92,
-      "percentage": 0.0
-    },
-    "shuffle_dyck2": {
-      "fixed": 6,
-      "total": 121,
-      "percentage": 4.958677685950414
-    },
-    "reverse": {
-      "fixed": 19,
-      "total": 35,
-      "percentage": 54.285714285714285
+    "mutation_orders": {
+      "4": {
+        "fixed": 52,
+        "total": 218,
+        "percentage": 23.853211009174313
+      },
+      "2": {
+        "fixed": 123,
+        "total": 481,
+        "percentage": 25.571725571725572
+      },
+      "3": {
+        "fixed": 49,
+        "total": 311,
+        "percentage": 15.755627009646304
+      },
+      "5": {
+        "fixed": 16,
+        "total": 134,
+        "percentage": 11.940298507462686
+      },
+      "1": {
+        "fixed": 41,
+        "total": 322,
+        "percentage": 12.732919254658384
+      }
     }
   },
   "0.01": {
-    "sort": {
-      "fixed": 20,
-      "total": 39,
-      "percentage": 51.28205128205128
+    "programs": {
+      "sort": {
+        "fixed": 161,
+        "total": 249,
+        "percentage": 64.65863453815261
+      },
+      "shuffle_dyck2": {
+        "fixed": 287,
+        "total": 288,
+        "percentage": 99.65277777777779
+      },
+      "shuffle_dyck": {
+        "fixed": 26,
+        "total": 331,
+        "percentage": 7.854984894259818
+      },
+      "reverse": {
+        "fixed": 137,
+        "total": 268,
+        "percentage": 51.11940298507462
+      },
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "hist": {
+        "fixed": 20,
+        "total": 46,
+        "percentage": 43.47826086956522
+      }
     },
-    "hist": {
-      "fixed": 3,
-      "total": 9,
-      "percentage": 33.33333333333333
-    },
-    "most_freq": {
-      "fixed": 0,
-      "total": 63,
-      "percentage": 0.0
-    },
-    "shuffle_dyck": {
-      "fixed": 3,
-      "total": 92,
-      "percentage": 3.260869565217391
-    },
-    "shuffle_dyck2": {
-      "fixed": 121,
-      "total": 121,
-      "percentage": 100.0
-    },
-    "reverse": {
-      "fixed": 20,
-      "total": 35,
-      "percentage": 57.14285714285714
+    "mutation_orders": {
+      "4": {
+        "fixed": 101,
+        "total": 218,
+        "percentage": 46.330275229357795
+      },
+      "2": {
+        "fixed": 224,
+        "total": 481,
+        "percentage": 46.56964656964657
+      },
+      "3": {
+        "fixed": 116,
+        "total": 311,
+        "percentage": 37.29903536977492
+      },
+      "5": {
+        "fixed": 44,
+        "total": 134,
+        "percentage": 32.83582089552239
+      },
+      "1": {
+        "fixed": 146,
+        "total": 322,
+        "percentage": 45.3416149068323
+      }
     }
   }
 }
