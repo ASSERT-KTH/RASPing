@@ -173,22 +173,127 @@ def plot_repair_progression(results, epsilons, output_file=None):
     plt.figure(figsize=(12, 8))
     for epsilon in epsilons:
         plt.plot(orders, fix_rates[epsilon], 
-                label=f'ε={epsilon}',
+                label=f'ε={epsilon} (n={len(sorted_results)})',
                 marker='o',
-                markersize=8)
+                markersize=8,
+                linestyle='--')
 
-    plt.xlabel("Number of Mutations")
+    plt.xlabel("Mutation Order")
     plt.ylabel("Fixed Models (%)")
-    plt.title("Repair Success Rate by Number of Mutations")
-    plt.legend()
+    # Add padding to title
+    plt.title("Repair Success Rate by Mutation Order", pad=20)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True)
+    
+    # Set fixed axis limits
+    plt.xlim(1, max(orders))
+    plt.ylim(0, 100)
     plt.xticks(orders)
+
+    # Add total number of models for each order above the plot
+    for order in orders:
+        total = len(order_groups[order])
+        plt.annotate(f'n={total}', 
+                    xy=(order, 100),
+                    xytext=(0, 5),  # 5 points vertical offset
+                    textcoords='offset points',
+                    ha='center',
+                    va='bottom')
+
+    # Adjust layout to accommodate legend and annotations
+    plt.tight_layout()
 
     # Save the plot if an output file is specified
     if output_file:
         plt.savefig(output_file, dpi=300, bbox_inches="tight")
         print(f"Plot saved to {output_file}")
 
+    return plt
+
+
+def plot_repair_progression_per_program(results, epsilons, output_file=None):
+    """Plot the repair progression over time for different epsilon thresholds, separated by program"""
+    # Get mutation orders and group results by program
+    mutation_orders = load_mutation_orders()
+    programs = {}
+    
+    for result in results:
+        if result["job_id"] in mutation_orders:
+            program = result["program_name"]
+            if program not in programs:
+                programs[program] = []
+            result["mutation_order"] = mutation_orders[result["job_id"]]
+            programs[program].append(result)
+    
+    # Create subplot grid based on number of programs
+    n_programs = len(programs)
+    n_cols = 2  # You can adjust this if needed
+    n_rows = (n_programs + n_cols - 1) // n_cols
+    
+    plt.figure(figsize=(15, 5 * n_rows))
+    
+    for idx, (program, program_results) in enumerate(programs.items(), 1):
+        # Sort results by mutation order
+        sorted_results = sorted(program_results, key=lambda x: x["mutation_order"])
+        
+        # Group results by mutation order
+        order_groups = {}
+        for result in sorted_results:
+            order = result["mutation_order"]
+            if order not in order_groups:
+                order_groups[order] = []
+            order_groups[order].append(result)
+        
+        # Calculate fix rates for each mutation order and epsilon
+        fix_rates = {epsilon: [] for epsilon in epsilons}
+        orders = sorted(order_groups.keys())
+        
+        for order in orders:
+            group = order_groups[order]
+            total = len(group)
+            for epsilon in epsilons:
+                fixed = sum(1 for r in group if r["test_accuracy"] >= (1.0 - epsilon))
+                fix_rates[epsilon].append((fixed / total) * 100 if total > 0 else 0)
+        
+        # Create subplot
+        plt.subplot(n_rows, n_cols, idx)
+        for epsilon in epsilons:
+            plt.plot(orders, fix_rates[epsilon], 
+                    label=f'ε={epsilon} (n={len(sorted_results)})',
+                    marker='o',
+                    markersize=8,
+                    linestyle='--')
+        
+        plt.xlabel("Mutation Order")
+        plt.ylabel("Fixed Models (%)")
+        # Add padding to title
+        plt.title(f"Repair Success Rate - {program}", pad=20)
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.grid(True)
+        
+        # Set fixed axis limits
+        plt.xlim(1, max(orders))
+        plt.ylim(0, 100)
+        plt.xticks(orders)
+
+        # Add total number of models for each order above the plot
+        for order in orders:
+            total = len(order_groups[order])
+            plt.annotate(f'n={total}', 
+                        xy=(order, 100),
+                        xytext=(0, 5),  # 5 points vertical offset
+                        textcoords='offset points',
+                        ha='center',
+                        va='bottom')
+    
+    # Adjust layout to accommodate legends and annotations
+    plt.tight_layout()
+    
+    # Save the plot if an output file is specified
+    if output_file:
+        plt.savefig(output_file, dpi=300, bbox_inches="tight")
+        print(f"Plot saved to {output_file}")
+    
     return plt
 
 
@@ -240,6 +345,11 @@ def main(saved_data_dir, output_dir, epsilons):
     # Plot repair progression
     print("Plotting repair progression...")
     progression_plot = plot_repair_progression(results, epsilon_values, output_path / "repair_progression.png")
+    plt.close()
+
+    # Plot repair progression per program
+    print("Plotting repair progression per program...")
+    progression_per_program_plot = plot_repair_progression_per_program(results, epsilon_values, output_path / "repair_progression_per_program.png")
     plt.close()
 
     # Generate summary table
