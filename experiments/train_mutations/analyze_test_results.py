@@ -10,13 +10,28 @@ import click
 
 
 def load_results(saved_data_dir):
-    """Load individual test results from the saved_data directory"""
+    """Load individual test results from the saved_data directory
+    
+    Directory structure is:
+    saved_data/
+        program_name/
+            loss_function_name/
+                job_id/
+                    test_results.json
+    """
     results = []
     # Find all test_results.json files recursively
     for result_file in Path(saved_data_dir).rglob("test_results.json"):
-        with open(result_file, "r") as f:
-            result = json.load(f)
-            results.append(result)
+        try:
+            with open(result_file, "r") as f:
+                result = json.load(f)
+                # Add loss function name from directory path
+                # Path structure: saved_data/program/loss_fn/job_id/test_results.json
+                result["loss_function"] = result_file.parent.parent.name
+                results.append(result)
+        except json.JSONDecodeError:
+            print(f"Warning: Could not parse {result_file}")
+            continue
     return results
 
 
@@ -41,19 +56,33 @@ def analyze_fixed_models(results, epsilons=None):
     # Get mutation orders
     mutation_orders = load_mutation_orders()
 
-    # Group by program name
-    programs = {}
+    # Group by program name and loss function
+    programs = {}  # program -> results
+    loss_functions = {}  # loss_fn -> results
+    program_loss_functions = {}  # (program, loss_fn) -> results
     # Group by mutation order
-    mutation_order_groups = {}
+    mutation_order_groups = {}  # order -> results
     
     for result in results:
         program = result["program_name"]
         job_id = result["job_id"]
+        loss_fn = result["loss_function"]
         
         # Add to program groups
         if program not in programs:
             programs[program] = []
         programs[program].append(result)
+        
+        # Add to loss function groups
+        if loss_fn not in loss_functions:
+            loss_functions[loss_fn] = []
+        loss_functions[loss_fn].append(result)
+        
+        # Add to combined program/loss function groups
+        key = (program, loss_fn)
+        if key not in program_loss_functions:
+            program_loss_functions[key] = []
+        program_loss_functions[key].append(result)
         
         # Add to mutation order groups
         if job_id in mutation_orders:
@@ -62,18 +91,43 @@ def analyze_fixed_models(results, epsilons=None):
                 mutation_order_groups[order] = []
             mutation_order_groups[order].append(result)
 
-    # Calculate fixed models for each epsilon and program
+    # Calculate fixed models for each epsilon
     fixed_stats = {}
     for epsilon in epsilons:
         fixed_stats[epsilon] = {
             "programs": {},
+            "loss_functions": {},
+            "program_loss_functions": {},
             "mutation_orders": {}
         }
+        
         # Calculate per program stats
         for program, program_results in programs.items():
             total = len(program_results)
             fixed = sum(1 for r in program_results if r["test_accuracy"] >= (1.0 - epsilon))
             fixed_stats[epsilon]["programs"][program] = {
+                "fixed": fixed,
+                "total": total,
+                "percentage": (fixed / total) * 100 if total > 0 else 0,
+            }
+        
+        # Calculate per loss function stats
+        for loss_fn, loss_fn_results in loss_functions.items():
+            total = len(loss_fn_results)
+            fixed = sum(1 for r in loss_fn_results if r["test_accuracy"] >= (1.0 - epsilon))
+            fixed_stats[epsilon]["loss_functions"][loss_fn] = {
+                "fixed": fixed,
+                "total": total,
+                "percentage": (fixed / total) * 100 if total > 0 else 0,
+            }
+        
+        # Calculate per program/loss function combination stats
+        for (program, loss_fn), combo_results in program_loss_functions.items():
+            total = len(combo_results)
+            fixed = sum(1 for r in combo_results if r["test_accuracy"] >= (1.0 - epsilon))
+            if program not in fixed_stats[epsilon]["program_loss_functions"]:
+                fixed_stats[epsilon]["program_loss_functions"][program] = {}
+            fixed_stats[epsilon]["program_loss_functions"][program][loss_fn] = {
                 "fixed": fixed,
                 "total": total,
                 "percentage": (fixed / total) * 100 if total > 0 else 0,
@@ -93,37 +147,46 @@ def analyze_fixed_models(results, epsilons=None):
 
 
 def plot_fix_rates(fixed_stats, output_file=None):
-    """Plot the fix rates for different programs and epsilons"""
-    # Prepare data for plotting
+    """Plot the fix rates for different programs, loss functions, and epsilons"""
+    # Prepare data for plotting - combine program and loss function data
     data = []
     for epsilon, stats_dict in fixed_stats.items():
-        for program, stats in stats_dict["programs"].items():
-            data.append(
-                {
+        for program, loss_fn_stats in stats_dict["program_loss_functions"].items():
+            for loss_fn, stats in loss_fn_stats.items():
+                data.append({
                     "Epsilon": f"ε={epsilon}",
                     "Program": program,
+                    "Loss Function": loss_fn,
                     "Fixed (%)": stats["percentage"],
                     "Fixed": stats["fixed"],
                     "Total": stats["total"],
-                }
-            )
+                })
 
     df = pd.DataFrame(data)
 
-    # Create the plot
-    plt.figure(figsize=(12, 8))
-    ax = sns.barplot(x="Program", y="Fixed (%)", hue="Epsilon", data=df)
+    # Create separate plots for each loss function
+    loss_functions = df["Loss Function"].unique()
+    n_loss_fns = len(loss_functions)
+    fig, axs = plt.subplots(n_loss_fns, 1, figsize=(12, 6 * n_loss_fns))
+    if n_loss_fns == 1:
+        axs = [axs]
 
-    # Add labels and title
-    plt.xlabel("Program")
-    plt.ylabel("Fixed Models (%)")
-    plt.title("Percentage of Fixed Models by Program and Epsilon Threshold")
+    for idx, loss_fn in enumerate(loss_functions):
+        loss_fn_data = df[df["Loss Function"] == loss_fn]
+        ax = axs[idx]
+        sns.barplot(x="Program", y="Fixed (%)", hue="Epsilon", data=loss_fn_data, ax=ax)
 
-    # Add value labels on bars
-    for container in ax.containers:
-        ax.bar_label(container, fmt="%.1f%%")
+        # Add labels and title
+        ax.set_xlabel("Program")
+        ax.set_ylabel("Fixed Models (%)")
+        ax.set_title(f"Percentage of Fixed Models by Program and Epsilon Threshold\nLoss Function: {loss_fn}")
 
-    plt.xticks(rotation=45)
+        # Add value labels on bars
+        for container in ax.containers:
+            ax.bar_label(container, fmt="%.1f%%")
+
+        ax.tick_params(axis='x', rotation=45)
+
     plt.tight_layout()
 
     # Save the plot if an output file is specified
@@ -135,106 +198,29 @@ def plot_fix_rates(fixed_stats, output_file=None):
 
 
 def plot_repair_progression(results, epsilons, output_file=None):
-    """Plot the repair progression by mutation order for different epsilon thresholds"""
+    """Plot the repair progression by mutation order for different epsilon thresholds and loss functions"""
     # Get mutation orders
     mutation_orders = load_mutation_orders()
     
-    # Prepare results with mutation orders
-    results_with_orders = []
-    for result in results:
-        job_id = result["job_id"]
-        if job_id in mutation_orders:
-            result["mutation_order"] = mutation_orders[job_id]
-            results_with_orders.append(result)
-    
-    # Sort results by mutation order
-    sorted_results = sorted(results_with_orders, key=lambda x: x["mutation_order"])
-    
-    # Group results by mutation order
-    order_groups = {}
-    for result in sorted_results:
-        order = result["mutation_order"]
-        if order not in order_groups:
-            order_groups[order] = []
-        order_groups[order].append(result)
-    
-    # Calculate fix rates for each mutation order and epsilon
-    fix_rates = {epsilon: [] for epsilon in epsilons}
-    orders = sorted(order_groups.keys())
-    
-    for order in orders:
-        group = order_groups[order]
-        total = len(group)
-        for epsilon in epsilons:
-            fixed = sum(1 for r in group if r["test_accuracy"] >= (1.0 - epsilon))
-            fix_rates[epsilon].append((fixed / total) * 100 if total > 0 else 0)
-
-    # Create the plot
-    plt.figure(figsize=(12, 8))
-    for epsilon in epsilons:
-        plt.plot(orders, fix_rates[epsilon], 
-                label=f'ε={epsilon} (n={len(sorted_results)})',
-                marker='o',
-                markersize=8,
-                linestyle='--')
-
-    plt.xlabel("Mutation Order")
-    plt.ylabel("Fixed Models (%)")
-    # Add padding to title
-    plt.title("Repair Success Rate by Mutation Order", pad=20)
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True)
-    
-    # Set fixed axis limits
-    plt.xlim(1, max(orders))
-    plt.ylim(0, 100)
-    plt.xticks(orders)
-
-    # Add total number of models for each order above the plot
-    for order in orders:
-        total = len(order_groups[order])
-        plt.annotate(f'n={total}', 
-                    xy=(order, 100),
-                    xytext=(0, 5),  # 5 points vertical offset
-                    textcoords='offset points',
-                    ha='center',
-                    va='bottom')
-
-    # Adjust layout to accommodate legend and annotations
-    plt.tight_layout()
-
-    # Save the plot if an output file is specified
-    if output_file:
-        plt.savefig(output_file, dpi=300, bbox_inches="tight")
-        print(f"Plot saved to {output_file}")
-
-    return plt
-
-
-def plot_repair_progression_per_program(results, epsilons, output_file=None):
-    """Plot the repair progression over time for different epsilon thresholds, separated by program"""
-    # Get mutation orders and group results by program
-    mutation_orders = load_mutation_orders()
-    programs = {}
-    
+    # Group results by loss function
+    loss_fn_groups = {}
     for result in results:
         if result["job_id"] in mutation_orders:
-            program = result["program_name"]
-            if program not in programs:
-                programs[program] = []
+            loss_fn = result["loss_function"]
+            if loss_fn not in loss_fn_groups:
+                loss_fn_groups[loss_fn] = []
             result["mutation_order"] = mutation_orders[result["job_id"]]
-            programs[program].append(result)
+            loss_fn_groups[loss_fn].append(result)
     
-    # Create subplot grid based on number of programs
-    n_programs = len(programs)
-    n_cols = 2  # You can adjust this if needed
-    n_rows = (n_programs + n_cols - 1) // n_cols
+    # Create separate plots for each loss function
+    n_loss_fns = len(loss_fn_groups)
+    fig, axs = plt.subplots(n_loss_fns, 1, figsize=(12, 6 * n_loss_fns))
+    if n_loss_fns == 1:
+        axs = [axs]
     
-    plt.figure(figsize=(15, 5 * n_rows))
-    
-    for idx, (program, program_results) in enumerate(programs.items(), 1):
+    for idx, (loss_fn, loss_fn_results) in enumerate(loss_fn_groups.items()):
         # Sort results by mutation order
-        sorted_results = sorted(program_results, key=lambda x: x["mutation_order"])
+        sorted_results = sorted(loss_fn_results, key=lambda x: x["mutation_order"])
         
         # Group results by mutation order
         order_groups = {}
@@ -255,38 +241,138 @@ def plot_repair_progression_per_program(results, epsilons, output_file=None):
                 fixed = sum(1 for r in group if r["test_accuracy"] >= (1.0 - epsilon))
                 fix_rates[epsilon].append((fixed / total) * 100 if total > 0 else 0)
         
-        # Create subplot
-        plt.subplot(n_rows, n_cols, idx)
+        ax = axs[idx]
         for epsilon in epsilons:
-            plt.plot(orders, fix_rates[epsilon], 
-                    label=f'ε={epsilon} (n={len(sorted_results)})',
-                    marker='o',
-                    markersize=8,
-                    linestyle='--')
+            ax.plot(orders, fix_rates[epsilon],
+                   label=f'ε={epsilon} (n={len(sorted_results)})',
+                   marker='o',
+                   markersize=8,
+                   linestyle='--')
         
-        plt.xlabel("Mutation Order")
-        plt.ylabel("Fixed Models (%)")
-        # Add padding to title
-        plt.title(f"Repair Success Rate - {program}", pad=20)
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-        plt.grid(True)
+        ax.set_xlabel("Mutation Order")
+        ax.set_ylabel("Fixed Models (%)")
+        ax.set_title(f"Repair Success Rate - {loss_fn}", pad=20)
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.grid(True)
         
         # Set fixed axis limits
-        plt.xlim(1, max(orders))
-        plt.ylim(0, 100)
-        plt.xticks(orders)
-
+        ax.set_xlim(1, max(orders))
+        ax.set_ylim(0, 100)
+        ax.set_xticks(orders)
+        
         # Add total number of models for each order above the plot
         for order in orders:
             total = len(order_groups[order])
-            plt.annotate(f'n={total}', 
-                        xy=(order, 100),
-                        xytext=(0, 5),  # 5 points vertical offset
-                        textcoords='offset points',
-                        ha='center',
-                        va='bottom')
+            ax.annotate(f'n={total}',
+                       xy=(order, 100),
+                       xytext=(0, 5),  # 5 points vertical offset
+                       textcoords='offset points',
+                       ha='center',
+                       va='bottom')
     
-    # Adjust layout to accommodate legends and annotations
+    plt.tight_layout()
+    
+    # Save the plot if an output file is specified
+    if output_file:
+        plt.savefig(output_file, dpi=300, bbox_inches="tight")
+        print(f"Plot saved to {output_file}")
+    
+    return plt
+
+
+def plot_repair_progression_per_program(results, epsilons, output_file=None):
+    """Plot the repair progression over time for different epsilon thresholds and loss functions, separated by program"""
+    # Get mutation orders and group results by program and loss function
+    mutation_orders = load_mutation_orders()
+    program_loss_fn_groups = {}  # (program, loss_fn) -> results
+    
+    for result in results:
+        if result["job_id"] in mutation_orders:
+            program = result["program_name"]
+            loss_fn = result["loss_function"]
+            key = (program, loss_fn)
+            if key not in program_loss_fn_groups:
+                program_loss_fn_groups[key] = []
+            result["mutation_order"] = mutation_orders[result["job_id"]]
+            program_loss_fn_groups[key].append(result)
+    
+    # Get unique programs and loss functions
+    programs = sorted(set(key[0] for key in program_loss_fn_groups.keys()))
+    loss_functions = sorted(set(key[1] for key in program_loss_fn_groups.keys()))
+    
+    # Create subplot grid
+    n_programs = len(programs)
+    n_loss_fns = len(loss_functions)
+    fig, axs = plt.subplots(n_programs, n_loss_fns, 
+                           figsize=(6 * n_loss_fns, 4 * n_programs),
+                           squeeze=False)
+    
+    for prog_idx, program in enumerate(programs):
+        for loss_idx, loss_fn in enumerate(loss_functions):
+            key = (program, loss_fn)
+            ax = axs[prog_idx, loss_idx]
+            
+            if key in program_loss_fn_groups:
+                program_results = program_loss_fn_groups[key]
+                
+                # Sort results by mutation order
+                sorted_results = sorted(program_results, key=lambda x: x["mutation_order"])
+                
+                # Group results by mutation order
+                order_groups = {}
+                for result in sorted_results:
+                    order = result["mutation_order"]
+                    if order not in order_groups:
+                        order_groups[order] = []
+                    order_groups[order].append(result)
+                
+                # Calculate fix rates for each mutation order and epsilon
+                fix_rates = {epsilon: [] for epsilon in epsilons}
+                orders = sorted(order_groups.keys())
+                
+                for order in orders:
+                    group = order_groups[order]
+                    total = len(group)
+                    for epsilon in epsilons:
+                        fixed = sum(1 for r in group if r["test_accuracy"] >= (1.0 - epsilon))
+                        fix_rates[epsilon].append((fixed / total) * 100 if total > 0 else 0)
+                
+                # Plot repair progression
+                for epsilon in epsilons:
+                    ax.plot(orders, fix_rates[epsilon],
+                           label=f'ε={epsilon} (n={len(sorted_results)})',
+                           marker='o',
+                           markersize=6,
+                           linestyle='--')
+                
+                # Add total number of models for each order above the plot
+                for order in orders:
+                    total = len(order_groups[order])
+                    ax.annotate(f'n={total}',
+                               xy=(order, 100),
+                               xytext=(0, 5),
+                               textcoords='offset points',
+                               ha='center',
+                               va='bottom',
+                               fontsize=8)
+                
+                ax.set_xlim(1, max(orders))
+                ax.set_ylim(0, 100)
+                ax.set_xticks(orders)
+            
+            # Always set labels and grid
+            if prog_idx == n_programs - 1:
+                ax.set_xlabel("Mutation Order")
+            if loss_idx == 0:
+                ax.set_ylabel("Fixed Models (%)")
+            
+            ax.set_title(f"{program} - {loss_fn}")
+            ax.grid(True)
+            
+            # Only add legend to the first plot
+            if prog_idx == 0 and loss_idx == 0:
+                ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    
     plt.tight_layout()
     
     # Save the plot if an output file is specified
