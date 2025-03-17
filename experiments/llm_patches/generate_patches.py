@@ -133,7 +133,7 @@ def generate_all_patches(
 
     # Use ThreadPoolExecutor for parallel processing
     # Number of workers is min of CPU count and number of mutations
-    max_workers = min(len(args_list), os.cpu_count() or 1)
+    max_workers = min(len(args_list), 2 * os.cpu_count() or 1)
 
     results = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -173,7 +173,7 @@ def generate_all_patches(
 )
 @click.option(
     "--model-name",
-    default="gpt-3.5-turbo",
+    default="gpt-4o-mini-2024-07-18",
     help="Model name to use for generation",
 )
 @click.option(
