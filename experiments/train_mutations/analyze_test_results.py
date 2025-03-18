@@ -371,6 +371,135 @@ def plot_repair_progression_per_program(results, epsilons, output_dir=None):
             print(f"Plot saved to {output_file}")
         plt.close()
 
+def plot_accuracy_histogram(results, output_dir=None):
+    """Plot histogram of test accuracies with summary statistics"""
+    plots_dir = Path(output_dir) / "plots"
+    plots_dir.mkdir(exist_ok=True, parents=True)
+    
+    # Group results by loss function and program
+    loss_fn_groups = {}
+    program_groups = {}
+    for result in results:
+        loss_fn = result["loss_function"]
+        program = result["program_name"]
+        
+        if loss_fn not in loss_fn_groups:
+            loss_fn_groups[loss_fn] = []
+            program_groups[loss_fn] = {}
+        if program not in program_groups[loss_fn]:
+            program_groups[loss_fn][program] = []
+            
+        loss_fn_groups[loss_fn].append(result)
+        program_groups[loss_fn][program].append(result)
+    
+    # Create histograms for each loss function
+    for loss_fn, loss_fn_results in loss_fn_groups.items():
+        # Create loss function directory
+        loss_fn_dir = plots_dir / loss_fn
+        loss_fn_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Create aggregate histogram
+        accuracies = pd.Series([r["test_accuracy"] * 100 for r in loss_fn_results])
+        plt.figure(figsize=(10, 6))
+        plt.hist(accuracies, bins=20, edgecolor="black")
+        
+        plt.axvline(
+            accuracies.mean(),
+            color="red",
+            linestyle="dashed",
+            linewidth=2,
+            label=f"Mean: {accuracies.mean():.2f}%",
+        )
+        plt.axvline(
+            accuracies.median(),
+            color="green",
+            linestyle="dashed",
+            linewidth=2,
+            label=f"Median: {accuracies.median():.2f}%",
+        )
+        
+        plt.title(f"Distribution of Test Accuracies (All Programs)\nLoss Function: {loss_fn}")
+        plt.xlabel("Accuracy (%)")
+        plt.ylabel("Count")
+        plt.legend()
+        plt.tight_layout()
+        
+        if output_dir:
+            output_file = loss_fn_dir / "accuracy_histogram_aggregate.png"
+            plt.savefig(output_file, dpi=300, bbox_inches="tight")
+            print(f"Plot saved to {output_file}")
+        plt.close()
+        
+        # Create per-program histograms in a single figure
+        num_programs = len(program_groups[loss_fn])
+        num_cols = min(3, num_programs)
+        num_rows = (num_programs + num_cols - 1) // num_cols
+        
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5*num_rows))
+        if num_programs == 1:
+            axes = np.array([axes])
+        axes = axes.flatten()
+        
+        for idx, (program, program_results) in enumerate(sorted(program_groups[loss_fn].items())):
+            ax = axes[idx]
+            prog_accuracies = pd.Series([r["test_accuracy"] * 100 for r in program_results])
+            
+            ax.hist(prog_accuracies, bins=20, edgecolor="black")
+            ax.axvline(
+                prog_accuracies.mean(),
+                color="red",
+                linestyle="dashed",
+                linewidth=2,
+                label=f"Mean: {prog_accuracies.mean():.2f}%",
+            )
+            ax.axvline(
+                prog_accuracies.median(),
+                color="green",
+                linestyle="dashed",
+                linewidth=2,
+                label=f"Median: {prog_accuracies.median():.2f}%",
+            )
+            
+            ax.set_title(f"{program}\n(n={len(program_results)})")
+            ax.set_xlabel("Accuracy (%)")
+            ax.set_ylabel("Count")
+            ax.legend(fontsize='small')
+        
+        # Hide empty subplots if any
+        for idx in range(len(program_groups[loss_fn]), len(axes)):
+            axes[idx].set_visible(False)
+        
+        fig.suptitle(f"Distribution of Test Accuracies by Program\nLoss Function: {loss_fn}", y=1.02)
+        plt.tight_layout()
+        
+        if output_dir:
+            output_file = loss_fn_dir / "accuracy_histogram_by_program.png"
+            plt.savefig(output_file, dpi=300, bbox_inches="tight")
+            print(f"Plot saved to {output_file}")
+            
+            # Save summary statistics
+            stats_file = loss_fn_dir / "accuracy_stats.txt"
+            with open(stats_file, "w") as f:
+                # Aggregate stats
+                f.write("=== Aggregate Statistics ===\n")
+                f.write(f"Number of models: {len(accuracies)}\n")
+                f.write(f"Mean accuracy: {accuracies.mean():.2f}%\n")
+                f.write(f"Median accuracy: {accuracies.median():.2f}%\n")
+                f.write(f"Min accuracy: {accuracies.min():.2f}%\n")
+                f.write(f"Max accuracy: {accuracies.max():.2f}%\n\n")
+                
+                # Per-program stats
+                f.write("=== Per-Program Statistics ===\n")
+                for program, program_results in sorted(program_groups[loss_fn].items()):
+                    prog_accuracies = pd.Series([r["test_accuracy"] * 100 for r in program_results])
+                    f.write(f"\n{program}:\n")
+                    f.write(f"  Number of models: {len(prog_accuracies)}\n")
+                    f.write(f"  Mean accuracy: {prog_accuracies.mean():.2f}%\n")
+                    f.write(f"  Median accuracy: {prog_accuracies.median():.2f}%\n")
+                    f.write(f"  Min accuracy: {prog_accuracies.min():.2f}%\n")
+                    f.write(f"  Max accuracy: {prog_accuracies.max():.2f}%\n")
+        plt.close()
+
 @click.command()
 @click.option(
     "--saved-data-dir",
@@ -416,6 +545,7 @@ def main(saved_data_dir, output_dir, epsilons):
     plot_fix_rates(fixed_stats, output_path)
     plot_repair_progression(results, epsilon_values, output_path)
     plot_repair_progression_per_program(results, epsilon_values, output_path)
+    plot_accuracy_histogram(results, output_path)
 
     # Generate summary table
     summary_file = output_path / "summary.md"
