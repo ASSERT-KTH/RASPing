@@ -40,9 +40,20 @@ class Trainer:
         use_wandb: bool = False,
         wandb_project: Optional[str] = None,
         wandb_name: Optional[str] = None,
+        from_pretrained: Optional[str] = None,
     ):
         self.model = model.model
         self.params = model.model.params
+        
+        # Load pretrained weights if specified
+        if from_pretrained is not None:
+            success = model.load_model(from_pretrained)
+            if success:
+                self.params = model.model.params
+                print(f"Successfully loaded pretrained model from {from_pretrained}")
+            else:
+                print(f"Warning: Failed to load pretrained model from {from_pretrained}")
+                
         self.X_train = X_train
         self.Y_train = Y_train
         self.loss_fn = loss_fn
@@ -283,3 +294,17 @@ class Trainer:
 
     def save_model(self):
         np.save(self.output_dir / "model.npy", self.state.params)
+
+    @staticmethod
+    def load_saved_model(model, model_path):
+        """
+        Load a saved model from a path
+        
+        Args:
+            model: A Model instance to load parameters into
+            model_path: Path to the directory containing model.npy or path to the model.npy file
+            
+        Returns:
+            True if loading was successful, False otherwise
+        """
+        return model.load_model(model_path)
