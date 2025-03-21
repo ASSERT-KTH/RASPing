@@ -2,8 +2,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
+import os
+from pathlib import Path
 
-from typing import List
+from typing import List, Optional
 from enum import Enum
 import haiku as hk
 
@@ -100,7 +102,7 @@ class ModelDiff:
 
 # A class which holds the rasp models as well as a few helper functions and some statistics
 class Model:
-    def __init__(self, raspFunction: rasp.SOp, inputs, seqLength: int, name: str):
+    def __init__(self, raspFunction: rasp.SOp, inputs, seqLength: int, name: str, from_pretrained: Optional[str] = None):
         self.raspFunction = raspFunction
         self.inputs = inputs
         self.seqLength = seqLength
@@ -127,6 +129,13 @@ class Model:
         self.updateWeightStatistics()
 
         self.setForwardFun()
+        
+        # Load pretrained weights if provided
+        if from_pretrained is not None:
+            loaded = self.load_model(from_pretrained)
+            if not loaded:
+                print(f"Warning: Failed to load pretrained model from {from_pretrained}")
+                print("Using default initialized weights instead.")
 
     def setForwardFun(self):
         global forward
@@ -162,6 +171,16 @@ class Model:
 
     # Sets the model weights to 'params'
     def setWeights(self, params):
+        # Assert structure matches
+        assert set(params.keys()) == set(self.model.params.keys()), f"Parameter structure mismatch: received {set(params.keys())} but expected {set(self.model.params.keys())}"
+        
+        for key in params:
+            assert set(params[key].keys()) == set(self.model.params[key].keys()), f"Subparameter structure mismatch in {key}: received {set(params[key].keys())} but expected {set(self.model.params[key].keys())}"
+            
+            # Assert shapes match
+            for subkey in params[key]:
+                assert params[key][subkey].shape == self.model.params[key][subkey].shape, f"Shape mismatch for {key}/{subkey}: received {params[key][subkey].shape} but expected {self.model.params[key][subkey].shape}"
+        
         self.model.params = params
 
     # Calculate and store new statistics for the weight distribution
@@ -641,3 +660,41 @@ class Model:
             )
         else:
             return ModelDiff(DiffType.NO_DIFF, same_items, diff_items, None)
+
+    def save_model(self, output_dir):
+        """Save model parameters to file"""
+        output_dir = Path(output_dir)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+            
+        np.save(output_dir / "model.npy", self.model.params)
+        return output_dir / "model.npy"
+    
+    def load_model(self, model_path):
+        """
+        Load model parameters from a file
+        
+        Args:
+            model_path: Path to the directory containing model.npy or path to the model.npy file directly
+        
+        Returns:
+            True if loading was successful, False otherwise
+        """
+        model_path = Path(model_path)
+        
+        # If a directory is provided, append model.npy to the path
+        if model_path.is_dir():
+            # Check for best_model.npy first (from REINFORCE)
+            if (model_path / "best_model.npy").exists():
+                model_path = model_path / "best_model.npy"
+            else:
+                model_path = model_path / "model.npy"
+                
+        try:
+            loaded_params = np.load(model_path, allow_pickle=True).item()
+            self.setWeights(loaded_params)
+            self.updateWeightStatistics()
+            return True
+        except Exception as e:
+            print(f"Error loading model from {model_path}: {e}")
+            return False
