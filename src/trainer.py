@@ -5,6 +5,7 @@ import haiku as hk
 import numpy as np
 import jax.numpy as jnp
 import wandb
+import pickle
 
 import tqdm
 from pathlib import Path
@@ -41,6 +42,8 @@ class Trainer:
         wandb_project: Optional[str] = None,
         wandb_name: Optional[str] = None,
         from_pretrained: Optional[str] = None,
+        store_trajectory: bool = False,
+        trajectory_store_interval: int = 10,
     ):
         self.model = model.model
         self.params = model.model.params
@@ -73,8 +76,11 @@ class Trainer:
             else None
         )
         self.valStep = valStep
-        self.output_dir = Path(output_dir)
+        self.output_dir = Path(output_dir) if output_dir else None
         self.use_wandb = use_wandb
+        self.store_trajectory = store_trajectory
+        self.trajectory_store_interval = trajectory_store_interval
+        self.trajectory = [] # List to store (step, params, loss) tuples
 
         if self.use_wandb:
             wandb.init(
@@ -166,6 +172,17 @@ class Trainer:
         val_losses = []
         val_accs = []
 
+        # Calculate initial loss and store initial state if trajectory storage is enabled
+        if self.store_trajectory and self.output_dir:
+            # Calculate initial loss on the first batch of training data
+            initial_loss = self.jit_val_loss(
+                self.state.params, 
+                self.X_train[:self.batch_size], 
+                self.Y_train[:self.batch_size], 
+                padToken
+            )
+            self.trajectory.append((0, jax.device_get(self.state.params), initial_loss))
+
         # Set up early stopping validation requirements
         if self.early_stopper is not None:
             if self.X_val is None or self.Y_val is None:
@@ -185,6 +202,12 @@ class Trainer:
                 self.state, metric = self.jit_update(self.state, x, y, padToken)
                 epoch_loss += metric["loss"]
                 n_batches += 1
+                
+                # Store state at intervals if trajectory storage is enabled
+                current_step = int(self.state.step)
+                if self.store_trajectory and self.output_dir and current_step % self.trajectory_store_interval == 0:
+                    # Store step, current (updated) params, and the loss calculated with these params
+                    self.trajectory.append((current_step, jax.device_get(self.state.params), metric['loss']))
 
             avg_epoch_loss = epoch_loss / n_batches
             train_losses.append(avg_epoch_loss)
@@ -242,6 +265,22 @@ class Trainer:
                     )
                 break
 
+        # Calculate final loss and store final state if trajectory storage is enabled
+        if self.store_trajectory and self.output_dir:
+            final_step = int(self.state.step)
+            final_params = jax.device_get(self.state.params)
+            # Ensure final state isn't identical to the last stored state due to interval
+            if not self.trajectory or self.trajectory[-1][0] != final_step:
+                # Recalculate loss for the final parameters on a training batch
+                padToken = self.model.input_encoder.encoding_map["compiler_pad"]
+                final_loss = self.jit_val_loss(
+                    final_params, 
+                    self.X_train[:self.batch_size], 
+                    self.Y_train[:self.batch_size], 
+                    padToken
+                )
+                self.trajectory.append((final_step, final_params, final_loss))
+
         if self.plot:
             # Plot training and validation loss
             plt.figure(figsize=(10, 4))
@@ -273,6 +312,8 @@ class Trainer:
                 os.makedirs(self.output_dir, exist_ok=True)
             self.save_metrics(train_losses, train_accs, val_losses, val_accs)
             self.save_model()
+            if self.store_trajectory:
+                self.save_trajectory()
 
         if self.use_wandb:
             wandb.finish()
@@ -294,6 +335,19 @@ class Trainer:
 
     def save_model(self):
         np.save(self.output_dir / "model.npy", self.state.params)
+
+    def save_trajectory(self):
+        """Save the training trajectory to a pickle file."""
+        if not self.output_dir:
+            print("Warning: Output directory not set, cannot save trajectory.")
+            return
+        trajectory_path = self.output_dir / "trajectory.pkl"
+        try:
+            with open(trajectory_path, "wb") as f:
+                pickle.dump(self.trajectory, f)
+            print(f"Trajectory saved to {trajectory_path}")
+        except Exception as e:
+            print(f"Error saving trajectory to {trajectory_path}: {e}")
 
     @staticmethod
     def load_saved_model(model, model_path):

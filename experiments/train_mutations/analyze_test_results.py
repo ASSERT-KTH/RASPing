@@ -167,7 +167,6 @@ def plot_fix_rates(fixed_stats, output_dir=None):
                 })
 
     df = pd.DataFrame(data)
-    
     # Create separate plots for each loss function
     for loss_fn in df["Loss Function"].unique():
         loss_fn_data = df[df["Loss Function"] == loss_fn]
@@ -540,8 +539,8 @@ def main(saved_data_dir, output_dir, epsilons):
         json.dump(fixed_stats, f, indent=2)
     print(f"Fixed model statistics saved to {fixed_stats_file}")
 
-    # Generate all plots
-    print("Generating plots...")
+    # Generate standard plots
+    print("Generating standard plots...")
     plot_fix_rates(fixed_stats, output_path)
     plot_repair_progression(results, epsilon_values, output_path)
     plot_repair_progression_per_program(results, epsilon_values, output_path)
