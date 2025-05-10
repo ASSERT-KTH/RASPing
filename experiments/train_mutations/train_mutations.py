@@ -37,6 +37,8 @@ def train_mutated_model(
     early_stopping_min_delta: float = 1e-4,
     output_dir: str = None,
     loss_fn_name: str = "cross_entropy_loss",
+    store_trajectory: bool = False,
+    trajectory_store_interval: int = 10,
 ):
     if loss_fn_name not in LOSS_FUNCTIONS:
         raise ValueError(f"Loss function {loss_fn_name} not found")
@@ -84,6 +86,8 @@ def train_mutated_model(
         use_wandb=True,
         wandb_project="dpr-mutation-training",
         wandb_name=f"{program_name}_{job_id}_{loss_fn_name}",
+        store_trajectory=store_trajectory,
+        trajectory_store_interval=trajectory_store_interval,
     )
 
     # Trainer will train the model log metrics, and save metrics and results to output_dir
@@ -120,6 +124,17 @@ def train_mutated_model(
     default="cross_entropy_loss",
     help="Loss function to use for training",
 )
+@click.option(
+    "--store-trajectory/--no-store-trajectory",
+    default=False,
+    help="Store the training trajectory (parameter history)"
+)
+@click.option(
+    "--trajectory-store-interval",
+    type=int,
+    default=10,
+    help="Interval (in steps) for storing trajectory points"
+)
 def run_test(
     program_name,
     job_id,
@@ -131,6 +146,8 @@ def run_test(
     early_stopping_min_delta,
     output_dir,
     loss_fn_name,
+    store_trajectory,
+    trajectory_store_interval,
 ):
     print(f"Training mutated model {program_name} (job {job_id}) with {loss_fn_name}...")
     if not output_dir:
@@ -146,6 +163,8 @@ def run_test(
         early_stopping_min_delta=early_stopping_min_delta,
         output_dir=output_dir,
         loss_fn_name=loss_fn_name,
+        store_trajectory=store_trajectory,
+        trajectory_store_interval=trajectory_store_interval,
     )
 
 

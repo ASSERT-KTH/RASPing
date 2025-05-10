@@ -28,6 +28,8 @@ def run_in_container(
     learning_rate: float = 1e-04,
     output_dir: str = None,
     loss_fn_name: str = "cross_entropy_loss",
+    store_trajectory: bool = False,
+    trajectory_store_interval: int = 50,
 ):
     """Wrapper to run train_mutations.py inside the apptainer container"""
     # Get path to container.sif relative to repository root
@@ -59,6 +61,16 @@ def run_in_container(
         "--loss_fn_name",
         loss_fn_name,
     ]
+
+    # Add trajectory storage options
+    if store_trajectory:
+        cmd.extend([
+            "--store-trajectory",
+            "--trajectory-store-interval",
+            str(trajectory_store_interval),
+        ])
+    else:
+        cmd.append("--no-store-trajectory")
 
     # Add output directory if specified, using full path
     if output_dir:
@@ -128,6 +140,8 @@ def main():
                 learning_rate=1e-04,
                 output_dir=f"saved_data/{program_name}/{loss_fn_name}/job_{job_id}/",
                 loss_fn_name=loss_fn_name,
+                store_trajectory=True,
+                trajectory_store_interval=50,
             )
             jobs.append(job)
 
