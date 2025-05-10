@@ -110,8 +110,6 @@ def main():
     # List of loss functions to test
     loss_functions = [
         "cross_entropy_loss",
-        "cross_entropy_loss_smoothed_accuracy",
-        "cross_entropy_loss_with_perfect_sequence",
     ]
 
     for _, row in df.iterrows():
