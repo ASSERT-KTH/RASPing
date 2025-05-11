@@ -32,7 +32,7 @@ LOSS_FUNCTIONS = {
 }
 
 
-def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, grid_size=20, grid_range_factor=0.2):
+def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, grid_size=100, grid_range_factor=0.2):
     """Compute the loss landscape around the trajectory in PCA space
     
     Args:
@@ -128,13 +128,8 @@ def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id,
                 compiled_model.use_unembed_argmax = False
                 compiled_model.pad_token = padToken
                 return compiled_model(x, use_dropout=False)
-            
-            # Compute loss on a subset of validation data for speed
-            subset_size = min(256, len(X_val))
-            X_subset = X_val[:subset_size]
-            Y_subset = Y_val[:subset_size]
-            
-            return loss_fn.apply(reconstructed_params, X_subset, Y_subset, padToken, forward=forward)
+       
+            return loss_fn.apply(reconstructed_params, X_val, Y_val, padToken, forward=forward)
         
         # 6. Compute loss for each grid point
         print(f"Computing loss at {grid_size}x{grid_size} grid points...")
@@ -176,6 +171,11 @@ def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id,
         import traceback
         traceback.print_exc()
         return None
+    
+    # Mask Z_grid values above ceil of initial loss
+    initial_loss = trajectory[0][2]
+    loss_threshold = 2* np.ceil(initial_loss)
+    Z_grid[Z_grid > loss_threshold] = 2 * initial_loss
     
     return X_grid, Y_grid, Z_grid, pca, param_matrix
 
@@ -300,8 +300,7 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
             ax2 = fig2.add_subplot(111)
             
             # Compute and plot loss landscape grid
-            grid_size = 20  # Adjust based on computational resources
-            landscape_result = compute_loss_landscape(trajectory, program_name, loss_function, job_id, grid_size=grid_size)
+            landscape_result = compute_loss_landscape(trajectory, program_name, loss_function, job_id)
             
             if landscape_result is not None:
                 X_grid, Y_grid, Z_grid, _, _ = landscape_result
@@ -685,7 +684,7 @@ def plot_multiple_trajectories(trajectory_files, output_dir, output_filename="co
     max_y += range_y * grid_range_factor
     
     # Use smaller grid size for multiple trajectories to reduce computation time
-    grid_size = 30
+    grid_size = 100
     x_grid = np.linspace(min_x, max_x, grid_size)
     y_grid = np.linspace(min_y, max_y, grid_size)
     X_grid, Y_grid = np.meshgrid(x_grid, y_grid)
@@ -809,6 +808,11 @@ def plot_multiple_trajectories(trajectory_files, output_dir, output_filename="co
                 # Clip extreme values for better visualization
                 p95 = np.nanpercentile(Z_grid, 95)
                 Z_grid = np.clip(Z_grid, None, p95 * 1.5)
+
+                # Mask Z_grid values above ceil of initial loss
+                initial_loss = trajectory[0][2]
+                loss_threshold = np.ceil(initial_loss)
+                Z_grid[Z_grid > loss_threshold] = np.nan
                 
                 # Plot the loss landscape as a surface with partial transparency
                 alpha = 0.3  # Use lower alpha for multiple surfaces
@@ -882,22 +886,7 @@ def plot_file(trajectory_file, output_dir):
     help="Directory to save plot outputs",
     type=click.Path()
 )
-@click.option(
-    "--program",
-    help="Filter by program name",
-    default=None
-)
-@click.option(
-    "--loss-function",
-    help="Filter by loss function name",
-    default=None
-)
-@click.option(
-    "--job-id",
-    help="Filter by job ID",
-    default=None
-)
-def plot_directory(data_dir, output_dir, program, loss_function, job_id):
+def plot_directory(data_dir, output_dir):
     """Process and plot all trajectory files in a directory."""
     print(f"Scanning for trajectory files in {data_dir}...")
     
@@ -921,8 +910,6 @@ def plot_directory(data_dir, output_dir, program, loss_function, job_id):
         processed_file_count += 1
         trajectory_file_path_str = str(trajectory_file_path_obj)
         
-        # print(f"Considering file {processed_file_count}/{len(trajectory_files)}: {trajectory_file_path_str}")
-
         try:
             # Extract info from path for filtering
             # Path structure: .../program_name/loss_function_name/job_id/trajectory.pkl
@@ -931,22 +918,7 @@ def plot_directory(data_dir, output_dir, program, loss_function, job_id):
                 print(f"Warning: Path {trajectory_file_path_str} is not in the expected format. Skipping.")
                 continue
                 
-            file_job_id = parts[-2]
-            file_loss_function = parts[-3]
-            file_program_name = parts[-4]
-
-            # Apply filters
-            if program and file_program_name != program:
-                # print(f"Skipping {trajectory_file_path_str} (program mismatch: '{file_program_name}' != '{program}')")
-                continue
-            if loss_function and file_loss_function != loss_function:
-                # print(f"Skipping {trajectory_file_path_str} (loss_function mismatch: '{file_loss_function}' != '{loss_function}')")
-                continue
-            if job_id and file_job_id != job_id:
-                # print(f"Skipping {trajectory_file_path_str} (job_id mismatch: '{file_job_id}' != '{job_id}')")
-                continue
-            
-            print(f"Processing and plotting filtered trajectory: {trajectory_file_path_str}")
+            print(f"Processing and plotting trajectory: {trajectory_file_path_str}")
             # plot_single_trajectory loads the file, creates the dict, and calls plot_loss_landscape_trajectory
             if plot_single_trajectory(trajectory_file_path_str, output_dir):
                 plotted_count += 1
@@ -962,9 +934,6 @@ def plot_directory(data_dir, output_dir, program, loss_function, job_id):
 
     if plotted_count > 0:
         print(f"\nFinished. Successfully plotted {plotted_count} trajectory/trajectories.")
-    elif len(trajectory_files) > 0 : # If files were found but none were plotted
-        print(f"\nFinished. No trajectories were plotted. Check filter criteria and previous logs for errors.")
-    # If no files were found initially, that's handled by the early return.
 
 
 @cli.command()

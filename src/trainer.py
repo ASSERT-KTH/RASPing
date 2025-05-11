@@ -146,7 +146,7 @@ class Trainer:
         ## Validation accuracy
         @hk.without_apply_rng
         @hk.transform
-        def _val_accuracy(x, y, padToken, forward):
+        def _accuracy(x, y, padToken, forward):
             logits = forward(jnp.array(x)).unembedded_output
             pred = jnp.argmax(logits, axis=-1)
 
@@ -160,8 +160,8 @@ class Trainer:
             )
             return val
 
-        _val_accuracy = jax.tree_util.Partial(_val_accuracy.apply, forward=forward)
-        self.jit_val_accuracy = jax.jit(_val_accuracy)
+        _accuracy = jax.tree_util.Partial(_accuracy.apply, forward=forward)
+        self.jit_accuracy = jax.jit(_accuracy)
 
     def train(self):
         padToken = self.model.input_encoder.encoding_map["compiler_pad"]
@@ -174,11 +174,11 @@ class Trainer:
 
         # Calculate initial loss and store initial state if trajectory storage is enabled
         if self.store_trajectory and self.output_dir:
-            # Calculate initial loss on the first batch of training data
+            # Calculate validation loss
             initial_loss = self.jit_val_loss(
                 self.state.params, 
-                self.X_train[:self.batch_size], 
-                self.Y_train[:self.batch_size], 
+                self.X_val, 
+                self.Y_val, 
                 padToken
             )
             self.trajectory.append((0, jax.device_get(self.state.params), initial_loss))
@@ -207,13 +207,19 @@ class Trainer:
                 current_step = int(self.state.step)
                 if self.store_trajectory and self.output_dir and current_step % self.trajectory_store_interval == 0:
                     # Store step, current (updated) params, and the loss calculated with these params
-                    self.trajectory.append((current_step, jax.device_get(self.state.params), metric['loss']))
+                    val_loss = self.jit_val_loss(
+                        self.state.params, 
+                        self.X_val, 
+                        self.Y_val, 
+                        padToken
+                    )
+                    self.trajectory.append((current_step, jax.device_get(self.state.params), val_loss))
 
             avg_epoch_loss = epoch_loss / n_batches
             train_losses.append(avg_epoch_loss)
 
             # Calculate training accuracy
-            train_acc = self.jit_val_accuracy(
+            train_acc = self.jit_accuracy(
                 self.state.params, self.X_train, self.Y_train, padToken
             )
             train_accs.append(train_acc)
@@ -229,7 +235,7 @@ class Trainer:
                     val_metrics["val_loss"] = val_loss
 
                     if self.valStep and epoch % self.valStep == 0:
-                        val_acc = self.jit_val_accuracy(
+                        val_acc = self.jit_accuracy(
                             self.state.params, self.X_val, self.Y_val, padToken
                         )
                         val_accs.append(val_acc)
@@ -237,7 +243,7 @@ class Trainer:
 
                     # Early stopping check with current parameters
                     if self.early_stopper is not None:
-                        if self.early_stopper(val_loss, self.state.params):
+                        if self.early_stopper(val_loss, self.state.params, int(self.state.step)):
                             print(f"Early stopping triggered after {epoch + 1} epochs")
                             stoppedTraining = True
 
@@ -263,6 +269,21 @@ class Trainer:
                         opt_state=self.state.opt_state,
                         step=self.state.step,
                     )
+                    # Truncate trajectory to only include up to the best step
+                    if self.store_trajectory and self.output_dir:
+                        best_step = self.early_stopper.best_step
+                        if best_step is not None:
+                            idx = None
+                            for i, (step, params, loss) in enumerate(self.trajectory):
+                                if step > best_step:
+                                    idx = i
+                                    break
+                            if idx is not None:
+                                self.trajectory = self.trajectory[: idx]
+                            else:
+                                print(f"Warning: No matching step found in trajectory for early stopping best step {best_step}. Trajectory will not be truncated.")
+                        else:
+                            print("Warning: Early stopper best_step is None. Trajectory will not be truncated.")
                 break
 
         # Calculate final loss and store final state if trajectory storage is enabled
@@ -274,9 +295,9 @@ class Trainer:
                 # Recalculate loss for the final parameters on a training batch
                 padToken = self.model.input_encoder.encoding_map["compiler_pad"]
                 final_loss = self.jit_val_loss(
-                    final_params, 
-                    self.X_train[:self.batch_size], 
-                    self.Y_train[:self.batch_size], 
+                    final_params,
+                    self.X_val,
+                    self.Y_val,
                     padToken
                 )
                 self.trajectory.append((final_step, final_params, final_loss))
