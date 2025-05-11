@@ -32,50 +32,6 @@ LOSS_FUNCTIONS = {
 }
 
 
-def load_trajectories(saved_data_dir):
-    """Load training trajectories from the saved_data directory
-    
-    Directory structure is assumed to be:
-    saved_data/
-        program_name/
-            loss_function_name/
-                job_id/
-                    trajectory.pkl
-    
-    Returns:
-        A dictionary mapping (program_name, loss_function, job_id) to trajectory data.
-    """
-    trajectories = {}
-    # Find all trajectory.pkl files recursively
-    for trajectory_file in Path(saved_data_dir).rglob("trajectory.pkl"):
-        try:
-            # Extract info from path: saved_data/program/loss_fn/job_id/trajectory.pkl
-            parts = trajectory_file.parts
-            job_id = parts[-2]
-            loss_function = parts[-3]
-            program_name = parts[-4]
-            key = (program_name, loss_function, job_id)
-            
-            with open(trajectory_file, "rb") as f:
-                trajectory_data = pickle.load(f)
-                # Basic validation for (step, params, loss) structure
-                if isinstance(trajectory_data, list) and all(isinstance(item, tuple) and len(item) == 3 for item in trajectory_data):
-                    trajectories[key] = trajectory_data
-                else:
-                    print(f"Warning: Invalid trajectory format (expected step, params, loss) in {trajectory_file}")
-                    
-        except pickle.UnpicklingError:
-            print(f"Warning: Could not unpickle {trajectory_file}")
-        except FileNotFoundError:
-            print(f"Warning: File not found during loading: {trajectory_file}") # Should not happen with rglob
-        except IndexError:
-             print(f"Warning: Could not parse path structure for {trajectory_file}")
-        except Exception as e:
-             print(f"Warning: An unexpected error occurred loading {trajectory_file}: {e}")
-             
-    return trajectories
-
-
 def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, grid_size=20, grid_range_factor=0.2):
     """Compute the loss landscape around the trajectory in PCA space
     
@@ -943,31 +899,72 @@ def plot_file(trajectory_file, output_dir):
 )
 def plot_directory(data_dir, output_dir, program, loss_function, job_id):
     """Process and plot all trajectory files in a directory."""
-    # Load all trajectories
-    print(f"Loading trajectories from {data_dir}...")
-    trajectories = load_trajectories(data_dir)
+    print(f"Scanning for trajectory files in {data_dir}...")
     
-    # Apply filters if provided
-    filtered_trajectories = {}
-    for key, trajectory in trajectories.items():
-        prog, loss_fn, j_id = key
+    # Find all trajectory.pkl files
+    try:
+        trajectory_files = list(Path(data_dir).rglob("trajectory.pkl"))
+    except Exception as e:
+        print(f"Error scanning directory {data_dir}: {e}")
+        return
+
+    if not trajectory_files:
+        print(f"No trajectory.pkl files found in {data_dir} or its subdirectories.")
+        return
+
+    print(f"Found {len(trajectory_files)} trajectory.pkl files. Applying filters and processing one by one...")
+    
+    plotted_count = 0
+    processed_file_count = 0
+
+    for trajectory_file_path_obj in trajectory_files:
+        processed_file_count += 1
+        trajectory_file_path_str = str(trajectory_file_path_obj)
         
-        # Apply filters
-        if program and prog != program:
-            continue
-        if loss_function and loss_fn != loss_function:
-            continue
-        if job_id and j_id != job_id:
-            continue
+        # print(f"Considering file {processed_file_count}/{len(trajectory_files)}: {trajectory_file_path_str}")
+
+        try:
+            # Extract info from path for filtering
+            # Path structure: .../program_name/loss_function_name/job_id/trajectory.pkl
+            parts = trajectory_file_path_obj.parts
+            if len(parts) < 4: # Ensure path is deep enough
+                print(f"Warning: Path {trajectory_file_path_str} is not in the expected format. Skipping.")
+                continue
+                
+            file_job_id = parts[-2]
+            file_loss_function = parts[-3]
+            file_program_name = parts[-4]
+
+            # Apply filters
+            if program and file_program_name != program:
+                # print(f"Skipping {trajectory_file_path_str} (program mismatch: '{file_program_name}' != '{program}')")
+                continue
+            if loss_function and file_loss_function != loss_function:
+                # print(f"Skipping {trajectory_file_path_str} (loss_function mismatch: '{file_loss_function}' != '{loss_function}')")
+                continue
+            if job_id and file_job_id != job_id:
+                # print(f"Skipping {trajectory_file_path_str} (job_id mismatch: '{file_job_id}' != '{job_id}')")
+                continue
             
-        filtered_trajectories[key] = trajectory
-    
-    # Generate plots
-    if filtered_trajectories:
-        print(f"Plotting {len(filtered_trajectories)} trajectories (after filtering)")
-        plot_loss_landscape_trajectory(filtered_trajectories, output_dir)
-    else:
-        print("No trajectories found matching the criteria.")
+            print(f"Processing and plotting filtered trajectory: {trajectory_file_path_str}")
+            # plot_single_trajectory loads the file, creates the dict, and calls plot_loss_landscape_trajectory
+            if plot_single_trajectory(trajectory_file_path_str, output_dir):
+                plotted_count += 1
+            # plot_single_trajectory has its own success/failure print messages.
+
+        except IndexError:
+            print(f"Warning: Could not parse path structure for {trajectory_file_path_str}. Skipping.")
+        except Exception as e:
+            # Catch any other unexpected errors for this specific file to allow the loop to continue
+            print(f"Warning: An unexpected error occurred while processing file {trajectory_file_path_str}: {e}. Skipping.")
+            # import traceback # Already imported at module level or in other functions
+            # traceback.print_exc() # Enable for more detailed debugging if needed
+
+    if plotted_count > 0:
+        print(f"\nFinished. Successfully plotted {plotted_count} trajectory/trajectories.")
+    elif len(trajectory_files) > 0 : # If files were found but none were plotted
+        print(f"\nFinished. No trajectories were plotted. Check filter criteria and previous logs for errors.")
+    # If no files were found initially, that's handled by the early return.
 
 
 @cli.command()
