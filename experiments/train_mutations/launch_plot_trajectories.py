@@ -31,7 +31,7 @@ def run_plot_in_container(trajectory_file: str, output_dir: str):
         str(container_path),
         "python",
         str(plot_trajectories_path),
-        "plot_file",
+        "plot-file",
         trajectory_file,
         output_dir,
     ]
