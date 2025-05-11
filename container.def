@@ -6,6 +6,5 @@ From: python:3.13.1-bullseye
 
 %post
     pip3 install -r requirements.txt
-    sudo apt update
-    sudo apt install texlive
-    sudo apt install dvipng texlive-latex-extra texlive-fonts-recommended
+    apt update -y
+    apt install -y texlive dvipng texlive-latex-extra texlive-fonts-recommended cm-super
