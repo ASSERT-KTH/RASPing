@@ -10,7 +10,7 @@ def get_executor() -> submitit.AutoExecutor:
     executor.update_parameters(
         name="RASPING-PLOT-TRAJECTORIES",
         nodes=1,
-        timeout_min=10,  # 10 minutes
+        timeout_min=30,
         slurm_additional_parameters={
             "reservation": "1g.10gb",
         },
