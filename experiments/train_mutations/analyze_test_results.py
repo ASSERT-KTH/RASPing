@@ -203,7 +203,7 @@ def plot_fix_rates(fixed_stats, output_dir=None):
         if output_dir:
             loss_fn_dir = plots_dir / loss_fn
             loss_fn_dir.mkdir(exist_ok=True, parents=True)
-            output_file = loss_fn_dir / "fix_rates.png"
+            output_file = loss_fn_dir / "fix_rates.pdf"
             plt.savefig(output_file, dpi=300, bbox_inches="tight")
             print(f"Plot saved to {output_file}")
         plt.close()
@@ -282,7 +282,7 @@ def plot_repair_progression(results, epsilons, output_dir=None):
         if output_dir:
             loss_fn_dir = plots_dir / loss_fn
             loss_fn_dir.mkdir(exist_ok=True, parents=True)
-            output_file = loss_fn_dir / "repair_progression.png"
+            output_file = loss_fn_dir / "repair_progression.pdf"
             plt.savefig(output_file, dpi=300, bbox_inches="tight")
             print(f"Plot saved to {output_file}")
         plt.close()
@@ -378,7 +378,7 @@ def plot_repair_progression_per_program(results, epsilons, output_dir=None):
         if output_dir:
             loss_fn_dir = plots_dir / loss_fn
             loss_fn_dir.mkdir(exist_ok=True, parents=True)
-            output_file = loss_fn_dir / "repair_progression_by_program.png"
+            output_file = loss_fn_dir / "repair_progression_by_program.pdf"
             plt.savefig(output_file, dpi=300, bbox_inches="tight")
             print(f"Plot saved to {output_file}")
         plt.close()
@@ -484,7 +484,7 @@ def plot_accuracy_histogram(results, output_dir=None):
         plt.tight_layout()
         
         if output_dir:
-            output_file = loss_fn_dir / "accuracy_histogram_aggregate.png"
+            output_file = loss_fn_dir / "accuracy_histogram_aggregate.pdf"
             plt.savefig(output_file, dpi=300, bbox_inches="tight")
             print(f"Plot saved to {output_file}")
         plt.close()
@@ -573,7 +573,7 @@ def plot_accuracy_histogram(results, output_dir=None):
             plt.tight_layout(rect=[0, 0, 1, 0.98 if num_rows > 1 else 0.95]) # Adjust layout to prevent title overlap
             
             if output_dir:
-                output_file = loss_fn_dir / "accuracy_histogram_by_program.png"
+                output_file = loss_fn_dir / "accuracy_histogram_by_program.pdf"
                 plt.savefig(output_file, dpi=300, bbox_inches="tight")
                 print(f"Plot saved to {output_file}")
             plt.close(fig) # Close the figure for per-program plots
