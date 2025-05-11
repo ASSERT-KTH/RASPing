@@ -175,7 +175,7 @@ def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id,
     # Mask Z_grid values above ceil of initial loss
     initial_loss = trajectory[0][2]
     loss_threshold = 2* np.ceil(initial_loss)
-    Z_grid[Z_grid > loss_threshold] = 2 * initial_loss
+    Z_grid[Z_grid > loss_threshold] = np.nan
     
     return X_grid, Y_grid, Z_grid, pca, param_matrix
 
@@ -307,14 +307,18 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                 
                 # Apply filtering/clipping to handle extreme values
                 Z_grid_plot = np.copy(Z_grid)
-                mask = np.isnan(Z_grid_plot)
-                Z_grid_plot[mask] = np.nanmean(Z_grid_plot)
+                # Do NOT fill NaNs with mean or any value
                 p95 = np.nanpercentile(Z_grid_plot, 95)
                 Z_grid_plot = np.clip(Z_grid_plot, None, p95 * 1.5)
                 
+                # Ensure NaNs are present for transparency
+                # (already present from masking step)
+                cmap = plt.cm.viridis.copy()
+                cmap.set_bad(color=(0, 0, 0, 0))  # Transparent for masked
+                
                 # Plot surface
                 surf = ax1.plot_surface(X_grid, Y_grid, Z_grid_plot, 
-                                     cmap='viridis', alpha=0.7, linewidth=0,
+                                     cmap=cmap, alpha=1.0, linewidth=0,
                                      antialiased=True, zorder=1)
                 fig1.colorbar(surf, ax=ax1, shrink=0.6, aspect=20, label='Loss Value')
                 
@@ -322,7 +326,7 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                 contour = ax2.contour(X_grid, Y_grid, Z_grid_plot, 
                                     levels=20, colors='k', alpha=0.7)
                 contourf = ax2.contourf(X_grid, Y_grid, Z_grid_plot, 
-                                      levels=20, cmap='viridis', alpha=0.7)
+                                      levels=20, cmap=cmap, alpha=1.0)
                 fig2.colorbar(contourf, ax=ax2, shrink=0.6, aspect=20, label='Loss Value')
 
             # 5. Select points for showing examples (start, middle, end)
@@ -814,10 +818,14 @@ def plot_multiple_trajectories(trajectory_files, output_dir, output_filename="co
                 loss_threshold = np.ceil(initial_loss)
                 Z_grid[Z_grid > loss_threshold] = np.nan
                 
+                # Ensure NaNs are present for transparency
+                cmap = plt.cm.viridis.copy()
+                cmap.set_bad(color=(0, 0, 0, 0))  # Transparent for masked
+                
                 # Plot the loss landscape as a surface with partial transparency
                 alpha = 0.3  # Use lower alpha for multiple surfaces
                 surf = ax.plot_surface(X_grid, Y_grid, Z_grid, 
-                                     cmap=plt.cm.viridis, alpha=alpha, linewidth=0,
+                                     cmap=cmap, alpha=alpha, linewidth=0,
                                      antialiased=True, zorder=1)
                 
             except Exception as e:
