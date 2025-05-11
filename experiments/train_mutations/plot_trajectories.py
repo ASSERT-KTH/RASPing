@@ -9,6 +9,7 @@ import pickle
 import click
 import sys
 import os
+from scipy.interpolate import RegularGridInterpolator
 
 # Add parent directory to path for imports
 module_path = os.path.abspath(os.path.join("../.."))
@@ -32,7 +33,7 @@ LOSS_FUNCTIONS = {
 }
 
 
-def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, grid_size=100, grid_range_factor=0.2):
+def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, pca, grid_size=100, grid_range_factor=0.2, pca_grid_limits=None):
     """Compute the loss landscape around the trajectory in PCA space
     
     Args:
@@ -40,8 +41,10 @@ def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id,
         program_name: Name of the program model
         loss_function_name: Name of the loss function
         job_id: Job ID for the specific model
+        pca: Fitted PCA object to use for projection/inverse
         grid_size: Number of points in each dimension of the grid
         grid_range_factor: How much to extend beyond the min/max of trajectory points
+        pca_grid_limits: (min_x, max_x, min_y, max_y) for the grid in PCA space (optional)
         
     Returns:
         Tuple of (X_grid, Y_grid, Z_grid, pca_model, param_matrix)
@@ -59,21 +62,23 @@ def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id,
     
     param_matrix = jnp.stack(flattened_params)
     
-    # 2. Apply PCA to get the principal components
-    pca = PCA(n_components=2)
-    projected_params = pca.fit_transform(param_matrix)
+    # 2. Project using provided PCA
+    projected_params = pca.transform(param_matrix)
     
     # 3. Create a grid in PCA space
-    min_x, max_x = projected_params[:, 0].min(), projected_params[:, 0].max()
-    min_y, max_y = projected_params[:, 1].min(), projected_params[:, 1].max()
-    
-    # Extend the grid beyond the trajectory points
-    range_x = max_x - min_x
-    range_y = max_y - min_y
-    min_x -= range_x * grid_range_factor
-    max_x += range_x * grid_range_factor
-    min_y -= range_y * grid_range_factor
-    max_y += range_y * grid_range_factor
+    if pca_grid_limits is not None:
+        min_x, max_x, min_y, max_y = pca_grid_limits
+    else:
+        min_x, max_x = projected_params[:, 0].min(), projected_params[:, 0].max()
+        min_y, max_y = projected_params[:, 1].min(), projected_params[:, 1].max()
+        
+        # Extend the grid beyond the trajectory points
+        range_x = max_x - min_x
+        range_y = max_y - min_y
+        min_x -= range_x * grid_range_factor
+        max_x += range_x * grid_range_factor
+        min_y -= range_y * grid_range_factor
+        max_y += range_y * grid_range_factor
     
     x_grid = np.linspace(min_x, max_x, grid_size)
     y_grid = np.linspace(min_y, max_y, grid_size)
@@ -174,7 +179,7 @@ def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id,
     
     # Mask Z_grid values above ceil of initial loss
     initial_loss = trajectory[0][2]
-    loss_threshold = 2* np.ceil(initial_loss)
+    loss_threshold = 5 * np.ceil(initial_loss)
     Z_grid[Z_grid > loss_threshold] = np.nan
     
     return X_grid, Y_grid, Z_grid, pca, param_matrix
@@ -287,7 +292,8 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
 
             # 3. Apply PCA (reduce to 2 components)
             pca = PCA(n_components=2)
-            projected_params = pca.fit_transform(param_matrix)
+            pca.fit(param_matrix)
+            projected_params = pca.transform(param_matrix)
             trajectory_pc2d = projected_params
 
             # 4. Create two separate figures - one for surface, one for contour
@@ -300,7 +306,7 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
             ax2 = fig2.add_subplot(111)
             
             # Compute and plot loss landscape grid
-            landscape_result = compute_loss_landscape(trajectory, program_name, loss_function, job_id)
+            landscape_result = compute_loss_landscape(trajectory, program_name, loss_function, job_id, pca=pca)
             
             if landscape_result is not None:
                 X_grid, Y_grid, Z_grid, _, _ = landscape_result
@@ -318,7 +324,7 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                 
                 # Plot surface
                 surf = ax1.plot_surface(X_grid, Y_grid, Z_grid_plot, 
-                                     cmap=cmap, alpha=1.0, linewidth=0,
+                                     cmap=cmap, alpha=0.7, linewidth=0,
                                      antialiased=True, zorder=1)
                 fig1.colorbar(surf, ax=ax1, shrink=0.6, aspect=20, label='Loss Value')
                 
@@ -329,10 +335,14 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                                       levels=20, cmap=cmap, alpha=1.0)
                 fig2.colorbar(contourf, ax=ax2, shrink=0.6, aspect=20, label='Loss Value')
 
-            # 5. Select points for showing examples (start, middle, end)
-            example_indices = [0, len(trajectory)//2, -1]  # Start, middle, end
-            example_markers = ['X', 'o', '*']
-            example_labels = ['Start', 'Mid', 'End'] # Simplified labels
+                # --- Interpolate Z values for trajectory points so the trajectory sits on the surface ---
+                interpolator = RegularGridInterpolator((Y_grid[:, 0], X_grid[0, :]), Z_grid_plot, bounds_error=False, fill_value=np.nan)
+                trajectory_z_on_surface = interpolator(trajectory_pc2d[:, [1, 0]])  # order is (y, x)
+
+            # 5. Select points for showing examples (start, end only)
+            example_indices = [0, -1]  # Start, end
+            example_markers = ['X', '*']
+            example_labels = ['Start', 'End'] # Simplified labels
             
             # 6. Load model and generate examples
             try:
@@ -362,7 +372,8 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                 for plot_idx, ax in enumerate([ax1, ax2]):
                     # Plot full trajectory
                     if plot_idx == 0:  # 3D surface plot
-                        ax.plot(trajectory_pc2d[:, 0], trajectory_pc2d[:, 1], losses, 
+                        # Plot trajectory using interpolated Z values so it sits on the surface
+                        ax.plot(trajectory_pc2d[:, 0], trajectory_pc2d[:, 1], trajectory_z_on_surface, 
                                color='r', linestyle='-', linewidth=2, label='Optimization Path', zorder=2)
                     else:  # 2D contour plot
                         ax.plot(trajectory_pc2d[:, 0], trajectory_pc2d[:, 1], 
@@ -372,7 +383,7 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                     for idx, (i, marker, label) in enumerate(zip(example_indices, example_markers, example_labels)):
                         # Plot point
                         if plot_idx == 0:  # 3D surface plot
-                            ax.scatter(trajectory_pc2d[i, 0], trajectory_pc2d[i, 1], losses[i],
+                            ax.scatter(trajectory_pc2d[i, 0], trajectory_pc2d[i, 1], trajectory_z_on_surface[i],
                                        s=150, marker=marker, label=label, depthshade=False, zorder=3)
                             
                             # Add example textbox for surface plot
@@ -424,7 +435,7 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                             z_range = max(Z_grid_plot.flatten()) - min(Z_grid_plot.flatten())
                             text_x = trajectory_pc2d[i, 0] + x_offset * x_range
                             text_y = trajectory_pc2d[i, 1]
-                            text_z = losses[i] + 0.1 * z_range  # Offset in z direction
+                            text_z = trajectory_z_on_surface[i] + 0.1 * z_range  # Offset in z direction
                             
                             ax.text(text_x, text_y, text_z,
                                   example_text,
@@ -437,7 +448,7 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                             # Add a line connecting point to text
                             ax.plot([trajectory_pc2d[i, 0], text_x],
                                   [trajectory_pc2d[i, 1], text_y],
-                                  [losses[i], text_z],
+                                  [trajectory_z_on_surface[i], text_z],
                                   linestyle=':', # Changed linestyle
                                   alpha=0.3,     # Changed alpha
                                   zorder=3)
@@ -523,12 +534,12 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
             plot_subdir.mkdir(exist_ok=True, parents=True)
             
             # Save surface plot
-            surface_file = plot_subdir / f"{job_id}_loss_landscape_surface.png"
+            surface_file = plot_subdir / f"{job_id}_loss_landscape_surface.pdf"
             fig1.savefig(surface_file, dpi=300, bbox_inches="tight")
             plt.close(fig1)
             
             # Save contour plot with examples
-            contour_file = plot_subdir / f"{job_id}_loss_landscape_contour.png"
+            contour_file = plot_subdir / f"{job_id}_loss_landscape_contour.pdf"
             fig2.savefig(contour_file, dpi=300, bbox_inches="tight")
             plt.close(fig2)
             
@@ -567,300 +578,201 @@ def plot_single_trajectory(trajectory_file, output_dir):
         return False
 
 
-def plot_multiple_trajectories(trajectory_files, output_dir, output_filename="comparison_plot.png"):
-    """Plot multiple trajectories on the same 3D plot for comparison.
-    
+def plot_multiple_trajectories(trajectory_files, output_dir, output_filename):
+    """Plot multiple trajectories on the same 3D and 2D plots for comparison.
     Args:
-        trajectory_files: List of paths to trajectory files
+        trajectory_files: List of paths to trajectory.pkl files
         output_dir: Directory to save the output plot
-        output_filename: Name of the output plot file
+        output_filename: Filename for the output plot
+    Returns:
+        True if successful, False otherwise
     """
-    print(f"Plotting comparison of {len(trajectory_files)} trajectories...")
-    
-    # Create output directory
-    plots_dir = Path(output_dir) / "plots" / "comparisons"
-    plots_dir.mkdir(exist_ok=True, parents=True)
-    
-    # Load all trajectories
-    trajectories_data = []
-    trajectory_labels = []
-    trajectory_info = []  # Store program_name, loss_function, job_id
-    
+    import pickle
+    from pathlib import Path
+    import numpy as np
+    import jax
+    import jax.numpy as jnp
+    from sklearn.decomposition import PCA
+    import matplotlib.pyplot as plt
+    from scipy.interpolate import RegularGridInterpolator
+
+    # 1. Load all trajectories and extract parameter structures
+    loaded_trajectories = []
+    param_structures = []
+    param_shapes = []
+    meta_infos = []  # (program_name, loss_function, job_id)
     for trajectory_file in trajectory_files:
         try:
+            with open(trajectory_file, "rb") as f:
+                trajectory_data = pickle.load(f)
+            # Extract meta info from path
             path = Path(trajectory_file)
             job_id = path.parent.name
             loss_function = path.parent.parent.name
             program_name = path.parent.parent.parent.name
-            label = f"{program_name}/{loss_function}/{job_id}"
-            
-            with open(trajectory_file, "rb") as f:
-                trajectory_data = pickle.load(f)
-                
-                # Basic validation
-                if isinstance(trajectory_data, list) and all(isinstance(item, tuple) and len(item) == 3 for item in trajectory_data):
-                    trajectories_data.append(trajectory_data)
-                    trajectory_labels.append(label)
-                    trajectory_info.append((program_name, loss_function, job_id))
-                else:
-                    print(f"Warning: Invalid trajectory format in {trajectory_file}")
-                    
+            meta_infos.append((program_name, loss_function, job_id))
+            loaded_trajectories.append(trajectory_data)
+            # Get parameter structure and shapes from first step
+            params = trajectory_data[0][1]
+            struct = jax.tree_util.tree_structure(params)
+            shapes = [np.shape(leaf) for leaf in jax.tree_util.tree_leaves(params)]
+            param_structures.append(struct)
+            param_shapes.append(shapes)
         except Exception as e:
-            print(f"Error loading trajectory {trajectory_file}: {e}")
-    
-    if not trajectories_data:
-        print("No valid trajectories found for comparison.")
-        return False
-    
-    # Create 3D plot
-    fig = plt.figure(figsize=(15, 10))
-    ax = fig.add_subplot(111, projection='3d')
-    
-    # Different colors for each trajectory
-    colors = plt.cm.tab10.colors
-    
-    # Step 1: Extract and flatten parameters from all trajectories for combined PCA
+            print(f"Error loading {trajectory_file}: {e}")
+            return False
+
+    # 2. Check all parameter structures and shapes are the same
+    first_struct = param_structures[0]
+    first_shapes = param_shapes[0]
+    for i, (struct, shapes) in enumerate(zip(param_structures, param_shapes)):
+        if struct != first_struct or shapes != first_shapes:
+            print(f"Error: Trajectory {trajectory_files[i]} has a different parameter structure or shapes.")
+            print(f"All trajectories must have the same model architecture and parameter shapes.")
+            return False
+
+    # 3. Flatten all parameters for all trajectories for shared PCA (match single-trajectory logic)
     all_flattened_params = []
-    trajectory_param_indices = []  # Keep track of which params belong to which trajectory
-    
-    for trajectory_idx, trajectory in enumerate(trajectories_data):
+    trajectory_flattened = []  # List of lists, one per trajectory
+    trajectory_steps = []
+    trajectory_losses = []
+    valid_indices = []
+    import haiku as hk
+    for idx, trajectory in enumerate(loaded_trajectories):
         params_list = [item[1] for item in trajectory]
-        
-        # Check if params are valid
+        steps = np.array([item[0] for item in trajectory])
+        losses = np.array([item[2] for item in trajectory]).astype(float)
+        # Check all params are dict or hk.Params
         if not all(isinstance(p, (dict, hk.Params)) for p in params_list):
-            print(f"Warning: Skipping {trajectory_labels[trajectory_idx]} - trajectory contains non-parameter objects.")
+            print(f"Warning: Skipping trajectory {meta_infos[idx]} - contains non-parameter objects.")
             continue
-        
-        # Flatten parameters for this trajectory
-        flattened_params_for_traj = []
-        for params in params_list:
+        flattened_params = []
+        for i, params in enumerate(params_list):
             leaves = jax.tree_util.tree_leaves(params)
             if not all(isinstance(leaf, (jnp.ndarray, np.ndarray)) for leaf in leaves):
-                print(f"Warning: Skipping {trajectory_labels[trajectory_idx]} - non-array leaf found in parameters.")
-                flattened_params_for_traj = None
+                print(f"Warning: Skipping trajectory {meta_infos[idx]} - non-array leaf found in parameters at step {steps[len(flattened_params)]}.")
+                flattened_params = None
                 break
             if leaves:
-                flattened_params_for_traj.append(jnp.concatenate([jnp.ravel(leaf) for leaf in leaves]))
+                flattened_params.append(jnp.concatenate([jnp.ravel(leaf) for leaf in leaves]))
             else:
-                flattened_params_for_traj.append(jnp.array([]))
-        
-        if flattened_params_for_traj is None:
+                flattened_params.append(jnp.array([]))
+        if flattened_params is None:
             continue
-            
         # Ensure all flattened vectors have the same dimension
-        if len(set(p.shape[0] for p in flattened_params_for_traj)) > 1:
-            print(f"Warning: Skipping {trajectory_labels[trajectory_idx]} - inconsistent parameter vector lengths.")
+        if len(set(p.shape[0] for p in flattened_params)) > 1:
+            print(f"Warning: Skipping trajectory {meta_infos[idx]} - inconsistent parameter vector lengths.")
             continue
-            
-        # Record index range for this trajectory in the combined list
-        start_idx = len(all_flattened_params)
-        all_flattened_params.extend(flattened_params_for_traj)
-        end_idx = len(all_flattened_params)
-        trajectory_param_indices.append((start_idx, end_idx, params_list))
-    
-    if not all_flattened_params:
-        print("No valid parameters found for comparison.")
+        trajectory_flattened.append(flattened_params)
+        trajectory_steps.append(steps)
+        trajectory_losses.append(losses)
+        all_flattened_params.extend(flattened_params)
+        valid_indices.append(idx)
+    if not trajectory_flattened:
+        print("Error: No valid trajectories to plot after flattening and validation.")
         return False
-        
-    # Check if all parameter vectors have the same dimension
-    vector_dimensions = set(p.shape[0] for p in all_flattened_params)
-    if len(vector_dimensions) > 1:
-        print(f"Warning: Cannot compute combined PCA - inconsistent parameter dimensions {vector_dimensions}")
-        return False
-        
-    # Step 2: Compute combined PCA
-    print("Computing combined PCA for all trajectories...")
-    param_matrix = jnp.stack(all_flattened_params)
+    all_flattened_params = jnp.stack(all_flattened_params)
+    # Only keep meta_infos for valid trajectories
+    meta_infos = [meta_infos[i] for i in valid_indices]
+
+    # 4. Fit shared PCA on all flattened params
     pca = PCA(n_components=2)
-    all_projected_params = pca.fit_transform(param_matrix)
-    
-    # Step 3: Create combined grid for loss landscape
-    min_x, max_x = all_projected_params[:, 0].min(), all_projected_params[:, 0].max()
-    min_y, max_y = all_projected_params[:, 1].min(), all_projected_params[:, 1].max()
-    
-    # Extend the grid beyond the trajectory points
+    pca.fit(all_flattened_params)
+
+    # 5. Project each trajectory into PCA space
+    projected_trajectories = []
+    for flattened in trajectory_flattened:
+        param_matrix = jnp.stack(flattened)
+        projected = pca.transform(param_matrix)
+        projected_trajectories.append(projected)
+
+    # Compute global min/max for all projected trajectories
+    all_proj = np.concatenate(projected_trajectories, axis=0)
+    min_x, max_x = all_proj[:, 0].min(), all_proj[:, 0].max()
+    min_y, max_y = all_proj[:, 1].min(), all_proj[:, 1].max()
+    # Add margin as in single-trajectory (use grid_range_factor)
     range_x = max_x - min_x
     range_y = max_y - min_y
-    grid_range_factor = 0.2
-    min_x -= range_x * grid_range_factor
-    max_x += range_x * grid_range_factor
-    min_y -= range_y * grid_range_factor
-    max_y += range_y * grid_range_factor
-    
-    # Use smaller grid size for multiple trajectories to reduce computation time
-    grid_size = 100
-    x_grid = np.linspace(min_x, max_x, grid_size)
-    y_grid = np.linspace(min_y, max_y, grid_size)
-    X_grid, Y_grid = np.meshgrid(x_grid, y_grid)
-    
-    # Plot each trajectory using the shared PCA
-    for i, (start_idx, end_idx, params_list) in enumerate(trajectory_param_indices):
-        try:
-            label = trajectory_labels[i]
-            color = colors[i % len(colors)]
-            program_name, loss_function, job_id = trajectory_info[i]
-            
-            # Get trajectory-specific data
-            trajectory = trajectories_data[i]
-            steps = np.array([item[0] for item in trajectory])
-            losses = np.array([item[2] for item in trajectory]).astype(float)
-            
-            # Get PCA-projected params for this trajectory
-            trajectory_pc2d = all_projected_params[start_idx:end_idx]
-            
-            # Step 4: Compute loss landscape for this trajectory
-            job_id_clean = job_id.replace("job_", "")
-            Z_grid = np.zeros_like(X_grid)
-            
-            try:
-                # Set up model and data for loss computation
-                program_name_key = program_name
-                if program_name == "most_freq":
-                    program_name_key = "most-freq"
-                elif program_name == "shuffle_dyck":
-                    program_name_key = "shuffle_dyck1"
-                
-                # Load the buggy model
-                model = load_buggy_models(
-                    max_length=10,
-                    program_name=program_name,
-                    job_id=job_id_clean
-                )[job_id_clean]
-                
-                # Load dataset
-                data_path = f"{Path(__file__).parent.resolve()}/../../data/"
-                val_dataset = load_dataset(data_path, program_name_key, split_name="val")
-                
-                # Encode the dataset
-                X_val, Y_val = encodeAndPadData(
-                    val_dataset, model.raspFunction, model.inputs, 10
-                )
-                
-                # Get loss function
-                if loss_function not in LOSS_FUNCTIONS:
-                    print(f"Warning: Loss function {loss_function} not found for {label}, using default")
-                    loss_fn = cross_entropy_loss
-                else:
-                    loss_fn = LOSS_FUNCTIONS[loss_function]
-                
-                # 5. Set up forward pass for loss computation
-                padToken = model.model.input_encoder.encoding_map["compiler_pad"]
-                
-                @jax.jit
-                def compute_loss_at_params(params):
-                    # Reconstruct the model's parameter structure using first params as template
-                    reconstructed_params = jax.tree_util.tree_unflatten(
-                        jax.tree_util.tree_structure(params_list[0]), 
-                        jax.tree_util.tree_leaves(params)
-                    )
-                    
-                    # Define forward pass
-                    def forward(x):
-                        compiled_model = model.model.get_compiled_model()
-                        compiled_model.use_unembed_argmax = False
-                        compiled_model.pad_token = padToken
-                        return compiled_model(x, use_dropout=False)
-                    
-                    # Compute loss on a subset of validation data for speed
-                    subset_size = min(256, len(X_val))
-                    X_subset = X_val[:subset_size]
-                    Y_subset = Y_val[:subset_size]
-                    
-                    return loss_fn.apply(reconstructed_params, X_subset, Y_subset, padToken, forward=forward)
-                
-                # Compute loss for a subset of grid points (for efficiency)
-                sample_rate = 2  # Only compute every nth point
-                print(f"Computing loss landscape for {label} (sampling at 1/{sample_rate} points)...")
-                for i in range(0, grid_size, sample_rate):
-                    for j in range(0, grid_size, sample_rate):
-                        # Convert PCA grid point back to parameter space
-                        pca_point = np.array([X_grid[i, j], Y_grid[i, j]])
-                        param_vector = pca.inverse_transform([pca_point])[0]
-                        
-                        try:
-                            # Check if the param_vector length matches the flattened params
-                            param_structure = jax.tree_util.tree_structure(params_list[0])
-                            param_leaves = jax.tree_util.tree_leaves(params_list[0])
-                            
-                            if len(param_vector) != sum(leaf.size for leaf in param_leaves):
-                                Z_grid[i, j] = np.nan
-                                continue
-                            
-                            # Reshape into nested parameter structure
-                            reconstructed_params = reconstruct_params(param_vector, params_list[0])
-                            
-                            # Compute loss at this parameter point
-                            loss_value = compute_loss_at_params(reconstructed_params)
-                            Z_grid[i, j] = loss_value
-                            
-                            # Copy value to surrounding points (simple interpolation)
-                            for di in range(sample_rate):
-                                for dj in range(sample_rate):
-                                    if i+di < grid_size and j+dj < grid_size:
-                                        Z_grid[i+di, j+dj] = loss_value
-                        except Exception as e:
-                            Z_grid[i, j] = np.nan
-                
-                # Fill remaining NaN values with interpolation
-                mask = np.isnan(Z_grid)
-                Z_grid[mask] = np.nanmean(Z_grid)
-                
-                # Apply filtering/smoothing for visualization
-                from scipy.ndimage import gaussian_filter
-                Z_grid = gaussian_filter(Z_grid, sigma=1.0)
-                
-                # Clip extreme values for better visualization
-                p95 = np.nanpercentile(Z_grid, 95)
-                Z_grid = np.clip(Z_grid, None, p95 * 1.5)
+    min_x -= range_x * 0.2
+    max_x += range_x * 0.2
+    min_y -= range_y * 0.2
+    max_y += range_y * 0.2
+    pca_grid_limits = (min_x, max_x, min_y, max_y)
 
-                # Mask Z_grid values above ceil of initial loss
-                initial_loss = trajectory[0][2]
-                loss_threshold = np.ceil(initial_loss)
-                Z_grid[Z_grid > loss_threshold] = np.nan
-                
-                # Ensure NaNs are present for transparency
-                cmap = plt.cm.viridis.copy()
-                cmap.set_bad(color=(0, 0, 0, 0))  # Transparent for masked
-                
-                # Plot the loss landscape as a surface with partial transparency
-                alpha = 0.3  # Use lower alpha for multiple surfaces
-                surf = ax.plot_surface(X_grid, Y_grid, Z_grid, 
-                                     cmap=cmap, alpha=alpha, linewidth=0,
-                                     antialiased=True, zorder=1)
-                
-            except Exception as e:
-                print(f"Error computing loss landscape for {label}: {e}")
-                import traceback
-                traceback.print_exc()
-            
-            # Plot the trajectory path
-            ax.plot(trajectory_pc2d[:, 0], trajectory_pc2d[:, 1], losses,
-                    marker='o', color=color, linestyle='-', linewidth=2, markersize=5, label=label, zorder=2)
-                    
-            # Plot start and end points
-            ax.scatter(trajectory_pc2d[0, 0], trajectory_pc2d[0, 1], losses[0],
-                       c=color, s=100, marker='X', depthshade=False, zorder=3)
-            ax.scatter(trajectory_pc2d[-1, 0], trajectory_pc2d[-1, 1], losses[-1],
-                       c=color, s=100, marker='*', depthshade=False, zorder=3)
-                       
-        except Exception as e:
-            print(f"Error processing trajectory for {trajectory_labels[i]}: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    # Add labels and title
-    ax.set_xlabel('Principal Component 1')
-    ax.set_ylabel('Principal Component 2')
-    ax.set_zlabel('Loss')
-    ax.set_title('Comparison of Multiple Trajectories with Loss Landscape')
-    ax.legend(loc='upper right', bbox_to_anchor=(1.1, 1.0))
-    
-    # Save plot
-    output_file = plots_dir / output_filename
-    plt.savefig(output_file, dpi=300, bbox_inches="tight")
-    plt.close(fig)
-    
-    print(f"Comparison plot saved to {output_file}")
+    # 6. Compute loss landscape using the first valid trajectory
+    program_name, loss_function, job_id = meta_infos[0]
+    landscape_result = compute_loss_landscape(
+        loaded_trajectories[valid_indices[0]], program_name, loss_function, job_id, pca=pca, pca_grid_limits=pca_grid_limits
+    )
+    if landscape_result is None:
+        print("Error: Could not compute loss landscape.")
+        return False
+    X_grid, Y_grid, Z_grid, _, _ = landscape_result
+    Z_grid_plot = np.copy(Z_grid)
+    p95 = np.nanpercentile(Z_grid_plot, 95)
+    Z_grid_plot = np.clip(Z_grid_plot, None, p95 * 1.5)
+    cmap = plt.cm.viridis.copy()
+    cmap.set_bad(color=(0, 0, 0, 0))
+
+    # 7. Plot all trajectories on the same 3D surface and 2D contour plots (unchanged)
+    fig1 = plt.figure(figsize=(12, 8))
+    ax1 = fig1.add_subplot(111, projection='3d')
+    fig2 = plt.figure(figsize=(12, 8))
+    ax2 = fig2.add_subplot(111)
+
+    # Plot surface and contour
+    surf = ax1.plot_surface(X_grid, Y_grid, Z_grid_plot, cmap=cmap, alpha=0.7, linewidth=0, antialiased=True, zorder=1)
+    fig1.colorbar(surf, ax=ax1, shrink=0.6, aspect=20, label='Loss Value')
+    contour = ax2.contour(X_grid, Y_grid, Z_grid_plot, levels=20, colors='k', alpha=0.7)
+    contourf = ax2.contourf(X_grid, Y_grid, Z_grid_plot, levels=20, cmap=cmap, alpha=1.0)
+    fig2.colorbar(contourf, ax=ax2, shrink=0.6, aspect=20, label='Loss Value')
+
+    # Interpolator for Z values
+    from scipy.interpolate import RegularGridInterpolator
+    interpolator = RegularGridInterpolator((Y_grid[:, 0], X_grid[0, :]), Z_grid_plot, bounds_error=False, fill_value=np.nan)
+
+    # Colors and markers for each trajectory
+    import itertools
+    color_cycle = itertools.cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    marker_cycle = itertools.cycle(['o', 's', 'D', '^', 'v', 'P', 'X', '*'])
+
+    for idx, (projected, steps, losses, meta) in enumerate(zip(projected_trajectories, trajectory_steps, trajectory_losses, meta_infos)):
+        color = next(color_cycle)
+        marker = next(marker_cycle)
+        label = f"{meta[0]} | {meta[1]} | {meta[2]}"
+        # Interpolate Z for 3D plot
+        trajectory_z_on_surface = interpolator(projected[:, [1, 0]])
+        # Plot trajectory
+        ax1.plot(projected[:, 0], projected[:, 1], trajectory_z_on_surface, color=color, linestyle='-', linewidth=2, label=label, zorder=2)
+        ax2.plot(projected[:, 0], projected[:, 1], color=color, linestyle='-', linewidth=2, label=label, zorder=2)
+        # Mark start/end
+        ax1.scatter(projected[0, 0], projected[0, 1], trajectory_z_on_surface[0], s=80, marker=marker, color=color, label=f"Start {label}", zorder=3)
+        ax1.scatter(projected[-1, 0], projected[-1, 1], trajectory_z_on_surface[-1], s=120, marker=marker, color=color, edgecolor='k', label=f"End {label}", zorder=3)
+        ax2.scatter(projected[0, 0], projected[0, 1], s=80, marker=marker, color=color, label=f"Start {label}", zorder=3)
+        ax2.scatter(projected[-1, 0], projected[-1, 1], s=120, marker=marker, color=color, edgecolor='k', label=f"End {label}", zorder=3)
+
+    # Labels and legends
+    ax1.set_xlabel('Principal Component 1')
+    ax1.set_ylabel('Principal Component 2')
+    ax1.set_zlabel('Loss')
+    ax1.set_title('Loss Landscape Surface Plot (Multiple Trajectories)')
+    ax1.legend(loc='best', fontsize=8)
+    ax2.set_xlabel('Principal Component 1')
+    ax2.set_ylabel('Principal Component 2')
+    ax2.set_title('Loss Landscape Contour Plot (Multiple Trajectories)')
+    ax2.legend(loc='best', fontsize=8)
+
+    # Save plots
+    output_dir = Path(output_dir)
+    output_dir.mkdir(exist_ok=True, parents=True)
+    surface_file = output_dir / (output_filename.replace('.pdf', '_surface.pdf'))
+    contour_file = output_dir / (output_filename.replace('.pdf', '_contour.pdf'))
+    fig1.savefig(surface_file, dpi=300, bbox_inches="tight")
+    plt.close(fig1)
+    fig2.savefig(contour_file, dpi=300, bbox_inches="tight")
+    plt.close(fig2)
+    print(f"Saved surface plot to {surface_file}")
+    print(f"Saved contour plot to {contour_file}")
     return True
 
 
@@ -954,7 +866,7 @@ def plot_directory(data_dir, output_dir):
 )
 @click.option(
     "--output-filename",
-    default="comparison_plot.png",
+    default="comparison_plot.pdf",
     help="Filename for the comparison plot",
     type=str
 )
