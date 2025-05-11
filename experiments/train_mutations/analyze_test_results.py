@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from pathlib import Path
-import glob
 import click
 
 
@@ -46,6 +45,20 @@ def load_mutation_orders():
         if row["execution_result"].get("status") == "BUGGY_MODEL":
             mutation_orders[row["job_id"]] = row["mutation_order"]
     return mutation_orders
+
+
+def load_original_buggy_accuracies():
+    """Load original accuracies of buggy models from aggregated mutations file"""
+    mutation_path = Path(__file__).parent.parent / "mutation/results/aggregated_mutations.json"
+    df = pd.read_json(mutation_path)
+    
+    original_accuracies = {}
+    for _, row in df.iterrows():
+        execution_result = row.get("execution_result", {})
+        if execution_result.get("status") == "BUGGY_MODEL":
+            # The 'accuracy' in execution_result for a BUGGY_MODEL is its accuracy before GBPR
+            original_accuracies[row["job_id"]] = execution_result.get("accuracy")
+    return original_accuracies
 
 
 def analyze_fixed_models(results, epsilons=None):
@@ -246,7 +259,7 @@ def plot_repair_progression(results, epsilons, output_dir=None):
         # Add annotations and styling
         ax.set_xlabel("Mutation Order")
         ax.set_ylabel("Fixed Models (%)")
-        ax.set_title(f"Repair Success Rate - {loss_fn}", pad=20)
+        ax.set_title("Repair Success Rate", pad=20)
         ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         ax.grid(True)
         ax.set_xlim(1, max(orders))
@@ -358,7 +371,7 @@ def plot_repair_progression_per_program(results, epsilons, output_dir=None):
                            va='bottom',
                            fontsize=8)
         
-        fig.suptitle(f"Repair Progression by Program - {loss_fn}", fontsize=16, y=1.02)
+        fig.suptitle("Repair Progression by Program", fontsize=16, y=1.02)
         plt.tight_layout()
         
         # Save the plot in loss function subdirectory
@@ -371,54 +384,101 @@ def plot_repair_progression_per_program(results, epsilons, output_dir=None):
         plt.close()
 
 def plot_accuracy_histogram(results, output_dir=None):
-    """Plot histogram of test accuracies with summary statistics"""
+    """Plot histogram of test accuracies (before and after GBPR) with summary statistics"""
     plots_dir = Path(output_dir) / "plots"
     plots_dir.mkdir(exist_ok=True, parents=True)
-    
+
+    original_buggy_accuracies_map = load_original_buggy_accuracies()
+
     # Group results by loss function and program
-    loss_fn_groups = {}
-    program_groups = {}
+    loss_fn_groups = {} # loss_fn -> list of results for that loss_fn
+    program_groups = {} # loss_fn -> program_name -> list of results for that program under that loss_fn
+    
     for result in results:
         loss_fn = result["loss_function"]
         program = result["program_name"]
-        
+        job_id = result["job_id"]
+
+        # Get original accuracy if available
+        original_accuracy = original_buggy_accuracies_map.get(job_id) # Returns None if job_id not found
+
         if loss_fn not in loss_fn_groups:
             loss_fn_groups[loss_fn] = []
             program_groups[loss_fn] = {}
         if program not in program_groups[loss_fn]:
             program_groups[loss_fn][program] = []
             
-        loss_fn_groups[loss_fn].append(result)
-        program_groups[loss_fn][program].append(result)
+        # Store both original and test accuracy
+        loss_fn_groups[loss_fn].append({
+            "test_accuracy": result["test_accuracy"], 
+            "original_accuracy": original_accuracy
+        })
+        program_groups[loss_fn][program].append({
+            "test_accuracy": result["test_accuracy"],
+            "original_accuracy": original_accuracy
+        })
     
     # Create histograms for each loss function
-    for loss_fn, loss_fn_results in loss_fn_groups.items():
-        # Create loss function directory
+    for loss_fn, loss_fn_results_list in loss_fn_groups.items():
         loss_fn_dir = plots_dir / loss_fn
         loss_fn_dir.mkdir(exist_ok=True, parents=True)
         
-        # Create aggregate histogram
-        accuracies = pd.Series([r["test_accuracy"] * 100 for r in loss_fn_results])
-        plt.figure(figsize=(10, 6))
-        plt.hist(accuracies, bins=20, edgecolor="black")
+        # Aggregate histogram for the current loss function
+        accuracies_after = pd.Series([r["test_accuracy"] * 100 for r in loss_fn_results_list])
+        # Filter out None values for original accuracies before converting to Series
+        accuracies_before = pd.Series([r["original_accuracy"] * 100 for r in loss_fn_results_list if r["original_accuracy"] is not None])
+
+        plt.figure(figsize=(12, 7))
+        plotted_anything_aggregate = False
         
-        plt.axvline(
-            accuracies.mean(),
-            color="red",
-            linestyle="dashed",
-            linewidth=2,
-            label=f"Mean: {accuracies.mean():.2f}%",
-        )
-        plt.axvline(
-            accuracies.median(),
-            color="green",
-            linestyle="dashed",
-            linewidth=2,
-            label=f"Median: {accuracies.median():.2f}%",
-        )
+        # Determine common bins for aggregate plot
+        combined_data_for_bins_agg = []
+        if not accuracies_before.empty:
+            combined_data_for_bins_agg.extend(accuracies_before.dropna().tolist())
+        if not accuracies_after.empty:
+            combined_data_for_bins_agg.extend(accuracies_after.dropna().tolist())
+
+        bins_to_use_agg = 50  # Default
+
+        if combined_data_for_bins_agg:
+            min_val = np.min(combined_data_for_bins_agg)
+            max_val = np.max(combined_data_for_bins_agg)
+            
+            if pd.isna(min_val) or pd.isna(max_val): # Should ideally not happen with dropna
+                bins_to_use_agg = 50
+            elif min_val == max_val:
+                # Create a small range around the single value, e.g., +/- 2.5, clamped to [0, 100]
+                actual_min = max(0.0, min_val - 2.5)
+                actual_max = min(100.0, max_val + 2.5)
+                if actual_min >= actual_max: # Ensure a tiny positive range if clamping collapsed it
+                    actual_max = actual_min + 1e-6 if actual_min < 100 else 100.0
+                    if actual_min == 100.0 : actual_min = 100.0 - 1e-6 # ensure min < max
+                bins_to_use_agg = np.linspace(actual_min, actual_max, 50 + 1)
+            else:
+                bins_to_use_agg = np.linspace(min_val, max_val, 50 + 1)
         
-        plt.title(f"Distribution of Test Accuracies (All Programs)\nLoss Function: {loss_fn}")
-        plt.xlabel("Accuracy (%)")
+        if not accuracies_before.empty:
+            plt.hist(accuracies_before, bins=bins_to_use_agg, edgecolor="black", label='Before GBPR', color='red', alpha=0.7)
+            plt.axvline(
+                accuracies_before.median(), color="darkred", linestyle="dashed", linewidth=2,
+                label=f"Median: {accuracies_before.median():.2f}%"
+            )
+            plotted_anything_aggregate = True
+            
+        if not accuracies_after.empty:
+            plt.hist(accuracies_after, bins=bins_to_use_agg, edgecolor="black", label='After GBPR', color='green', alpha=0.7)
+            plt.axvline(
+                accuracies_after.median(), color="darkgreen", linestyle="dashed", linewidth=2,
+                label=f"Median: {accuracies_after.median():.2f}%"
+            )
+            plotted_anything_aggregate = True
+
+        if not plotted_anything_aggregate: # Skip if no data
+            plt.close()
+            continue
+        
+        plt.title("Distribution of Test Accuracy (All Programs)")
+        plt.xlabel("Test Set Accuracy (%)")
         plt.ylabel("Count")
         plt.legend()
         plt.tight_layout()
@@ -429,75 +489,146 @@ def plot_accuracy_histogram(results, output_dir=None):
             print(f"Plot saved to {output_file}")
         plt.close()
         
-        # Create per-program histograms in a single figure
-        num_programs = len(program_groups[loss_fn])
+        # Create per-program histograms in a single figure for the current loss function
+        current_program_group = program_groups[loss_fn]
+        num_programs = len(current_program_group)
+        if num_programs == 0:
+            continue
+
         num_cols = min(3, num_programs)
         num_rows = (num_programs + num_cols - 1) // num_cols
         
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5*num_rows))
-        if num_programs == 1:
-            axes = np.array([axes])
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows), squeeze=False)
         axes = axes.flatten()
         
-        for idx, (program, program_results) in enumerate(sorted(program_groups[loss_fn].items())):
-            ax = axes[idx]
-            prog_accuracies = pd.Series([r["test_accuracy"] * 100 for r in program_results])
+        plotted_program_idx = 0
+        for idx, (program, program_results_list) in enumerate(sorted(current_program_group.items())):
+            ax = axes[plotted_program_idx] # Use plotted_program_idx to handle cases where some programs have no data
+            prog_accuracies_after = pd.Series([r["test_accuracy"] * 100 for r in program_results_list])
+            prog_accuracies_before = pd.Series([r["original_accuracy"] * 100 for r in program_results_list if r["original_accuracy"] is not None])
             
-            ax.hist(prog_accuracies, bins=20, edgecolor="black")
-            ax.axvline(
-                prog_accuracies.mean(),
-                color="red",
-                linestyle="dashed",
-                linewidth=2,
-                label=f"Mean: {prog_accuracies.mean():.2f}%",
-            )
-            ax.axvline(
-                prog_accuracies.median(),
-                color="green",
-                linestyle="dashed",
-                linewidth=2,
-                label=f"Median: {prog_accuracies.median():.2f}%",
-            )
+            plotted_anything_program = False
+
+            # Determine common bins for this program's plot
+            combined_data_for_bins_prog = []
+            if not prog_accuracies_before.empty:
+                combined_data_for_bins_prog.extend(prog_accuracies_before.dropna().tolist())
+            if not prog_accuracies_after.empty:
+                combined_data_for_bins_prog.extend(prog_accuracies_after.dropna().tolist())
+
+            bins_to_use_prog = 50  # Default
+
+            if combined_data_for_bins_prog:
+                min_val_prog = np.min(combined_data_for_bins_prog)
+                max_val_prog = np.max(combined_data_for_bins_prog)
+
+                if pd.isna(min_val_prog) or pd.isna(max_val_prog):
+                    bins_to_use_prog = 50
+                elif min_val_prog == max_val_prog:
+                    actual_min_prog = max(0.0, min_val_prog - 2.5)
+                    actual_max_prog = min(100.0, max_val_prog + 2.5)
+                    if actual_min_prog >= actual_max_prog:
+                        actual_max_prog = actual_min_prog + 1e-6 if actual_min_prog < 100 else 100.0
+                        if actual_min_prog == 100.0 : actual_min_prog = 100.0 - 1e-6
+                    bins_to_use_prog = np.linspace(actual_min_prog, actual_max_prog, 50 + 1)
+                else:
+                    bins_to_use_prog = np.linspace(min_val_prog, max_val_prog, 50 + 1)
+
+            if not prog_accuracies_before.empty:
+                ax.hist(prog_accuracies_before, bins=bins_to_use_prog, edgecolor="black", label='Before GBPR', color='red', alpha=0.7)
+                ax.axvline(
+                    prog_accuracies_before.median(), color="darkred", linestyle="dashed", linewidth=1.5,
+                    label=f"Median (Before): {prog_accuracies_before.median():.2f}%"
+                )
+                plotted_anything_program = True
+
+            if not prog_accuracies_after.empty:
+                ax.hist(prog_accuracies_after, bins=bins_to_use_prog, edgecolor="black", label='After GBPR', color='green', alpha=0.7)
+                ax.axvline(
+                    prog_accuracies_after.median(), color="darkgreen", linestyle="dashed", linewidth=1.5,
+                    label=f"Median (After): {prog_accuracies_after.median():.2f}%"
+                )
+                plotted_anything_program = True
             
-            ax.set_title(f"{program}\n(n={len(program_results)})")
+            if not plotted_anything_program: # Skip if no data for this program
+                ax.set_title(f"{program}\n(No accuracy data)")
+                ax.set_visible(False) 
+                # Do not increment plotted_program_idx here, so the next valid plot uses this ax
+                continue
+
+            ax.set_title(f"{program}\n(Models: Before={len(prog_accuracies_before)}, After={len(prog_accuracies_after)})")
             ax.set_xlabel("Accuracy (%)")
             ax.set_ylabel("Count")
             ax.legend(fontsize='small')
+            plotted_program_idx += 1
         
-        # Hide empty subplots if any
-        for idx in range(len(program_groups[loss_fn]), len(axes)):
-            axes[idx].set_visible(False)
+        for i in range(plotted_program_idx, len(axes)): # Hide unused subplots
+            axes[i].set_visible(False)
         
-        fig.suptitle(f"Distribution of Test Accuracies by Program\nLoss Function: {loss_fn}", y=1.02)
-        plt.tight_layout()
-        
-        if output_dir:
-            output_file = loss_fn_dir / "accuracy_histogram_by_program.png"
-            plt.savefig(output_file, dpi=300, bbox_inches="tight")
-            print(f"Plot saved to {output_file}")
+        if plotted_program_idx == 0: # No programs had data to plot
+            plt.close(fig)
+            # Continue to stats writing even if no plots generated for by_program
+        else:
+            fig.suptitle("Distribution of Test Accuracy by Program", y=1.02 if num_rows > 1 else 1.05)
+            plt.tight_layout(rect=[0, 0, 1, 0.98 if num_rows > 1 else 0.95]) # Adjust layout to prevent title overlap
             
-            # Save summary statistics
+            if output_dir:
+                output_file = loss_fn_dir / "accuracy_histogram_by_program.png"
+                plt.savefig(output_file, dpi=300, bbox_inches="tight")
+                print(f"Plot saved to {output_file}")
+            plt.close(fig) # Close the figure for per-program plots
+            
+        # Stats writing (remains unchanged from original logic, but ensure it's outside the conditional plotting)
+        if output_dir: # This check was already there for the stats file
             stats_file = loss_fn_dir / "accuracy_stats.txt"
             with open(stats_file, "w") as f:
-                # Aggregate stats
-                f.write("=== Aggregate Statistics ===\n")
-                f.write(f"Number of models: {len(accuracies)}\n")
-                f.write(f"Mean accuracy: {accuracies.mean():.2f}%\n")
-                f.write(f"Median accuracy: {accuracies.median():.2f}%\n")
-                f.write(f"Min accuracy: {accuracies.min():.2f}%\n")
-                f.write(f"Max accuracy: {accuracies.max():.2f}%\n\n")
+                f.write(f"=== Statistics for Loss Function: {loss_fn} ===\n")
                 
+                # Aggregate stats
+                f.write("\n--- Aggregate Statistics (All Programs) ---\n")
+                if not accuracies_before.empty:
+                    f.write("Original Buggy Model Accuracy (Before GBPR):\n")
+                    f.write(f"  Number of models: {len(accuracies_before)}\n")
+                    f.write(f"  Median accuracy: {accuracies_before.median():.2f}%\n")
+                    f.write(f"  Min accuracy: {accuracies_before.min():.2f}%\n")
+                    f.write(f"  Max accuracy: {accuracies_before.max():.2f}%\n")
+                else:
+                    f.write("No 'Before GBPR' accuracy data available for aggregate.\n")
+
+                if not accuracies_after.empty:
+                    f.write("Test Accuracy (After GBPR):\n")
+                    f.write(f"  Number of models: {len(accuracies_after)}\n")
+                    f.write(f"  Median accuracy: {accuracies_after.median():.2f}%\n")
+                    f.write(f"  Min accuracy: {accuracies_after.min():.2f}%\n")
+                    f.write(f"  Max accuracy: {accuracies_after.max():.2f}%\n")
+                else:
+                    f.write("No 'After GBPR' accuracy data available for aggregate.\n")
+
                 # Per-program stats
-                f.write("=== Per-Program Statistics ===\n")
-                for program, program_results in sorted(program_groups[loss_fn].items()):
-                    prog_accuracies = pd.Series([r["test_accuracy"] * 100 for r in program_results])
-                    f.write(f"\n{program}:\n")
-                    f.write(f"  Number of models: {len(prog_accuracies)}\n")
-                    f.write(f"  Mean accuracy: {prog_accuracies.mean():.2f}%\n")
-                    f.write(f"  Median accuracy: {prog_accuracies.median():.2f}%\n")
-                    f.write(f"  Min accuracy: {prog_accuracies.min():.2f}%\n")
-                    f.write(f"  Max accuracy: {prog_accuracies.max():.2f}%\n")
-        plt.close()
+                f.write("\n--- Per-Program Statistics ---\n")
+                for program, program_results_list in sorted(current_program_group.items()):
+                    # Recalculate these series as they are local to the plotting loop
+                    prog_accuracies_after_stats = pd.Series([r["test_accuracy"] * 100 for r in program_results_list])
+                    prog_accuracies_before_stats = pd.Series([r["original_accuracy"] * 100 for r in program_results_list if r["original_accuracy"] is not None])
+                    
+                    f.write(f"\nProgram: {program}\n")
+                    if not prog_accuracies_before_stats.empty:
+                        f.write("  Original Buggy Model Accuracy (Before GBPR):\n")
+                        f.write(f"    Number of models: {len(prog_accuracies_before_stats)}\n")
+                        f.write(f"    Median accuracy: {prog_accuracies_before_stats.median():.2f}%\n")
+                        f.write(f"    Min accuracy: {prog_accuracies_before_stats.min():.2f}%\n")
+                        f.write(f"    Max accuracy: {prog_accuracies_before_stats.max():.2f}%\n")
+                    else:
+                        f.write("  No 'Before GBPR' accuracy data available for this program.\n")
+                    
+                    if not prog_accuracies_after_stats.empty:
+                        f.write("  Test Accuracy (After GBPR):\n")
+                        f.write(f"    Number of models: {len(prog_accuracies_after_stats)}\n")
+                        f.write(f"    Median accuracy: {prog_accuracies_after_stats.median():.2f}%\n")
+                        f.write(f"    Min accuracy: {prog_accuracies_after_stats.min():.2f}%\n")
+                        f.write(f"    Max accuracy: {prog_accuracies_after_stats.max():.2f}%\n")
+                    else:
+                        f.write("  No 'After GBPR' accuracy data available for this program.\n")
 
 @click.command()
 @click.option(
