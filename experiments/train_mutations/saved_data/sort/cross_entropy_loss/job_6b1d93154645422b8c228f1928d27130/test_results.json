@@ -1,6 +1,7 @@
 {
   "program_name": "sort",
   "job_id": "6b1d93154645422b8c228f1928d27130",
-  "test_accuracy": 0.9998,
-  "test_samples": 5000
+  "test_accuracy": 0.9996,
+  "test_samples": 5000,
+  "loss_function": "cross_entropy_loss"
 }
