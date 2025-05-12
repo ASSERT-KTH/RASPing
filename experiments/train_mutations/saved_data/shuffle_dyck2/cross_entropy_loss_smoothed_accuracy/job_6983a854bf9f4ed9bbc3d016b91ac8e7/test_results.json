@@ -1,7 +1,0 @@
-{
-  "program_name": "shuffle_dyck2",
-  "job_id": "6983a854bf9f4ed9bbc3d016b91ac8e7",
-  "test_accuracy": 0.991,
-  "test_samples": 5000,
-  "loss_function": "cross_entropy_loss_smoothed_accuracy"
-}

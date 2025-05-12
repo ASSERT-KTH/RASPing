@@ -1,7 +1,0 @@
-{
-  "program_name": "most_freq",
-  "job_id": "ac2a0bee3afd4dadbc921a0a105dfe94",
-  "test_accuracy": 0.3186,
-  "test_samples": 5000,
-  "loss_function": "cross_entropy_loss_smoothed_accuracy"
-}
