@@ -61,11 +61,8 @@ def load_original_buggy_accuracies():
     return original_accuracies
 
 
-def analyze_fixed_models(results, epsilons=None):
+def analyze_fixed_models(results, epsilons):
     """Analyze how many models are fixed based on different epsilon thresholds"""
-    if epsilons is None:
-        epsilons = [0.0, 0.001, 0.01]
-
     # Get mutation orders
     mutation_orders = load_mutation_orders()
 
@@ -569,7 +566,7 @@ def plot_accuracy_histogram(results, output_dir=None):
             plt.close(fig)
             # Continue to stats writing even if no plots generated for by_program
         else:
-            fig.suptitle("Distribution of Test Accuracy by Program", y=1.02 if num_rows > 1 else 1.05)
+            fig.suptitle("Distribution of Correctness Accuracy by Program (Before and After GBPR)")
             plt.tight_layout(rect=[0, 0, 1, 0.98 if num_rows > 1 else 0.95]) # Adjust layout to prevent title overlap
             
             if output_dir:
@@ -641,15 +638,10 @@ def plot_accuracy_histogram(results, output_dir=None):
     default="analysis_outputs",
     help="Directory to save analysis outputs",
 )
-@click.option(
-    "--epsilons",
-    default="0.0,0.001,0.01",
-    help="Comma-separated list of epsilon values",
-)
-def main(saved_data_dir, output_dir, epsilons):
+def main(saved_data_dir, output_dir):
     """Analyze and visualize test results from trained mutation models"""
     # Parse epsilons
-    epsilon_values = [float(e) for e in epsilons.split(",")]
+    epsilon_values = np.linspace(0.0, 0.01, 5)
 
     # Ensure output directory exists
     output_path = Path(output_dir)
@@ -677,41 +669,6 @@ def main(saved_data_dir, output_dir, epsilons):
     plot_repair_progression_per_program(results, epsilon_values, output_path)
     plot_accuracy_histogram(results, output_path)
 
-    # Generate summary table
-    summary_file = output_path / "summary.md"
-    with open(summary_file, "w") as f:
-        f.write("# Test Results Summary\n\n")
-        
-        # First write fix rates by program
-        f.write("## Fix Rates by Program\n\n")
-        for epsilon in epsilon_values:
-            f.write(f"### Epsilon = {epsilon}\n\n")
-            f.write("| Program | Fixed | Total | Percentage |\n")
-            f.write("|---------|-------|-------|------------|\n")
-
-            for program, stats in fixed_stats[epsilon]["programs"].items():
-                f.write(
-                    f"| {program} | {stats['fixed']} | {stats['total']} | {stats['percentage']:.2f}% |\n"
-                )
-            f.write("\n")
-            
-        # Then write fix rates by mutation order
-        f.write("## Fix Rates by Number of Mutations\n\n")
-        for epsilon in epsilon_values:
-            f.write(f"### Epsilon = {epsilon}\n\n")
-            f.write("| Number of Mutations | Fixed | Total | Percentage |\n")
-            f.write("|-------------------|-------|-------|------------|\n")
-
-            # Sort by mutation order number
-            sorted_orders = sorted(fixed_stats[epsilon]["mutation_orders"].keys())
-            for order in sorted_orders:
-                stats = fixed_stats[epsilon]["mutation_orders"][order]
-                f.write(
-                    f"| {order} | {stats['fixed']} | {stats['total']} | {stats['percentage']:.2f}% |\n"
-                )
-            f.write("\n")
-
-    print(f"Summary saved to {summary_file}")
     print(f"All analysis outputs saved to {output_dir}/")
 
 
