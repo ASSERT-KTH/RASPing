@@ -417,53 +417,64 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                             # Gather all annotation anchor points for this plot
                             anchor_points = np.array([trajectory_pc2d[j, :2] for j in example_indices])
 
-                            # Compute a smart offset direction for this annotation to avoid overlap
-                            # Try to push annotations away from each other using a simple repulsion scheme
-                            base_offset = 0.14 * np.array([x_max - x_min, y_max - y_min])
-                            # Start with a default offset direction (cycle through quadrants)
-                            default_dirs = np.array([
-                                [1, 1],
-                                [-1, 1],
-                                [1, -1],
-                                [-1, -1],
+                            # Define the four corners of the plot
+                            corners = np.array([
+                                [x_min, y_min],  # bottom-left
+                                [x_max, y_min],  # bottom-right
+                                [x_min, y_max],  # top-left
+                                [x_max, y_max],  # top-right
                             ])
-                            direction = default_dirs[idx % len(default_dirs)].astype(float)
 
-                            # Compute repulsion from other annotation anchor points
-                            repulsion = np.zeros(2)
-                            for j, other_pt in enumerate(anchor_points):
-                                if j == idx:
-                                    continue
-                                diff = anchor_points[idx] - other_pt
-                                dist = np.linalg.norm(diff)
-                                if dist < 1e-6:
-                                    # If exactly overlapping, nudge in default direction
-                                    repulsion += direction
-                                elif dist < 0.18 * max(x_max - x_min, y_max - y_min):
-                                    # If close, add repulsion
-                                    repulsion += diff / (dist + 1e-3)
-                            # Normalize repulsion and combine with default direction
-                            if np.linalg.norm(repulsion) > 0:
-                                repulsion = repulsion / np.linalg.norm(repulsion)
-                                offset_dir = 0.7 * direction + 0.7 * repulsion
-                            else:
-                                offset_dir = direction
-                            # Normalize and scale
-                            if np.linalg.norm(offset_dir) > 0:
-                                offset_dir = offset_dir / np.linalg.norm(offset_dir)
-                            offset_vec = base_offset * offset_dir
+                            # For the first time through, assign each example to the closest corner
+                            # Do this only once per plot, not per example
+                            if idx == 0:
+                                # Compute distance matrix: shape (num_examples, 4)
+                                dists = np.linalg.norm(anchor_points[:, None, :] - corners[None, :, :], axis=2)
+                                # Find the optimal assignment (minimize total distance)
+                                # Use a simple greedy assignment since there are only 4 examples/corners
+                                assigned_corners = [-1] * len(anchor_points)
+                                assigned_examples = [-1] * 4
+                                dists_copy = dists.copy()
+                                for _ in range(4):
+                                    ex_idx, corner_idx = np.unravel_index(np.argmin(dists_copy), dists_copy.shape)
+                                    assigned_corners[ex_idx] = corner_idx
+                                    assigned_examples[corner_idx] = ex_idx
+                                    dists_copy[ex_idx, :] = np.inf
+                                    dists_copy[:, corner_idx] = np.inf
+                                # Store the assignment for this plot
+                                plot_corner_assignment = assigned_corners
+                            # Use the stored assignment
+                            corner_idx = plot_corner_assignment[idx]
+                            corner = corners[corner_idx]
+
+                            # Offset the annotation a bit away from the corner, toward the example point
+                            # Compute a vector from the corner to the example point, normalize, and scale
+                            ex_point = anchor_points[idx]
+                            vec = ex_point - corner
+                            if np.linalg.norm(vec) > 0:
+                                vec = vec / np.linalg.norm(vec)
+                            offset_magnitude = 0.12 * np.array([x_max - x_min, y_max - y_min])
+                            offset_vec = vec * offset_magnitude
 
                             # Compute annotation position and clamp to bounds
-                            x_anno = clamp(trajectory_pc2d[i, 0] + offset_vec[0], x_min, x_max)
-                            y_anno = clamp(trajectory_pc2d[i, 1] + offset_vec[1], y_min, y_max)
+                            x_anno = clamp(corner[0] + offset_vec[0], x_min, x_max)
+                            y_anno = clamp(corner[1] + offset_vec[1], y_min, y_max)
 
-                            # Choose alignment based on offset direction
-                            ha = 'left' if offset_vec[0] >= 0 else 'right'
-                            va = 'bottom' if offset_vec[1] >= 0 else 'top'
+                            # Choose alignment based on which corner
+                            if corner_idx == 0:  # bottom-left
+                                ha, va = 'left', 'bottom'
+                            elif corner_idx == 1:  # bottom-right
+                                ha, va = 'right', 'bottom'
+                            elif corner_idx == 2:  # top-left
+                                ha, va = 'left', 'top'
+                            elif corner_idx == 3:  # top-right
+                                ha, va = 'right', 'top'
+                            else:
+                                ha, va = 'center', 'center'
 
                             ax.annotate(
                                 example_text,
-                                xy=(trajectory_pc2d[i, 0], trajectory_pc2d[i, 1]),
+                                xy=(ex_point[0], ex_point[1]),
                                 xytext=(x_anno, y_anno),
                                 bbox=props,
                                 ha=ha,
