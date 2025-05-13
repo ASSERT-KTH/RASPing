@@ -21,7 +21,6 @@ from src.loss import (
     cross_entropy_loss_smoothed_accuracy,
     cross_entropy_loss_with_perfect_sequence,
 )
-from src.trainer import Trainer
 from experiments.mutation.load_mutations import load_buggy_models
 from src.functions import load_dataset, encodeAndPadData
 
@@ -33,7 +32,7 @@ LOSS_FUNCTIONS = {
 }
 
 
-def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, pca, grid_size=200, grid_range_factor=0.2, pca_grid_limits=None):
+def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, pca, grid_size=200, grid_range_factor=0.25, pca_grid_limits=None):
     """Compute the loss landscape around the trajectory in PCA space
     
     Args:
@@ -224,27 +223,6 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
     print(f"Generating Loss Landscape Trajectory plots for {len(trajectories)} models...")
     processed_count = 0
 
-    original_usetex_setting = plt.rcParams['text.usetex']
-    original_latex_preamble = plt.rcParams['text.latex.preamble']
-    
-    plt.rcParams['text.usetex'] = True
-    # Add xcolor package for \textcolor command
-    if '\\usepackage{xcolor}' not in original_latex_preamble:
-        plt.rcParams['text.latex.preamble'] = original_latex_preamble + '\n\\usepackage{xcolor}'
-
-    def escape_latex(s):
-        """Escape special LaTeX characters in a string."""
-        return str(s).replace('\\', '\\textbackslash{}') \
-                  .replace('{', '\\{') \
-                  .replace('}', '\\}') \
-                  .replace('#', '\\#') \
-                  .replace('$', '\\$') \
-                  .replace('%', '\\%') \
-                  .replace('&', '\\&') \
-                  .replace('_', '\\_') \
-                  .replace('^', '\\^') \
-                  .replace('~', '\\textasciitilde{}')
-
     for key, trajectory in trajectories.items():
         program_name, loss_function, job_id = key
         
@@ -326,23 +304,23 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                 surf = ax1.plot_surface(X_grid, Y_grid, Z_grid_plot, 
                                      cmap=cmap, alpha=0.7, linewidth=0,
                                      antialiased=True, zorder=1)
-                fig1.colorbar(surf, ax=ax1, shrink=0.6, aspect=20, label='Loss Value')
                 
                 # Plot contour
                 contour = ax2.contour(X_grid, Y_grid, Z_grid_plot, 
                                     levels=20, colors='k', alpha=0.7)
                 contourf = ax2.contourf(X_grid, Y_grid, Z_grid_plot, 
                                       levels=20, cmap=cmap, alpha=1.0)
-                fig2.colorbar(contourf, ax=ax2, shrink=0.6, aspect=20, label='Loss Value')
+                fig2.colorbar(contourf, ax=ax2, shrink=0.6, aspect=20, label='Correctness Loss')
 
                 # --- Interpolate Z values for trajectory points so the trajectory sits on the surface ---
                 interpolator = RegularGridInterpolator((Y_grid[:, 0], X_grid[0, :]), Z_grid_plot, bounds_error=False, fill_value=np.nan)
                 trajectory_z_on_surface = interpolator(trajectory_pc2d[:, [1, 0]])  # order is (y, x)
 
             # 5. Select points for showing examples (start, end only)
-            example_indices = [0, -1]  # Start, end
-            example_markers = ['X', '*']
-            example_labels = ['Start', 'End'] # Simplified labels
+            example_indices = [0, len(trajectory) // 4, 3 * len(trajectory) // 4, -1]
+            example_markers = ['X', 'o', 'o', 'o']
+            example_colors = ['red', '#ff9900', '#99cc00', 'green']  # Red to green
+            example_labels = ["Buggy Program", None, None, "Repaired Program"]
             
             # 6. Load model and generate examples
             try:
@@ -365,164 +343,137 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                 data_path = f"{Path(__file__).parent.resolve()}/../../data/"
                 val_dataset = load_dataset(data_path, program_name_key, split_name="val")
                 
-                # Get a few example inputs
-                example_inputs = val_dataset[:2]
+                # Only include the first two examples of length 7 (before removing BOS token)
+                filtered_examples = []
+                for ex in val_dataset:
+                    # ex is (input_seq, true_output)
+                    input_seq, true_output = ex
+                    if hasattr(input_seq, '__len__') and len(input_seq) == 7:
+                        filtered_examples.append(ex)
+                    if len(filtered_examples) == 2:
+                        break
+                example_inputs = filtered_examples
                 
                 # Plot trajectory and examples on both plots
                 for plot_idx, ax in enumerate([ax1, ax2]):
                     # Plot full trajectory
                     if plot_idx == 0:  # 3D surface plot
-                        # Plot trajectory using interpolated Z values so it sits on the surface
                         ax.plot(trajectory_pc2d[:, 0], trajectory_pc2d[:, 1], trajectory_z_on_surface, 
-                               color='r', linestyle='-', linewidth=2, label='Optimization Path', zorder=2)
+                               color='r', linestyle='-', linewidth=2, label='Repair Trajectory', zorder=2)
                     else:  # 2D contour plot
                         ax.plot(trajectory_pc2d[:, 0], trajectory_pc2d[:, 1], 
-                               color='r', linestyle='-', linewidth=2, label='Optimization Path', zorder=2)
+                               color='r', linestyle='-', linewidth=2, label='Repair Trajectory', zorder=2)
                     
-                    # Plot example points and add textboxes
-                    for idx, (i, marker, label) in enumerate(zip(example_indices, example_markers, example_labels)):
-                        # Plot point
+                    # Plot example points (markers) in both plots, but add textboxes only in contour plot
+                    for idx, (i, marker, color, label) in enumerate(zip(example_indices, example_markers, example_colors, example_labels)):
+                        # Plot point (marker)
                         if plot_idx == 0:  # 3D surface plot
                             ax.scatter(trajectory_pc2d[i, 0], trajectory_pc2d[i, 1], trajectory_z_on_surface[i],
-                                       s=150, marker=marker, label=label, depthshade=False, zorder=3)
-                            
-                            # Add example textbox for surface plot
-                            # Set model parameters to this point
-                            model.model.params = params_list[i]
-                            
-                            # Generate examples
-                            example_text = f"{escape_latex(label)}:\n"
-                            for input_seq, true_output in example_inputs:
-                                # Get model output
-                                output_seq = model.apply(input_seq)
-                                # Filter "BOS" tokens for display and format strings
-                                # Escape tokens for LaTeX
-                                clean_input_tokens = [escape_latex(str(token)) for token in input_seq if str(token).upper() != "BOS"]
-                                # Original tokens for comparison logic, escaped tokens for display
-                                original_clean_output_tokens = [str(token) for token in output_seq if str(token).upper() != "BOS"]
-                                original_clean_true_output_tokens = [str(token) for token in true_output if str(token).upper() != "BOS"]
-                                
-                                display_input_seq = " ".join(clean_input_tokens)
-                                
-                                colored_output_parts = []
-                                for k_token_idx, output_token_k_orig in enumerate(original_clean_output_tokens):
-                                    output_token_k_escaped = escape_latex(output_token_k_orig)
-                                    if k_token_idx < len(original_clean_true_output_tokens) and output_token_k_orig == original_clean_true_output_tokens[k_token_idx]:
-                                        colored_output_parts.append("\\textcolor{green}{" + output_token_k_escaped + "}")
-                                    else:
-                                        colored_output_parts.append("\\textcolor{red}{" + output_token_k_escaped + "}")
-                                
-                                display_colored_output_seq = " ".join(colored_output_parts)
-                                if not display_colored_output_seq: # Handle empty output
-                                    display_colored_output_seq = "\\textit{(empty output)}"
-                                
-                                example_text += f"{program_name}({display_input_seq}) = {display_colored_output_seq}\n"
-                            
-                            example_text = example_text.rstrip("\n") # Remove trailing newline
-
-                            # Create text box with 3D positioning
-                            props = dict(boxstyle='round', facecolor='white', alpha=0.8)
-                            # Position text boxes on alternating sides
-                            if idx % 2 == 0:
-                                x_offset = 0.05
-                                alignment = 'left'
-                            else:
-                                x_offset = -0.05
-                                alignment = 'right'
-                            
-                            # For 3D plot, we need to position the text box in 3D space
-                            x_range = max(X_grid.flatten()) - min(X_grid.flatten())
-                            z_range = max(Z_grid_plot.flatten()) - min(Z_grid_plot.flatten())
-                            text_x = trajectory_pc2d[i, 0] + x_offset * x_range
-                            text_y = trajectory_pc2d[i, 1]
-                            text_z = trajectory_z_on_surface[i] + 0.1 * z_range  # Offset in z direction
-                            
-                            ax.text(text_x, text_y, text_z,
-                                  example_text,
-                                  bbox=props,
-                                  ha=alignment,
-                                  va='bottom',
-                                  fontsize=8,
-                                  zorder=4)
-                            
-                            # Add a line connecting point to text
-                            ax.plot([trajectory_pc2d[i, 0], text_x],
-                                  [trajectory_pc2d[i, 1], text_y],
-                                  [trajectory_z_on_surface[i], text_z],
-                                  linestyle=':', # Changed linestyle
-                                  alpha=0.3,     # Changed alpha
-                                  zorder=3)
-                            
+                                       s=50, marker=marker, color=color, label=label, depthshade=False, zorder=3)
                         else:  # 2D contour plot
                             ax.scatter(trajectory_pc2d[i, 0], trajectory_pc2d[i, 1],
-                                       s=150, marker=marker, label=label, zorder=3)
-                            
+                                       s=50, marker=marker, color=color, label=label, zorder=3)
                             # Add example textbox (only on contour plot)
-                            # Set model parameters to this point
                             model.model.params = params_list[i]
-                            
-                            # Generate examples
-                            example_text = f"{escape_latex(label)}:\n"
+                            example_text = ""
                             for input_seq, true_output in example_inputs:
-                                # Get model output
                                 output_seq = model.apply(input_seq)
-                                # Filter "BOS" tokens for display and format strings
-                                # Escape tokens for LaTeX
-                                clean_input_tokens = [escape_latex(str(token)) for token in input_seq if str(token).upper() != "BOS"]
-                                # Original tokens for comparison logic, escaped tokens for display
+                                clean_input_tokens = [str(token) for token in input_seq if str(token).upper() != "BOS"]
                                 original_clean_output_tokens = [str(token) for token in output_seq if str(token).upper() != "BOS"]
                                 original_clean_true_output_tokens = [str(token) for token in true_output if str(token).upper() != "BOS"]
-
                                 display_input_seq = " ".join(clean_input_tokens)
-
-                                colored_output_parts = []
-                                for k_token_idx, output_token_k_orig in enumerate(original_clean_output_tokens):
-                                    output_token_k_escaped = escape_latex(output_token_k_orig)
-                                    if k_token_idx < len(original_clean_true_output_tokens) and output_token_k_orig == original_clean_true_output_tokens[k_token_idx]:
-                                        colored_output_parts.append("\\textcolor{green}{" + output_token_k_escaped + "}")
-                                    else:
-                                        colored_output_parts.append("\\textcolor{red}{" + output_token_k_escaped + "}")
-                                
-                                display_colored_output_seq = " ".join(colored_output_parts)
-                                if not display_colored_output_seq: # Handle empty output
-                                    display_colored_output_seq = "\\textit{(empty output)}"
-
-                                example_text += f"{program_name}({display_input_seq}) = {display_colored_output_seq}\n"
-                            
-                            example_text = example_text.rstrip("\n") # Remove trailing newline
-                            
-                            # Create text box
+                                # Mark the *entire* output as correct/incorrect at the end, based on full sequence match
+                                output_parts = [str(token) for token in original_clean_output_tokens]
+                                display_output_seq = " ".join(output_parts)
+                                if not display_output_seq:
+                                    display_output_seq = "(empty output)"
+                                # Determine if the full output matches the true output
+                                if original_clean_output_tokens == original_clean_true_output_tokens:
+                                    mark = "(✓)"
+                                else:
+                                    mark = "(✗)"
+                                example_text += f"{program_name}({display_input_seq}) = {display_output_seq} {mark}\n"
+                            example_text = example_text.rstrip("\n")
                             props = dict(boxstyle='round', facecolor='white', alpha=0.8)
-                            # Position text boxes on alternating sides
-                            if idx % 2 == 0:
-                                x_offset = 0.05
-                                alignment = 'left'
+                            # Improved annotation placement to avoid overlap using smart repulsion
+
+                            # Get plot bounds
+                            x_min, x_max = X_grid.min(), X_grid.max()
+                            y_min, y_max = Y_grid.min(), Y_grid.max()
+                            def clamp(val, minval, maxval):
+                                return max(min(val, maxval), minval)
+
+                            # Gather all annotation anchor points for this plot
+                            anchor_points = np.array([trajectory_pc2d[j, :2] for j in example_indices])
+
+                            # Compute a smart offset direction for this annotation to avoid overlap
+                            # Try to push annotations away from each other using a simple repulsion scheme
+                            base_offset = 0.14 * np.array([x_max - x_min, y_max - y_min])
+                            # Start with a default offset direction (cycle through quadrants)
+                            default_dirs = np.array([
+                                [1, 1],
+                                [-1, 1],
+                                [1, -1],
+                                [-1, -1],
+                            ])
+                            direction = default_dirs[idx % len(default_dirs)].astype(float)
+
+                            # Compute repulsion from other annotation anchor points
+                            repulsion = np.zeros(2)
+                            for j, other_pt in enumerate(anchor_points):
+                                if j == idx:
+                                    continue
+                                diff = anchor_points[idx] - other_pt
+                                dist = np.linalg.norm(diff)
+                                if dist < 1e-6:
+                                    # If exactly overlapping, nudge in default direction
+                                    repulsion += direction
+                                elif dist < 0.18 * max(x_max - x_min, y_max - y_min):
+                                    # If close, add repulsion
+                                    repulsion += diff / (dist + 1e-3)
+                            # Normalize repulsion and combine with default direction
+                            if np.linalg.norm(repulsion) > 0:
+                                repulsion = repulsion / np.linalg.norm(repulsion)
+                                offset_dir = 0.7 * direction + 0.7 * repulsion
                             else:
-                                x_offset = -0.05
-                                alignment = 'right'
-                            
-                            ax.annotate(example_text,
-                                      xy=(trajectory_pc2d[i, 0], trajectory_pc2d[i, 1]),
-                                      xytext=(trajectory_pc2d[i, 0] + x_offset * (max(X_grid.flatten()) - min(X_grid.flatten())),
-                                             trajectory_pc2d[i, 1]),
-                                      bbox=props,
-                                      ha=alignment,
-                                      va='center',
-                                      fontsize=8,
-                                      arrowprops=dict(arrowstyle="-"))
+                                offset_dir = direction
+                            # Normalize and scale
+                            if np.linalg.norm(offset_dir) > 0:
+                                offset_dir = offset_dir / np.linalg.norm(offset_dir)
+                            offset_vec = base_offset * offset_dir
+
+                            # Compute annotation position and clamp to bounds
+                            x_anno = clamp(trajectory_pc2d[i, 0] + offset_vec[0], x_min, x_max)
+                            y_anno = clamp(trajectory_pc2d[i, 1] + offset_vec[1], y_min, y_max)
+
+                            # Choose alignment based on offset direction
+                            ha = 'left' if offset_vec[0] >= 0 else 'right'
+                            va = 'bottom' if offset_vec[1] >= 0 else 'top'
+
+                            ax.annotate(
+                                example_text,
+                                xy=(trajectory_pc2d[i, 0], trajectory_pc2d[i, 1]),
+                                xytext=(x_anno, y_anno),
+                                bbox=props,
+                                ha=ha,
+                                va=va,
+                                fontsize=10,
+                                arrowprops=dict(arrowstyle="-")
+                            )
                 
-                # Add labels and title
-                if plot_idx == 0:  # 3D surface plot
-                    ax1.set_xlabel('Principal Component 1')
-                    ax1.set_ylabel('Principal Component 2')
-                    ax1.set_zlabel('Loss')
-                    ax1.set_title('Loss Landscape Surface Plot\n' + f'{program_name} - {loss_function} - {job_id}')
-                    ax1.legend()
-                else:  # 2D contour plot
-                    ax2.set_xlabel('Principal Component 1')
-                    ax2.set_ylabel('Principal Component 2')
-                    ax2.set_title('Loss Landscape Contour Plot with Examples\n' + f'{program_name} - {loss_function} - {job_id}')
-                    ax2.legend()
+                    # Add labels and title
+                    if plot_idx == 0:  # 3D surface plot
+                        ax1.set(
+                            xticklabels=[],
+                            yticklabels=[],
+                        )
+                    else:  # 2D contour plot
+                        ax2.legend(loc='best', fontsize=8)
+                        # Remove numbers from axes
+                        ax2.set_xticks([])
+                        ax2.set_yticks([])
+                        ax2.set_xticklabels([])
+                        ax2.set_yticklabels([])
                 
             except Exception as e:
                 print(f"Error generating examples for {key}: {e}")
@@ -722,10 +673,8 @@ def plot_multiple_trajectories(trajectory_files, output_dir, output_filename):
 
     # Plot surface and contour
     surf = ax1.plot_surface(X_grid, Y_grid, Z_grid_plot, cmap=cmap, alpha=0.7, linewidth=0, antialiased=True, zorder=1)
-    fig1.colorbar(surf, ax=ax1, shrink=0.6, aspect=20, label='Loss Value')
     contour = ax2.contour(X_grid, Y_grid, Z_grid_plot, levels=20, colors='k', alpha=0.7)
     contourf = ax2.contourf(X_grid, Y_grid, Z_grid_plot, levels=20, cmap=cmap, alpha=1.0)
-    fig2.colorbar(contourf, ax=ax2, shrink=0.6, aspect=20, label='Loss Value')
 
     # Interpolator for Z values
     from scipy.interpolate import RegularGridInterpolator
@@ -752,14 +701,7 @@ def plot_multiple_trajectories(trajectory_files, output_dir, output_filename):
         ax2.scatter(projected[-1, 0], projected[-1, 1], s=120, marker=marker, color=color, edgecolor='k', label=f"End {label}", zorder=3)
 
     # Labels and legends
-    ax1.set_xlabel('Principal Component 1')
-    ax1.set_ylabel('Principal Component 2')
-    ax1.set_zlabel('Loss')
-    ax1.set_title('Loss Landscape Surface Plot (Multiple Trajectories)')
     ax1.legend(loc='best', fontsize=8)
-    ax2.set_xlabel('Principal Component 1')
-    ax2.set_ylabel('Principal Component 2')
-    ax2.set_title('Loss Landscape Contour Plot (Multiple Trajectories)')
     ax2.legend(loc='best', fontsize=8)
 
     # Save plots
