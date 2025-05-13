@@ -33,7 +33,7 @@ LOSS_FUNCTIONS = {
 }
 
 
-def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, pca, grid_size=100, grid_range_factor=0.2, pca_grid_limits=None):
+def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, pca, grid_size=200, grid_range_factor=0.2, pca_grid_limits=None):
     """Compute the loss landscape around the trajectory in PCA space
     
     Args:
