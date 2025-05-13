@@ -22,8 +22,8 @@ Program: hist
     Max accuracy: 0.00%
   Test Accuracy (After GBPR):
     Number of models: 46
-    Median accuracy: 53.49%
-    Min accuracy: 0.74%
+    Median accuracy: 53.02%
+    Min accuracy: 0.76%
     Max accuracy: 100.00%
 
 Program: most_freq
