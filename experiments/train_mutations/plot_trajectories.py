@@ -32,7 +32,7 @@ LOSS_FUNCTIONS = {
 }
 
 
-def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, pca, grid_size=200, grid_range_factor=0.25, pca_grid_limits=None):
+def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id, pca, grid_size=200, grid_range_factor=0.2, pca_grid_limits=None):
     """Compute the loss landscape around the trajectory in PCA space
     
     Args:
@@ -316,8 +316,19 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                 interpolator = RegularGridInterpolator((Y_grid[:, 0], X_grid[0, :]), Z_grid_plot, bounds_error=False, fill_value=np.nan)
                 trajectory_z_on_surface = interpolator(trajectory_pc2d[:, [1, 0]])  # order is (y, x)
 
-            # 5. Select points for showing examples (start, end only)
-            example_indices = [0, len(trajectory) // 4, 3 * len(trajectory) // 4, -1]
+            # 5. Select points for showing examples (start, 25%, 75%, end) based on trajectory distance
+            # Compute cumulative distances along the trajectory in PCA space
+            diffs = np.diff(trajectory_pc2d, axis=0)
+            step_distances = np.linalg.norm(diffs, axis=1)
+            cumulative_distances = np.concatenate([[0], np.cumsum(step_distances)])
+            total_distance = cumulative_distances[-1]
+            # Find indices closest to 25% and 75% of the total distance
+            percentiles = [0.0, 0.25, 0.75, 1.0]
+            example_indices = []
+            for p in percentiles:
+                target_dist = p * total_distance
+                idx = np.argmin(np.abs(cumulative_distances - target_dist))
+                example_indices.append(idx)
             example_markers = ['X', 'o', 'o', 'o']
             example_colors = ['red', '#ff9900', '#99cc00', 'green']  # Red to green
             example_labels = ["Buggy Program", None, None, "Repaired Program"]
