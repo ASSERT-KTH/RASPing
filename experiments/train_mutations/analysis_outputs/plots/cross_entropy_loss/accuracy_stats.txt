@@ -4,12 +4,14 @@
 Original Buggy Model Accuracy (Before GBPR):
   Number of models: 1466
   Median accuracy: 2.00%
+  Average accuracy: 36.69%
   Stddev: 44.05%
   Min accuracy: 0.00%
   Max accuracy: 98.00%
 Test Accuracy (After GBPR):
   Number of models: 1466
   Median accuracy: 98.54%
+  Average accuracy: 80.11%
   Stddev: 31.17%
   Min accuracy: 0.08%
   Max accuracy: 100.00%
