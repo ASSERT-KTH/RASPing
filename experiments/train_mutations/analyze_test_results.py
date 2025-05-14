@@ -587,6 +587,7 @@ def plot_accuracy_histogram(results, output_dir=None):
                     f.write("Original Buggy Model Accuracy (Before GBPR):\n")
                     f.write(f"  Number of models: {len(accuracies_before)}\n")
                     f.write(f"  Median accuracy: {accuracies_before.median():.2f}%\n")
+                    f.write(f"  Stddev: {accuracies_before.std():.2f}%\n")
                     f.write(f"  Min accuracy: {accuracies_before.min():.2f}%\n")
                     f.write(f"  Max accuracy: {accuracies_before.max():.2f}%\n")
                 else:
@@ -596,6 +597,7 @@ def plot_accuracy_histogram(results, output_dir=None):
                     f.write("Test Accuracy (After GBPR):\n")
                     f.write(f"  Number of models: {len(accuracies_after)}\n")
                     f.write(f"  Median accuracy: {accuracies_after.median():.2f}%\n")
+                    f.write(f"  Stddev: {accuracies_after.std():.2f}%\n")
                     f.write(f"  Min accuracy: {accuracies_after.min():.2f}%\n")
                     f.write(f"  Max accuracy: {accuracies_after.max():.2f}%\n")
                 else:
