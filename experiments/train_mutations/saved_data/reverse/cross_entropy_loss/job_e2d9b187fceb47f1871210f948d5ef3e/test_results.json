@@ -1,6 +1,7 @@
 {
   "program_name": "reverse",
   "job_id": "e2d9b187fceb47f1871210f948d5ef3e",
-  "test_accuracy": 1.0,
-  "test_samples": 5000
+  "test_accuracy": 0.0078000000000000005,
+  "test_samples": 5000,
+  "loss_function": "cross_entropy_loss"
 }
