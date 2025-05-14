@@ -354,15 +354,76 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
                 data_path = f"{Path(__file__).parent.resolve()}/../../data/"
                 val_dataset = load_dataset(data_path, program_name_key, split_name="val")
                 
-                # Only include the first two examples of length 7 (before removing BOS token)
-                filtered_examples = []
+                # Select three examples of length 7 that are all initially incorrect, and can be fixed one by one along the trajectory
+                # If not possible, fall back to original strategy
+
+                # 1. Gather all length-7 examples
+                print(f"Gathering all length-7 examples...")
+                length7_examples = []
                 for ex in val_dataset:
-                    # ex is (input_seq, true_output)
                     input_seq, true_output = ex
                     if hasattr(input_seq, '__len__') and len(input_seq) == 7:
-                        filtered_examples.append(ex)
-                    if len(filtered_examples) == 2:
-                        break
+                        length7_examples.append(ex)
+                # 2. For each example, check at the trajectory points specified by example_indices if it is correct
+                # We'll use the params_list for each trajectory point
+                print(f"Checking example status at trajectory points...")
+                example_status = []  # List of (example, [correct_at_each_selected_point])
+                for ex in length7_examples:
+                    input_seq, true_output = ex
+                    corrects = []
+                    for idx in example_indices:
+                        params = params_list[idx]
+                        model.model.params = params
+                        output_seq = model.apply(input_seq)
+                        # Remove BOS tokens for comparison
+                        clean_output = [str(token) for token in output_seq if str(token).upper() != "BOS"]
+                        clean_true = [str(token) for token in true_output if str(token).upper() != "BOS"]
+                        corrects.append(clean_output == clean_true)
+                    example_status.append((ex, corrects))
+                # 3. Try to find three examples that are all incorrect at the first point,
+                # and such that at each subsequent point, one more becomes correct
+                print(f"Inspecting {len(example_status)} examples...")
+                found = False
+                from itertools import combinations
+                for exs in combinations(example_status, 3):
+                    # exs: [(ex1, [bool, bool, bool, bool]), (ex2, [bool, bool, bool, bool]), (ex3, [bool, bool, bool, bool])]
+                    # Try all orderings of the three examples
+                    # Check that at each step, once an example becomes correct, it stays correct
+                    if (
+                        sum([ex[1][0] for ex in exs]) == 0 and
+                        sum([ex[1][1] for ex in exs]) == 1 and
+                        sum([ex[1][2] for ex in exs]) == 2 and
+                        sum([ex[1][3] for ex in exs]) == 3
+                    ):
+                        # For each example, find the first index where it becomes correct, and check it stays correct after
+                        valid = True
+                        for ex in exs:
+                            corrects = ex[1]
+                            first_correct = None
+                            for idx, c in enumerate(corrects):
+                                if c and first_correct is None:
+                                    first_correct = idx
+                            if first_correct is not None:
+                                # After first_correct, all must be correct
+                                if not all(corrects[i] for i in range(first_correct, len(corrects))):
+                                    valid = False
+                                    break
+                        if valid:
+                            found = True
+                            # Sort the three examples by the number of corrects (descending)
+                            sorted_exs = sorted(exs, key=lambda ex: sum(ex[1]), reverse=True)
+                            example_inputs = [ex[0] for ex in sorted_exs]
+                            filtered_examples = [ex[0] for ex in sorted_exs]
+                            break
+                if not found:
+                    # Fallback: just pick first two examples of length 7 (original strategy)
+                    filtered_examples = []
+                    for ex in val_dataset:
+                        input_seq, true_output = ex
+                        if hasattr(input_seq, '__len__') and len(input_seq) == 7:
+                            filtered_examples.append(ex)
+                        if len(filtered_examples) == 2:
+                            break
                 example_inputs = filtered_examples
                 
                 # Plot trajectory and examples on both plots
