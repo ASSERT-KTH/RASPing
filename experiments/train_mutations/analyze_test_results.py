@@ -381,7 +381,7 @@ def plot_repair_progression_per_program(results, epsilons, output_dir=None):
         plt.close()
 
 def plot_accuracy_histogram(results, output_dir=None):
-    """Plot histogram of test accuracies (before and after GBPR) with summary statistics"""
+    """Plot histogram of test accuracies (before and after GBPR) with summary statistics, including per-operator histograms"""
     plots_dir = Path(output_dir) / "plots"
     plots_dir.mkdir(exist_ok=True, parents=True)
 
@@ -390,7 +390,7 @@ def plot_accuracy_histogram(results, output_dir=None):
     # Group results by loss function and program
     loss_fn_groups = {} # loss_fn -> list of results for that loss_fn
     program_groups = {} # loss_fn -> program_name -> list of results for that program under that loss_fn
-    
+
     for result in results:
         loss_fn = result["loss_function"]
         program = result["program_name"]
@@ -404,7 +404,6 @@ def plot_accuracy_histogram(results, output_dir=None):
             program_groups[loss_fn] = {}
         if program not in program_groups[loss_fn]:
             program_groups[loss_fn][program] = []
-            
         # Store both original and test accuracy
         loss_fn_groups[loss_fn].append({
             "test_accuracy": result["test_accuracy"], 
@@ -414,7 +413,6 @@ def plot_accuracy_histogram(results, output_dir=None):
             "test_accuracy": result["test_accuracy"],
             "original_accuracy": original_accuracy
         })
-    
     # Create histograms for each loss function
     for loss_fn, loss_fn_results_list in loss_fn_groups.items():
         loss_fn_dir = plots_dir / loss_fn
@@ -631,6 +629,28 @@ def plot_accuracy_histogram(results, output_dir=None):
                     else:
                         f.write("  No 'After GBPR' accuracy data available for this program.\n")
 
+def aggregate_test_accuracies(results, output_dir=None):
+    """Aggregate all test accuracies from the results and save to a CSV file"""
+    output_path = Path(output_dir) if output_dir else Path(".")
+    output_path.mkdir(exist_ok=True, parents=True)
+    
+    # Flatten all results into a DataFrame
+    records = []
+    for result in results:
+        record = {
+            "job_id": result.get("job_id"),
+            "program_name": result.get("program_name"),
+            "loss_function": result.get("loss_function"),
+            "test_accuracy": result.get("test_accuracy"),
+        }
+        records.append(record)
+    df = pd.DataFrame(records)
+    
+    # Save to CSV
+    output_file = output_path / "all_test_accuracies.csv"
+    df.to_csv(output_file, index=False)
+    print(f"Aggregated test accuracies saved to {output_file}")
+
 @click.command()
 @click.option(
     "--saved-data-dir",
@@ -655,6 +675,9 @@ def main(saved_data_dir, output_dir):
     print(f"Loading results from {saved_data_dir}...")
     results = load_results(saved_data_dir)
     print(f"Loaded {len(results)} results")
+
+    # Aggregate all test accuracies
+    aggregate_test_accuracies(results, output_path)
 
     # Analyze fixed models
     print("Analyzing fixed models...")
