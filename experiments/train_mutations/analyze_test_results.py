@@ -629,6 +629,147 @@ def plot_accuracy_histogram(results, output_dir=None):
                     else:
                         f.write("  No 'After GBPR' accuracy data available for this program.\n")
 
+def plot_accuracy_histogram_by_mutation_order(results, output_dir=None):
+    """Plot histogram of test accuracies (before and after GBPR) per mutation order, with summary statistics."""
+    plots_dir = Path(output_dir) / "plots"
+    plots_dir.mkdir(exist_ok=True, parents=True)
+
+    original_buggy_accuracies_map = load_original_buggy_accuracies()
+    mutation_orders_map = load_mutation_orders()  # job_id -> mutation_order
+
+    # Group results by loss function and mutation order
+    loss_fn_groups = {}  # loss_fn -> list of results for that loss_fn
+    mutation_order_groups = {}  # loss_fn -> mutation_order -> list of results
+
+    for result in results:
+        loss_fn = result["loss_function"]
+        job_id = result["job_id"]
+        mutation_order = mutation_orders_map.get(job_id)
+        if mutation_order is None:
+            continue  # skip if no mutation order
+        original_accuracy = original_buggy_accuracies_map.get(job_id)
+
+        if loss_fn not in loss_fn_groups:
+            loss_fn_groups[loss_fn] = []
+            mutation_order_groups[loss_fn] = {}
+        if mutation_order not in mutation_order_groups[loss_fn]:
+            mutation_order_groups[loss_fn][mutation_order] = []
+        # Store both original and test accuracy
+        loss_fn_groups[loss_fn].append({
+            "test_accuracy": result["test_accuracy"],
+            "original_accuracy": original_accuracy,
+            "mutation_order": mutation_order
+        })
+        mutation_order_groups[loss_fn][mutation_order].append({
+            "test_accuracy": result["test_accuracy"],
+            "original_accuracy": original_accuracy
+        })
+
+    # Create histograms for each loss function
+    for loss_fn, loss_fn_results_list in loss_fn_groups.items():
+        loss_fn_dir = plots_dir / loss_fn
+        loss_fn_dir.mkdir(exist_ok=True, parents=True)
+
+        # Per-mutation-order histograms in a single figure for the current loss function
+        current_mutation_order_group = mutation_order_groups[loss_fn]
+        num_orders = len(current_mutation_order_group)
+        if num_orders == 0:
+            continue
+
+        num_cols = min(3, num_orders)
+        num_rows = (num_orders + num_cols - 1) // num_cols
+
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows), squeeze=False)
+        axes = axes.flatten()
+
+        total_orders = len(current_mutation_order_group)
+        last_row_count = total_orders % num_cols if total_orders % num_cols != 0 else num_cols
+        offset = (num_cols - last_row_count) // 2 if num_rows > 1 and last_row_count < num_cols else 0
+
+        # Hide all axes initially
+        for ax in axes:
+            ax.set_visible(False)
+
+        for idx, (mutation_order, order_results_list) in enumerate(sorted(current_mutation_order_group.items())):
+            # Calculate which axis to use
+            if num_rows > 1 and idx // num_cols == num_rows - 1 and last_row_count < num_cols:
+                # Last row, center the plots
+                ax_idx = (num_rows - 1) * num_cols + offset + (idx % last_row_count)
+            else:
+                ax_idx = idx
+            ax = axes[ax_idx]
+            ax.set_visible(True)
+
+            order_accuracies_after = pd.Series([r["test_accuracy"] * 100 for r in order_results_list])
+            order_accuracies_before = pd.Series([r["original_accuracy"] * 100 for r in order_results_list if r["original_accuracy"] is not None])
+
+            plotted_anything_order = False
+
+            # Determine common bins for this mutation order's plot
+            combined_data_for_bins_order = []
+            if not order_accuracies_before.empty:
+                combined_data_for_bins_order.extend(order_accuracies_before.dropna().tolist())
+            if not order_accuracies_after.empty:
+                combined_data_for_bins_order.extend(order_accuracies_after.dropna().tolist())
+
+            bins_to_use_order = 50  # Default
+
+            if combined_data_for_bins_order:
+                min_val_order = np.min(combined_data_for_bins_order)
+                max_val_order = np.max(combined_data_for_bins_order)
+
+                if pd.isna(min_val_order) or pd.isna(max_val_order):
+                    bins_to_use_order = 50
+                elif min_val_order == max_val_order:
+                    actual_min_order = max(0.0, min_val_order - 2.5)
+                    actual_max_order = min(100.0, max_val_order + 2.5)
+                    if actual_min_order >= actual_max_order:
+                        actual_max_order = actual_min_order + 1e-6 if actual_min_order < 100 else 100.0
+                        if actual_min_order == 100.0 : actual_min_order = 100.0 - 1e-6
+                    bins_to_use_order = np.linspace(actual_min_order, actual_max_order, 50 + 1)
+                else:
+                    bins_to_use_order = np.linspace(min_val_order, max_val_order, 50 + 1)
+
+            if not order_accuracies_before.empty:
+                ax.hist(order_accuracies_before, bins=bins_to_use_order, edgecolor="black", label='Before GBPR', color='red', alpha=0.7)
+                ax.axvline(
+                    order_accuracies_before.median(), color="darkred", linestyle="dashed", linewidth=1.5,
+                    label=f"Median (Before): {order_accuracies_before.median():.2f}%"
+                )
+                plotted_anything_order = True
+
+            if not order_accuracies_after.empty:
+                ax.hist(order_accuracies_after, bins=bins_to_use_order, edgecolor="black", label='After GBPR', color='green', alpha=0.7)
+                ax.axvline(
+                    order_accuracies_after.median(), color="darkgreen", linestyle="dashed", linewidth=1.5,
+                    label=f"Median (After): {order_accuracies_after.median():.2f}%"
+                )
+                plotted_anything_order = True
+
+            if not plotted_anything_order:
+                ax.set_title(f"Mutation Order {mutation_order}\n(No accuracy data)")
+                continue
+
+            ax.set_title(f"Mutation Order {mutation_order}\n(Models: Before={len(order_accuracies_before)}, After={len(order_accuracies_after)})")
+            ax.set_xlabel("Accuracy (%)")
+            ax.set_ylabel("Count")
+            ax.legend(fontsize='small')
+
+        # Hide unused axes
+        for i in range(total_orders, len(axes)):
+            axes[i].set_visible(False)
+
+        if total_orders == 0:
+            plt.close(fig)
+        else:
+            fig.suptitle("Distribution of Correctness Accuracy by Mutation Order (Before and After GBPR)")
+            plt.tight_layout(rect=[0, 0, 1, 0.98 if num_rows > 1 else 0.95])
+            if output_dir:
+                output_file = loss_fn_dir / "accuracy_histogram_by_mutation_order.pdf"
+                plt.savefig(output_file, dpi=300, bbox_inches="tight")
+                print(f"Plot saved to {output_file}")
+            plt.close(fig)
+
 def aggregate_test_accuracies(results, output_dir=None):
     """Aggregate all test accuracies from the results and save to a CSV file"""
     output_path = Path(output_dir) if output_dir else Path(".")
@@ -695,6 +836,7 @@ def main(saved_data_dir, output_dir):
     plot_repair_progression(results, epsilon_values, output_path)
     plot_repair_progression_per_program(results, epsilon_values, output_path)
     plot_accuracy_histogram(results, output_path)
+    plot_accuracy_histogram_by_mutation_order(results, output_path)
 
     print(f"All analysis outputs saved to {output_dir}/")
 
