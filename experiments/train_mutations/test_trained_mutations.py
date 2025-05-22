@@ -12,6 +12,18 @@ if module_path not in sys.path:
 
 from src.functions import load_dataset, encodeAndPadData
 from experiments.mutation.load_mutations import load_buggy_models
+from src.loss import (
+    cross_entropy_loss,
+    cross_entropy_loss_smoothed_accuracy,
+    cross_entropy_loss_with_perfect_sequence,
+)
+
+
+LOSS_FUNCTIONS = {
+    "cross_entropy_loss": cross_entropy_loss,
+    "cross_entropy_loss_smoothed_accuracy": cross_entropy_loss_smoothed_accuracy,
+    "cross_entropy_loss_with_perfect_sequence": cross_entropy_loss_with_perfect_sequence,
+}
 
 
 def test_trained_model(
@@ -19,10 +31,11 @@ def test_trained_model(
     job_id: str,
     max_len: int = 10,
     output_dir: str = None,
+    loss_fn_name: str = "cross_entropy_loss",
 ):
     # Load the trained model
     if not output_dir:
-        output_dir = f"saved_data/{program_name}/job_{job_id}"
+        output_dir = f"saved_data/{program_name}/{loss_fn_name}/job_{job_id}"
 
     output_dir = Path(output_dir)
     model_path = output_dir / "model.npy"
@@ -63,6 +76,7 @@ def test_trained_model(
         "job_id": job_id,
         "test_accuracy": float(accuracy),
         "test_samples": len(X_test),
+        "loss_function": loss_fn_name,
     }
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -82,18 +96,26 @@ def test_trained_model(
     type=str,
     help="Directory containing the trained model and where to save test results",
 )
+@click.option(
+    "--loss_fn_name",
+    type=click.Choice(list(LOSS_FUNCTIONS.keys())),
+    default="cross_entropy_loss",
+    help="Loss function used for training",
+)
 def run_test(
     program_name,
     job_id,
     max_len,
     output_dir,
+    loss_fn_name,
 ):
-    print(f"Testing trained model {program_name} (job {job_id})...")
+    print(f"Testing trained model {program_name} (job {job_id}) with {loss_fn_name}...")
     results = test_trained_model(
         program_name=program_name,
         job_id=job_id,
         max_len=max_len,
         output_dir=output_dir,
+        loss_fn_name=loss_fn_name,
     )
     print(f"Test results: {results}")
 

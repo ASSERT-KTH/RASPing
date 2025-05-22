@@ -18,6 +18,7 @@ class EarlyStopping:
         self.counter = 0
         self.best_value = np.inf if mode == "min" else -np.inf
         self.best_params = None
+        self.best_step = None  # Store the step number when best_params is updated
         self.should_stop = False
 
         if mode not in ["min", "max"]:
@@ -26,7 +27,7 @@ class EarlyStopping:
         self.monitor_op = np.less if mode == "min" else np.greater
         self.min_delta *= 1 if mode == "min" else -1  # Change sign based on mode
 
-    def __call__(self, current_value: float, current_params=None) -> bool:
+    def __call__(self, current_value: float, current_params=None, current_step=None) -> bool:
         """Returns True if training should stop."""
         # For 'min' mode: Checks if current_value + min_delta < best_value
         # For 'max' mode: Checks if current_value - min_delta > best_value
@@ -34,6 +35,8 @@ class EarlyStopping:
             self.best_value = current_value
             if current_params is not None:
                 self.best_params = current_params
+            if current_step is not None:
+                self.best_step = current_step
             self.counter = 0
         else:
             self.counter += 1
@@ -47,4 +50,5 @@ class EarlyStopping:
         self.counter = 0
         self.best_value = np.inf if self.mode == "min" else -np.inf
         self.best_params = None
+        self.best_step = None
         self.should_stop = False

@@ -14,7 +14,7 @@ autoreload==0.1.2
 black==24.10.0
 click==8.1.8
 parso==0.8.4
-cosmic-ray==8.4.1
+cosmic-ray @ git+https://github.com/andre15silva/cosmic-ray.git@feature/higher-order-mutants
 toml==0.10.2
 pytest==8.3.4
 python-dotenv==1.0.1
@@ -22,3 +22,7 @@ backoff==2.2.1
 openai==1.61.0
 wandb==0.19.6
 submitit==1.5.2
+tqdm==4.67.1
+seaborn==0.13.2
+pytest-skip-slow==0.0.5
+scikit-learn==1.6.1

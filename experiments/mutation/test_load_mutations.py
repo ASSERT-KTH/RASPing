@@ -7,12 +7,12 @@ from src.model import Model
 @pytest.mark.parametrize(
     "program_name,job_id",
     [
-        ("sort", "f35ba7e838874bba8335cd9ca5db2aa7"),
-        ("reverse", "9db50f10314547858e52a5aff4bc2be4"),
-        ("hist", "45728e11fb1043829d4057c016b549b9"),
-        ("most_freq", "14ac16fe5f49412aa1ee30461b5769a0"),
-        ("shuffle_dyck", "8940b2d2299f45c08b474d151c6d760b"),
-        ("shuffle_dyck2", "739a764b78784fc3b4b6f80006eac399"),
+        ("sort", "4795828b71974ec8829297c301a19dfe"),
+        ("reverse", "2b6f62a96b1d411a81185c47fcf323ab"),
+        ("hist", "2a722d5d5449441fad93f98c73c633a2"),
+        ("most_freq", "d6de3b3af9fe403faeac2b7b7f0b5f85"),
+        ("shuffle_dyck", "28357cf95fbd4389a311073d185756b8"),
+        ("shuffle_dyck2", "95b38e6e8ede42268ff62e85f987dfa7"),
     ],
 )
 def test_load_program_mutations(program_name, job_id):
@@ -29,6 +29,7 @@ def test_load_program_mutations(program_name, job_id):
     "program_name",
     ["sort", "reverse", "hist", "most_freq", "shuffle_dyck", "shuffle_dyck2"],
 )
+@pytest.mark.slow
 def test_load_all_program_mutations(program_name):
     """Test loading all mutations for each supported program."""
     models = load_buggy_models(max_length=10, program_name=program_name)

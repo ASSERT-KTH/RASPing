@@ -1,0 +1,7 @@
+{
+  "program_name": "hist",
+  "job_id": "2af54ea1a47a4f108666bdbc7c9beb43",
+  "test_accuracy": 0.0076,
+  "test_samples": 5000,
+  "loss_function": "cross_entropy_loss"
+}
