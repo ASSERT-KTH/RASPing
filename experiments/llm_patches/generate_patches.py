@@ -213,7 +213,7 @@ def generate_all_patches(
             prompt_type,
         )
         for idx, mutation in mutations.items()
-    ][:1]
+    ]
 
     # Use ThreadPoolExecutor for parallel processing
     # Number of workers is min of CPU count and number of mutations
