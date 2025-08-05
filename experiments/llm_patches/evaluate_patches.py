@@ -111,7 +111,7 @@ def extract_patch(message: dict) -> Optional[str]:
         code = match.group(2)  # Capture the code block content
         code_blocks.append((language, code))
 
-    return code_blocks[0][1] if code_blocks else None
+    return code_blocks[-1][1] if code_blocks else None
 
 
 def evaluate_single_patch_response(args) -> Dict[str, Any]:

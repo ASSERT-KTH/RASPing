@@ -400,31 +400,30 @@ class Aggregate(SOp, Generic[VT]):
 ```
 
 # Your Task
-Repair a RASP program that incorrectly implements a certain program.
 
-Keep in mind:
-- Adhere strictly to RASP's core operations.
-- Keep your programs simple, if possible. (E.g. For identity, just return rasp.Map(lambda x: x, rasp.tokens)
-- Meticulously add comments to your code for clarity.
-- Output functional, executable Python code utilizing RASP's parameters.
-- Don't import any additional packages. Write pure RASP code.
-- Provide functional, complete Python code, not pseudo-code or placeholders.
+You are tasked with repairing a RASP (Restricted Access Sequence Processing Language) program that is not functioning as intended. Your goal is to analyze the current program, understand the expected behavior, identify the issues, and provide a corrected version of the program.
 
-Also Note:
-- Aggregate functions should always have None as the default (meaning you should leave the default as is.) This is because we want to compile these functions later, which only works with a default of None.
-- Again, do not use any functions from the example without defining them yourself. You cannot assume any function from the examples is already defined.
-- If your `make_x()` functions have additional parameters like `make_x(n)` or `make_x(threshold)`, you should always have a default value like `make_x(threshold = 2)`
-- Avoid the `rasp.Full()` functionality. It will prevent compiling. Instead of `rasp.Full(n)`` use the following function: `rasp.Map(lambda x: n, rasp.indices)`
+Here is the current RASP program that needs to be repaired:
 
-Endeavour to follow these guidelines to construct accurate and efficient RASP programs. Your expertise in Python will be fundamental to this task, so make sure that your code is both clean and precise, adhering to the RASP principles.
+<current_program>
+{{PROGRAM_HERE}}
+</current_program>
 
-# Task
+The expected behavior of this program is:
 
-Here is the RASP program that you need to repair:
-```python
-<PROGRAM_HERE>
-```
+<expected_behavior>
+{{EXPECTED_BEHAVIOR}}
+</expected_behavior>
 
-# Output format
+However, the current behavior of the program is:
 
-The output should be the complete repaired RASP program, provided inside a Markdown code block.
+<current_behavior>
+{{CURRENT_BEHAVIOR}}
+</current_behavior>
+
+To repair this program, please follow these steps:
+
+1. Carefully analyze the current program and compare it with the expected behavior.
+2. Identify any logical errors, incorrect function usage, or misunderstandings of RASP principles.
+3. Make necessary corrections to the program while adhering to RASP's core operations and principles.
+4. Ensure that your repaired program achieves the expected behavior.
