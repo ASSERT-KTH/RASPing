@@ -2,7 +2,6 @@
 
 import sys
 from pathlib import Path
-import json
 from typing import Dict, Any
 import openai
 import backoff
@@ -30,7 +29,7 @@ from src.jsonl import write_jsonl
     backoff.expo,
     Exception,
     max_tries=5,
-    raise_on_giveup=False,
+    raise_on_giveup=True,
 )
 def generate_completion(client, **kwargs):
     """Generate completion with backoff retry logic."""
@@ -41,12 +40,14 @@ def generate_patches_for_mutation(
     api_key: str,
     mutation: Dict[str, Any],
     n_patches: int = 1,
-    model_name: str = "gpt-4o-mini-2024-07-18",
+    model_name: str = "gpt-4.1-2025-04-14",
     temperature: float = 0.2,
+    prompt_type: str = "small",
 ) -> list[Dict[str, Any]]:
     """Generate patches for a single mutation using the OpenAI API."""
     prompt = build_prompt(
-        buggy_program=mutation["program_source_after"],
+        mutation=mutation,
+        prompt_type=prompt_type,
     )
 
     client = openai.OpenAI(api_key=api_key)
@@ -73,6 +74,7 @@ def process_single_mutation(args):
         output_path,
         model_name,
         temperature,
+        prompt_type,
     ) = args
     result = generate_patches_for_mutation(
         api_key,
@@ -80,6 +82,7 @@ def process_single_mutation(args):
         n_patches,
         model_name=model_name,
         temperature=temperature,
+        prompt_type=prompt_type,
     )
 
     # Save results immediately after generation as JSONL
@@ -92,7 +95,7 @@ def process_single_mutation(args):
                 "program_name": mutation["program_name"],
                 "job_id": mutation["job_id"],
                 "responses": result,
-                "prompt": build_prompt(mutation["program_source_after"]),
+                "prompt": build_prompt(mutation, prompt_type),
                 "model_name": model_name,
                 "temperature": temperature,
             }
@@ -111,6 +114,7 @@ def generate_all_patches(
     job_id: str = None,
     model_name: str = "gpt-4o-mini-2024-07-18",
     temperature: float = 0.2,
+    prompt_type: str = "small",
 ) -> None:
     """Generate patches for all mutations matching the filters."""
     mutations = load_mutation(mutation_path, program_name, job_id)
@@ -127,6 +131,7 @@ def generate_all_patches(
             output_path,
             model_name,
             temperature,
+            prompt_type,
         )
         for idx, mutation in mutations.items()
     ]
@@ -162,7 +167,7 @@ def generate_all_patches(
 @click.option(
     "--mutation-path",
     default=lambda: str(
-        Path(__file__).parent.parent / "mutation/results/aggregated_mutations.json"
+        Path(__file__).parent.parent / "mutation/raspbugs.json"
     ),
     help="Path to mutations JSON file",
 )
@@ -182,6 +187,12 @@ def generate_all_patches(
     help="Temperature for generation",
     type=float,
 )
+@click.option(
+    "--prompt-type",
+    default="small",
+    help="Prompt type to use for generation",
+    type=str,
+)
 def main(
     n_patches: int,
     program_name: str,
@@ -190,6 +201,7 @@ def main(
     output_dir: str,
     model_name: str,
     temperature: float,
+    prompt_type: str,
 ) -> None:
     """Generate patches for mutations using OpenAI API."""
     # Use API key from environment if not provided via CLI
@@ -208,6 +220,7 @@ def main(
         job_id=job_id,
         model_name=model_name,
         temperature=temperature,
+        prompt_type=prompt_type,
     )
 
 
