@@ -78,7 +78,7 @@ def evaluate_patch(patch: str, program_name: str, max_length: int) -> Evaluation
             elif program_name == "shuffle_dyck":
                 program = module.make_shuffle_dyck(["()"])
             elif program_name == "shuffle_dyck2":
-                program = module.make_shuffle_dyck2(["()", "{}"])
+                program = module.make_shuffle_dyck2()
             else:
                 return EvaluationResult(
                     passed=False, error=f"Unknown program {program_name}"
