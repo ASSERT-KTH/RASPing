@@ -273,10 +273,14 @@ def evaluate_all_patches(
     # Process patch files in parallel while evaluating patches sequentially within each file
     n_workers = min(len(patch_files), multiprocessing.cpu_count())
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        future_to_patch = {
-            executor.submit(evaluate_patches_for_mutation, patch_file, max_length): patch_file
-            for patch_file in patch_files
-        }
+        future_to_patch = {}
+        for patch_file in patch_files:
+            data = next(stream_jsonl(str(patch_file)))
+            output_file = results_dir / f"{data['program_name']}_{data['job_id']}.jsonl"
+            if output_file.exists():
+                continue
+            else:
+                future_to_patch[executor.submit(evaluate_patches_for_mutation, patch_file, max_length, results_dir)] = patch_file
         with tqdm(total=len(patch_files), desc="Processing patch files") as pbar:
             for future in as_completed(future_to_patch):
                 patch_file = future_to_patch[future]
