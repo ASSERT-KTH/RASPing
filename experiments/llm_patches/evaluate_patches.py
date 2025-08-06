@@ -149,33 +149,14 @@ def evaluate_patches_for_mutation(
         for i, response in enumerate(data["responses"][0]["choices"])
     ]
 
-    results = [None] * len(eval_args)  # Pre-allocate results list
-    n_workers = min(len(eval_args), multiprocessing.cpu_count())
-
-    with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        # Submit all tasks
-        future_to_idx = {
-            executor.submit(evaluate_single_patch_response, arg): i
-            for i, arg in enumerate(eval_args)
-        }
-
-        # Process results as they complete using as_completed
-        with tqdm(
-            total=len(eval_args), desc=f"Evaluating patches for {data['program_name']}"
-        ) as pbar:
-            for future in as_completed(future_to_idx):
-                idx = future_to_idx[future]
-                try:
-                    result = future.result()
-                    results[idx] = result
-                except Exception as e:
-                    results[idx] = {
-                        "patch_index": idx,
-                        "passed": False,
-                        "error": f"Process error: {str(e)}",
-                        "accuracy": None,
-                    }
-                pbar.update(1)
+    # Evaluate patches sequentially
+    results = [
+        evaluate_single_patch_response(arg)
+        for arg in tqdm(
+            eval_args,
+            desc=f"Evaluating patches for {data['program_name']}"
+        )
+    ]
 
     return {
         "mutation_id": data["mutation_id"],
@@ -286,19 +267,39 @@ def evaluate_all_patches(
     patch_files = list(patches_path.glob("*.jsonl"))
     program_results = {}
 
-    # Process patch files sequentially but parallelize patch evaluation within each file
-    for patch_file in tqdm(patch_files, desc="Processing patch files"):
-        result = evaluate_patches_for_mutation(patch_file, max_length)
-        program_name = result["program_name"]
+    # Process patch files in parallel while evaluating patches sequentially within each file
+    n_workers = min(len(patch_files), multiprocessing.cpu_count())
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        future_to_patch = {
+            executor.submit(evaluate_patches_for_mutation, patch_file, max_length): patch_file
+            for patch_file in patch_files
+        }
+        with tqdm(total=len(patch_files), desc="Processing patch files") as pbar:
+            for future in as_completed(future_to_patch):
+                patch_file = future_to_patch[future]
+                try:
+                    result = future.result()
+                except Exception as e:
+                    # If evaluation failed, create a placeholder result to capture the error
+                    result = {
+                        "mutation_id": None,
+                        "program_name": patch_file.stem.split("_")[0],
+                        "job_id": None,
+                        "patch_results": [],
+                        "error": f"Process error: {str(e)}",
+                    }
+                program_name = result["program_name"]
 
-        # Save individual mutation result
-        output_file = results_dir / f"{program_name}_{result['job_id']}.jsonl"
-        write_jsonl(str(output_file), [result])
+                # Save individual mutation result
+                output_file = results_dir / f"{program_name}_{result['job_id']}.jsonl"
+                write_jsonl(str(output_file), [result])
 
-        # Collect results by program
-        if program_name not in program_results:
-            program_results[program_name] = []
-        program_results[program_name].append(result)
+                # Collect results by program
+                if program_name not in program_results:
+                    program_results[program_name] = []
+                program_results[program_name].append(result)
+
+                pbar.update(1)
 
     # Generate program summaries
     for program_name in program_results:
