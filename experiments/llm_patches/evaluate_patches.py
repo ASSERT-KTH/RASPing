@@ -280,7 +280,7 @@ def evaluate_all_patches(
             if output_file.exists():
                 continue
             else:
-                future_to_patch[executor.submit(evaluate_patches_for_mutation, patch_file, max_length, results_dir)] = patch_file
+                future_to_patch[executor.submit(evaluate_patches_for_mutation, patch_file, max_length)] = patch_file
         with tqdm(total=len(patch_files), desc="Processing patch files") as pbar:
             for future in as_completed(future_to_patch):
                 patch_file = future_to_patch[future]
