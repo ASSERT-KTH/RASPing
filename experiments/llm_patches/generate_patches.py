@@ -10,7 +10,7 @@ from tqdm import tqdm
 import click
 from dotenv import load_dotenv
 import os
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 
 # Load environment variables
 load_dotenv()
@@ -127,8 +127,6 @@ def generate_patches_for_mutation(
         prompt_type=prompt_type,
     )
     
-    print(prompt)
-
     client = openai.OpenAI(api_key=api_key)
     responses = []
     completion = generate_completion(
@@ -155,6 +153,11 @@ def process_single_mutation(args):
         temperature,
         prompt_type,
     ) = args
+
+    output_file = output_path / f"{mutation['program_name']}_{mutation['job_id']}.jsonl"
+    if output_file.exists():
+        return idx, []
+
     result = generate_patches_for_mutation(
         api_key,
         mutation,
@@ -165,7 +168,6 @@ def process_single_mutation(args):
     )
 
     # Save results immediately after generation as JSONL
-    output_file = output_path / f"{mutation['program_name']}_{mutation['job_id']}.jsonl"
     write_jsonl(
         str(output_file),
         [
@@ -220,7 +222,7 @@ def generate_all_patches(
     max_workers = min(len(args_list), 2 * os.cpu_count() or 1)
 
     results = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
         # Use tqdm to show progress
         futures = list(
             tqdm(
