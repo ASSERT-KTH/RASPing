@@ -18,6 +18,7 @@ module_paths = [
 if module_paths not in sys.path:
     sys.path.extend(module_paths)
 
+from tracr.rasp import rasp
 from src.model import Model
 from src.functions import load_dataset
 from src.jsonl import stream_jsonl, write_jsonl
@@ -67,15 +68,17 @@ def evaluate_patch(patch: str, program_name: str, max_length: int) -> Evaluation
             if program_name == "hist":
                 program = module.make_hist()
             elif program_name == "sort":
-                program = module.make_sort(min_key=min(inputs))
+                program = module.make_sort(
+                    rasp.tokens, rasp.tokens, max_seq_len=max_length, min_key=min(inputs)
+                )
             elif program_name == "reverse":
-                program = module.make_reverse()
+                program = module.make_reverse(rasp.tokens)
             elif program_name == "most_freq":
                 program = module.make_sort_freq(max_length)
             elif program_name == "shuffle_dyck":
                 program = module.make_shuffle_dyck(["()"])
             elif program_name == "shuffle_dyck2":
-                program = module.make_shuffle_dyck2()
+                program = module.make_shuffle_dyck2(["()", "{}"])
             else:
                 return EvaluationResult(
                     passed=False, error=f"Unknown program {program_name}"
