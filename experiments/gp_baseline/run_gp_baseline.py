@@ -1,0 +1,125 @@
+import argparse
+import logging
+import json
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+from experiments.mutation.load_mutations import load_mutation
+from experiments.gp_baseline.gp_core import run_gp_for_bug, canonicalize_for_dataset
+from src.functions import getAcceptedNamesAndInput
+
+
+def _run_single_job(entry: Dict[str, Any], data_dir: Path, accepted_inputs: List[Any], args) -> Tuple[str, Dict[str, Any]]:
+    dataset_name = canonicalize_for_dataset(entry["program_name"])
+    result = run_gp_for_bug(
+        mutation_entry=entry,
+        data_dir=data_dir,
+        accepted_inputs=accepted_inputs,
+        budget=args.budget,
+        population_size=args.population_size,
+        tournament_k=args.tournament_k,
+        seed=args.seed,
+        log_every=args.log_every,
+    )
+    return dataset_name, result
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run GP baseline to repair buggy RASP programs")
+    parser.add_argument("--mutation-path", type=str, required=True, help="Path to aggregated_mutations.json")
+    parser.add_argument("--program-name", type=str, default=None, help="Program name to filter (e.g., reverse, sort, hist, most-freq, shuffle_dyck1, shuffle_dyck2)")
+    parser.add_argument("--job-id", type=str, default=None, help="Specific job_id to run (overrides --n-jobs if provided)")
+    parser.add_argument("--n-jobs", type=int, default=1, help="Number of jobs to run for the program name (ignored if --job-id is set)")
+    parser.add_argument("--data-dir", type=str, default="data", help="Directory containing program datasets")
+    parser.add_argument("--budget", type=int, default=500, help="Max successful compile+eval candidates per bug")
+    parser.add_argument("--population-size", type=int, default=16, help="Population size μ and offspring λ per generation")
+    parser.add_argument("--tournament-k", type=int, default=3, help="Tournament size for parent selection")
+    parser.add_argument("--seed", type=int, default=42, help="RNG seed")
+    parser.add_argument("--output-dir", type=str, default="experiments/gp_baseline/results", help="Directory to write per-bug JSON results")
+    parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level")
+    parser.add_argument("--log-every", type=int, default=25, help="Log progress every N successful evals")
+    parser.add_argument("--workers", type=int, default=1, help="Number of parallel workers")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing results instead of skipping")
+
+    args = parser.parse_args()
+
+    data_dir = Path(args.data_dir).resolve()
+    output_dir = Path(args.output_dir).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Configure logging
+    logging.basicConfig(level=getattr(logging, args.log_level), format='[%(asctime)s] %(levelname)s %(name)s: %(message)s')
+
+    # Load matching mutation entries
+    mutations: Dict[str, Dict[str, Any]] = load_mutation(
+        mutation_path=args.mutation_path,
+        program_name=args.program_name if args.program_name else None,
+        job_id=args.job_id if args.job_id else None,
+    )
+
+    if args.job_id:
+        # Single job expected
+        to_run: List[Dict[str, Any]] = [mutations[args.job_id]] if args.job_id in mutations else []
+    else:
+        # Take first N jobs by insertion order
+        to_run = [row for _, row in list(mutations.items())[: max(args.n_jobs, 0)]]
+
+    if not to_run:
+        print("No matching buggy mutations found with the given filters.")
+        return
+
+    # Prepare accepted inputs map
+    accepted_inputs_map = getAcceptedNamesAndInput()
+
+    # Filter out jobs that already have results (resume) unless overwrite
+    filtered: List[Dict[str, Any]] = []
+    for entry in to_run:
+        program_name_raw = entry["program_name"]
+        dataset_name = canonicalize_for_dataset(program_name_raw)
+        job_id = entry.get("job_id", "unknown")
+        out_path = output_dir / f"{dataset_name}_{job_id}.json"
+        if out_path.exists() and not args.overwrite:
+            logging.info(f"Skipping existing result: {out_path}")
+            continue
+        filtered.append(entry)
+
+    if not filtered:
+        logging.info("All selected jobs already completed. Nothing to do.")
+        return
+
+    # Execute jobs in parallel
+    workers = max(1, args.workers)
+    logging.info(f"Launching {len(filtered)} jobs with workers={workers}")
+
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        futures = {}
+        for entry in filtered:
+            program_name_raw = entry["program_name"]
+            dataset_name = canonicalize_for_dataset(program_name_raw)
+            if dataset_name not in accepted_inputs_map:
+                logging.error(f"Unsupported program_name: {program_name_raw}")
+                continue
+            accepted_inputs = accepted_inputs_map[dataset_name]
+            futures[ex.submit(_run_single_job, entry, data_dir, accepted_inputs, args)] = entry
+        for fut in as_completed(futures):
+            entry = futures[fut]
+            try:
+                dataset_name, result = fut.result()
+            except Exception as e:
+                logging.error(f"Job {entry.get('job_id')} failed: {e}")
+                continue
+            job_id = entry.get("job_id", "unknown")
+            out_path = output_dir / f"{dataset_name}_{job_id}.json"
+            tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+            with open(tmp_path, "w") as f:
+                json.dump(result, f)
+            tmp_path.replace(out_path)
+            logging.info(f"Wrote result: {out_path}")
+
+
+if __name__ == "__main__":
+    main()
+
+
