@@ -31,7 +31,7 @@ def main():
     parser.add_argument("--mutation-path", type=str, required=True, help="Path to aggregated_mutations.json")
     parser.add_argument("--program-name", type=str, default=None, help="Program name to filter (e.g., reverse, sort, hist, most-freq, shuffle_dyck1, shuffle_dyck2)")
     parser.add_argument("--job-id", type=str, default=None, help="Specific job_id to run (overrides --n-jobs if provided)")
-    parser.add_argument("--n-jobs", type=int, default=1, help="Number of jobs to run for the program name (ignored if --job-id is set)")
+    parser.add_argument("--n-jobs", type=int, default=None, help="Number of jobs to run for the program name (ignored if --job-id is set)")
     parser.add_argument("--data-dir", type=str, default="data", help="Directory containing program datasets")
     parser.add_argument("--budget", type=int, default=500, help="Max successful compile+eval candidates per bug")
     parser.add_argument("--population-size", type=int, default=16, help="Population size μ and offspring λ per generation")
@@ -62,9 +62,11 @@ def main():
     if args.job_id:
         # Single job expected
         to_run: List[Dict[str, Any]] = [mutations[args.job_id]] if args.job_id in mutations else []
-    else:
+    elif args.n_jobs:
         # Take first N jobs by insertion order
         to_run = [row for _, row in list(mutations.items())[: max(args.n_jobs, 0)]]
+    else:
+        to_run = [row for _, row in list(mutations.items())]
 
     if not to_run:
         print("No matching buggy mutations found with the given filters.")
