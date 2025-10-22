@@ -197,8 +197,7 @@ def apply_mutation_once(source_code: str, rng: random.Random) -> Optional[str]:
 class Candidate:
     source: str
     train_acc: float
-    tested: bool = False
-    test_acc: Optional[float] = None
+    test_acc: float = None
 
     def key(self) -> Tuple[float, float]:
         return (self.train_acc, self.test_acc)
@@ -293,7 +292,7 @@ def run_gp(
     )
     base_eval = get_or_eval(base_source)
     if base_eval is not None:
-        population.append(Candidate(base_source, base_eval[0], test_acc=base_eval[1]))
+        population.append(Candidate(base_source, base_eval[0], base_eval[1]))
         seen.add(hash_source(base_source))
         logger.info(
             f"Seeded base candidate: train={base_eval[0]:.4f} test={base_eval[1]:.4f}"
@@ -314,7 +313,7 @@ def run_gp(
         if eval_result is None:
             continue
         seen.add(h)
-        population.append(Candidate(mutated, eval_result[0], test_acc=eval_result[1]))
+        population.append(Candidate(mutated, eval_result[0], eval_result[1]))
         logger.debug(
             f"Seeded mutated candidate {h}: train={eval_result[0]:.4f} test={eval_result[1]:.4f}"
         )
@@ -342,7 +341,7 @@ def run_gp(
             test_data,
         )
         logger.info(
-            f"Early stop: perfect train achieved after {num_evaluated} successful evals (attempts={num_attempted}, dup={num_duplicates}, fails={num_compile_failures}). Test={test_acc:.4f}"
+            f"Early stop: perfect train achieved after {num_evaluated} successful evals (attempts={num_attempted}, dup={num_duplicates}, fails={num_compile_failures}). Test={best_by_train.test_acc:.4f}"
         )
         return {
             "status": "success_early",
@@ -386,7 +385,7 @@ def run_gp(
             if eval_result is None:
                 continue
             seen.add(h)
-            cand = Candidate(mutated, eval_result[0], test_acc=eval_result[1])
+            cand = Candidate(mutated, eval_result[0], eval_result[1])
             offspring.append(cand)
             if cand.train_acc > best_by_train.train_acc:
                 best_by_train = cand
@@ -416,7 +415,7 @@ def run_gp(
         })
 
     logger.info(
-        f"Completed: evaluated={num_evaluated}/{budget}, attempts={num_attempted}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_by_train.train_acc:.4f}, test={test_acc:.4f}"
+        f"Completed: evaluated={num_evaluated}/{budget}, attempts={num_attempted}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_by_train.train_acc:.4f}, test={best_by_train.test_acc:.4f}"
     )
 
     return {
