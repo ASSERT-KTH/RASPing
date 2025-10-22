@@ -197,12 +197,11 @@ def apply_mutation_once(source_code: str, rng: random.Random) -> Optional[str]:
 class Candidate:
     source: str
     train_acc: float
-    val_acc: float
     tested: bool = False
     test_acc: Optional[float] = None
 
     def key(self) -> Tuple[float, float]:
-        return (self.train_acc, self.val_acc)
+        return (self.train_acc, self.test_acc)
 
 
 def hash_source(source: str) -> str:
@@ -212,16 +211,13 @@ def hash_source(source: str) -> str:
 def evaluate_source(
     source_code: str,
     program_name: str,
-    data_dir: Path,
     max_length: int,
     accepted_inputs: Sequence[Any],
     train_data: List[Tuple[List[Any], List[Any]]],
-    val_data: List[Tuple[List[Any], List[Any]]],
 ) -> Tuple[float, float]:
     program = build_program_from_source(source_code, program_name, max_length, accepted_inputs)
     train_acc = evaluate_program_on_split(program, train_data)
-    val_acc = evaluate_program_on_split(program, val_data)
-    return train_acc, val_acc
+    return train_acc
 
 
 def evaluate_source_test(
@@ -266,27 +262,29 @@ def run_gp(
     num_compile_failures = 0
 
     def get_or_eval(src: str) -> Optional[Tuple[float, float]]:
-        nonlocal num_evaluated, num_attempted, num_compile_failures
+        nonlocal num_evaluated, num_attempted, num_compile_failures, num_duplicates
         h = hash_source(src)
         if h in cache:
+            num_duplicates += 1
             return cache[h]
         # Try to compile and evaluate; treat compile failures as invalid (not counted)
         try:
             num_attempted += 1
-            train_acc, val_acc = evaluate_source(
-                src, program_name, data_dir, max_length, accepted_inputs, fitness_data, fitness_data
+            train_acc = evaluate_source(
+                src, program_name, max_length, accepted_inputs, fitness_data
             )
+            test_acc = evaluate_source_test(src, program_name, max_length, accepted_inputs, test_data)
         except Exception as e:
             num_compile_failures += 1
             logger.debug(f"Compile/eval failed for candidate {h}: {e}")
             return None
-        cache[h] = (train_acc, val_acc)
+        cache[h] = (train_acc, test_acc)
         num_evaluated += 1
-        if log_every and num_attempted % max(1, log_every) == 0:
+        if log_every and num_evaluated % max(1, log_every) == 0:
             logger.info(
-                f"Progress: attempts={num_attempted}/{budget} | successful={num_evaluated} | dup={num_duplicates} | fails={num_compile_failures} | best_train={best_by_train.train_acc if 'best_by_train' in locals() else 'N/A'}"
+                f"Progress: evaluated={num_evaluated}/{budget} | attempts={num_attempted} | dup={num_duplicates} | fails={num_compile_failures} | best_train={best_by_train.train_acc if 'best_by_train' in locals() else 'N/A'}"
             )
-        return train_acc, val_acc
+        return train_acc, test_acc
 
     # Initialize population with base + mutated variants
     population: List[Candidate] = []
@@ -295,10 +293,10 @@ def run_gp(
     )
     base_eval = get_or_eval(base_source)
     if base_eval is not None:
-        population.append(Candidate(base_source, base_eval[0], base_eval[1]))
+        population.append(Candidate(base_source, base_eval[0], test_acc=base_eval[1]))
         seen.add(hash_source(base_source))
         logger.info(
-            f"Seeded base candidate: train={base_eval[0]:.4f} val={base_eval[1]:.4f}"
+            f"Seeded base candidate: train={base_eval[0]:.4f} test={base_eval[1]:.4f}"
         )
 
     # Fill remaining with random single-step mutations
@@ -310,16 +308,15 @@ def run_gp(
             continue
         h = hash_source(mutated)
         if h in seen:
-            num_duplicates += 1
             logger.debug(f"Duplicate candidate skipped: {h}")
             continue
         eval_result = get_or_eval(mutated)
         if eval_result is None:
             continue
         seen.add(h)
-        population.append(Candidate(mutated, eval_result[0], eval_result[1]))
+        population.append(Candidate(mutated, eval_result[0], test_acc=eval_result[1]))
         logger.debug(
-            f"Seeded mutated candidate {h}: train={eval_result[0]:.4f} val={eval_result[1]:.4f}"
+            f"Seeded mutated candidate {h}: train={eval_result[0]:.4f} test={eval_result[1]:.4f}"
         )
 
     if not population:
@@ -364,7 +361,9 @@ def run_gp(
         return max(contenders, key=lambda c: c.train_acc)
 
     generation = 0
-    while num_attempted < budget:
+    # Track best candidate after each generation
+    generation_history: List[Dict[str, Any]] = []
+    while num_evaluated < budget:
         offspring: List[Candidate] = []
         generation += 1
         logger.info(
@@ -373,7 +372,7 @@ def run_gp(
 
         # Generate up to population_size offspring (μ=λ)
         gen_attempts = 0
-        while len(offspring) < population_size and num_attempted < budget and gen_attempts < population_size * 50:
+        while len(offspring) < population_size and num_evaluated < budget and gen_attempts < population_size * 50:
             gen_attempts += 1
             parent = tournament_select(population)
             mutated = apply_mutation_once(parent.source, rng)
@@ -381,44 +380,43 @@ def run_gp(
                 continue
             h = hash_source(mutated)
             if h in seen:
-                num_duplicates += 1
                 logger.debug(f"Duplicate candidate skipped: {h}")
                 continue
             eval_result = get_or_eval(mutated)
             if eval_result is None:
                 continue
             seen.add(h)
-            cand = Candidate(mutated, eval_result[0], eval_result[1])
+            cand = Candidate(mutated, eval_result[0], test_acc=eval_result[1])
             offspring.append(cand)
             if cand.train_acc > best_by_train.train_acc:
                 best_by_train = cand
                 logger.info(
-                    f"New best: train={best_by_train.train_acc:.4f}"
+                    f"New best: train={best_by_train.train_acc:.4f} test={best_by_train.test_acc:.4f}"
                 )
 
-            if best_by_train.train_acc >= 1.0 or num_attempted >= budget:
+            if best_by_train.train_acc >= 1.0 or num_evaluated >= budget:
                 break
 
         # Replacement: (μ+λ) keep top μ by train, tiebreak by val
         population = sorted(population + offspring, key=lambda c: c.train_acc, reverse=True)[:population_size]
         logger.info(
-            f"Generation {generation} end: offspring={len(offspring)}, attempts={num_attempted}/{budget}, successful={num_evaluated}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_by_train.train_acc:.4f}"
+            f"Generation {generation} end: offspring={len(offspring)}, evaluated={num_evaluated}/{budget}, attempts={num_attempted}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_by_train.train_acc:.4f} | best_test={best_by_train.test_acc:.4f}"
         )
 
-        if best_by_train.train_acc >= 1.0 or num_attempted >= budget:
+        if best_by_train.train_acc >= 1.0 or num_evaluated >= budget:
             break
 
-    # Final test on best-by-val
-    test_acc = evaluate_source_test(
-        best_by_train.source,
-        program_name,
-        max_length,
-        accepted_inputs,
-        test_data,
-    )
+        # Record generation end stats
+        generation_history.append({
+            "generation": generation,
+            "num_attempted": num_attempted,
+            "num_evaluated": num_evaluated,
+            "best_train_acc": best_by_train.train_acc,
+            "best_test_acc": best_by_train.test_acc,
+        })
 
     logger.info(
-        f"Completed: attempts={num_attempted}/{budget}, successful={num_evaluated}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_by_train.train_acc:.4f}, test={test_acc:.4f}"
+        f"Completed: evaluated={num_evaluated}/{budget}, attempts={num_attempted}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_by_train.train_acc:.4f}, test={test_acc:.4f}"
     )
 
     return {
@@ -428,8 +426,9 @@ def run_gp(
         "num_duplicates": num_duplicates,
         "num_compile_failures": num_compile_failures,
         "train_acc": best_by_train.train_acc,
-        "test_acc": test_acc,
+        "test_acc": best_by_train.test_acc,
         "best_source": best_by_train.source,
+        "generation_history": generation_history,
     }
 
 
@@ -438,8 +437,8 @@ def run_gp_for_bug(
     data_dir: Path,
     accepted_inputs: Sequence[Any],
     budget: int = 500,
-    population_size: int = 16,
-    tournament_k: int = 3,
+    population_size: int = 60,
+    tournament_k: int = 4,
     seed: int = 42,
     log_every: int = 25,
 ) -> Dict[str, Any]:
