@@ -298,6 +298,19 @@ def run_gp(
             f"Seeded base candidate: train={base_eval[0]:.4f} test={base_eval[1]:.4f}"
         )
 
+    generation = 0
+    # Track best candidate after each generation
+    generation_history: List[Dict[str, Any]] = []
+
+    generation_history.append({
+        "generation": generation,
+        "num_attempted": num_attempted,
+        "num_evaluated": num_evaluated,
+        "best_train_acc": population[0].train_acc,
+        "best_test_acc": population[0].test_acc,
+    })
+    generation += 1
+
     # Fill remaining with random single-step mutations
     attempts = 0
     while len(population) < population_size and attempts < population_size * 20:
@@ -331,6 +344,15 @@ def run_gp(
         f"Initial best: train={best_by_train.train_acc:.4f}"
     )
 
+    generation_history.append({
+        "generation": generation,
+        "num_attempted": num_attempted,
+        "num_evaluated": num_evaluated,
+        "best_train_acc": population[0].train_acc,
+        "best_test_acc": population[0].test_acc,
+    })
+    generation += 1
+
     # Early stop if we already have perfect val
     if best_by_train.train_acc >= 1.0:
         test_acc = evaluate_source_test(
@@ -358,18 +380,6 @@ def run_gp(
     def tournament_select(pop: List[Candidate]) -> Candidate:
         contenders = rng.sample(pop, k=min(tournament_k, len(pop)))
         return max(contenders, key=lambda c: c.train_acc)
-
-    generation = 0
-    # Track best candidate after each generation
-    generation_history: List[Dict[str, Any]] = []
-
-    generation_history.append({
-        "generation": 0,
-        "num_attempted": num_attempted,
-        "num_evaluated": num_evaluated,
-        "best_train_acc": best_by_train.train_acc,
-        "best_test_acc": best_by_train.test_acc,
-    })
 
     while num_evaluated < budget:
         offspring: List[Candidate] = []
