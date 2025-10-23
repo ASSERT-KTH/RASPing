@@ -362,6 +362,15 @@ def run_gp(
     generation = 0
     # Track best candidate after each generation
     generation_history: List[Dict[str, Any]] = []
+
+    generation_history.append({
+        "generation": 0,
+        "num_attempted": num_attempted,
+        "num_evaluated": num_evaluated,
+        "best_train_acc": best_by_train.train_acc,
+        "best_test_acc": best_by_train.test_acc,
+    })
+
     while num_evaluated < budget:
         offspring: List[Candidate] = []
         generation += 1
@@ -402,9 +411,6 @@ def run_gp(
             f"Generation {generation} end: offspring={len(offspring)}, evaluated={num_evaluated}/{budget}, attempts={num_attempted}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_by_train.train_acc:.4f} | best_test={best_by_train.test_acc:.4f}"
         )
 
-        if best_by_train.train_acc >= 1.0 or num_evaluated >= budget:
-            break
-
         # Record generation end stats
         generation_history.append({
             "generation": generation,
@@ -413,6 +419,9 @@ def run_gp(
             "best_train_acc": best_by_train.train_acc,
             "best_test_acc": best_by_train.test_acc,
         })
+
+        if best_by_train.train_acc >= 1.0 or num_evaluated >= budget:
+            break
 
     logger.info(
         f"Completed: evaluated={num_evaluated}/{budget}, attempts={num_attempted}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_by_train.train_acc:.4f}, test={best_by_train.test_acc:.4f}"
