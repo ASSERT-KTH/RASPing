@@ -66,14 +66,14 @@ def test_run_gp_respects_attempt_budget(tmp_path: Path):
         program_name_raw="sort",
         data_dir=data_dir,
         accepted_inputs=[1, 2, 3],
-        budget=50,
+        budget=100,
         population_size=16,
         tournament_k=2,
         log_every=0,
     )
 
-    # Budget counted by attempts
-    assert result["num_attempted"] <= 50
+    # Budget counted by total programs generated
+    assert result["num_programs"] <= 100
     # print("\n".join(difflib.unified_diff(MINI_SORT_SRC.splitlines(), result["best_source"].splitlines())))
     # Should return metrics and a source
     assert result["train_acc"] == 1.0
