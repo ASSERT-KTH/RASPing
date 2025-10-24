@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 def load_gp_histories(results_dir: Path) -> tuple[Dict[Tuple[str, str], List[Tuple[int, float]]], List[Tuple[str, str]]]:
     """
-    Load per-job GP histories as a list of (num_evaluated, best_test_acc) tuples.
+    Load per-job GP histories as a list of (num_programs, best_test_acc) tuples.
     Returns (job_histories, jobs_list)
     """
     files = sorted(results_dir.glob("*.json"))
@@ -28,7 +28,7 @@ def load_gp_histories(results_dir: Path) -> tuple[Dict[Tuple[str, str], List[Tup
                 continue
             series: List[Tuple[int, float]] = []
             for entry in hist:
-                steps = int(entry.get("num_evaluated", 0))
+                steps = int(entry.get("num_programs", entry.get("num_evaluated", 0)))
                 best = float(entry.get("best_test_acc", 0.0))
                 if steps > 0:
                     series.append((steps, best))
@@ -161,7 +161,7 @@ def main():
     if grad_job_series:
         plt.plot(x_grad, grad_fixed_pct, label="Grad % fixed", color="#2ca02c")
         plt.plot(x_grad, grad_median_pct, label="Grad median accuracy (%)", color="#2ca02c", linestyle="--")
-    plt.xlabel("Programs evaluated")
+    plt.xlabel("Programs generated")
     plt.ylabel("Percentage")
     plt.ylim(0, 100)
     plt.grid(True, alpha=0.3)
