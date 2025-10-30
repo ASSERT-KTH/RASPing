@@ -111,18 +111,19 @@ def load_gradient_job_series(saved_data_dir: Path, loss_fn: str, jobs: List[Tupl
     return job_to_series
 
 
-def aggregate_job_series(job_to_series: Dict[Tuple[str, str], List[float]], threshold: float) -> tuple[List[int], List[float], List[float]]:
+def aggregate_job_series(job_to_series: Dict[Tuple[str, str], List[float]], threshold: float) -> tuple[List[int], List[float], List[float], List[float]]:
     """
     Given per-job best-so-far accuracy series (per step), compute aggregated
-    median accuracy (%) and % fixed across jobs at each global step.
-    Returns (x_steps, fixed_pct, median_pct).
+    median accuracy (%), mean accuracy (%), and % fixed across jobs at each global step.
+    Returns (x_steps, fixed_pct, median_pct, mean_pct).
     """
     if not job_to_series:
-        return [], [], []
+        return [], [], [], []
     max_len = max(len(s) for s in job_to_series.values())
     x_steps = list(range(1, max_len + 1))
     fixed_pct: List[float] = []
     median_pct: List[float] = []
+    mean_pct: List[float] = []
     for s in x_steps:
         vals = []
         for series in job_to_series.values():
@@ -134,7 +135,8 @@ def aggregate_job_series(job_to_series: Dict[Tuple[str, str], List[float]], thre
         vals_np = np.array(vals, dtype=float)
         fixed_pct.append(100.0 * float(np.mean(vals_np >= threshold)))
         median_pct.append(100.0 * float(np.median(vals_np)))
-    return x_steps, fixed_pct, median_pct
+        mean_pct.append(100.0 * float(np.mean(vals_np)))
+    return x_steps, fixed_pct, median_pct, mean_pct
 
 
 def expand_gp_history_to_series(hist: List[Tuple[int, float]]) -> List[float]:
@@ -185,22 +187,28 @@ def create_plot(
     """
     Create a plot from the given job series data.
     """
-    x_gp, gp_fixed_pct, gp_median_pct = aggregate_job_series(gp_job_series, threshold)
+    n_gp = len(gp_job_series)
+    x_gp, gp_fixed_pct, gp_median_pct, gp_mean_pct = aggregate_job_series(gp_job_series, threshold)
     
     plt.figure(figsize=(8, 5))
     # GP baseline lines
-    plt.plot(x_gp, gp_fixed_pct, label="GP % fixed", color="#1f77b4")
-    plt.plot(x_gp, gp_median_pct, label="GP median accuracy (%)", color="#1f77b4", linestyle="--")
+    plt.plot(x_gp, gp_fixed_pct, label=f"GP % fixed ({n_gp} programs)", color="#1f77b4")
+    plt.plot(x_gp, gp_median_pct, label=f"GP median accuracy (%) ({n_gp} programs)", color="#1f77b4", linestyle="--")
+    plt.plot(x_gp, gp_mean_pct, label=f"GP avg accuracy (%) ({n_gp} programs)", color="#1f77b4", linestyle=":")
     # Gradient-based lines (if available)
     if grad_job_series:
-        x_grad, grad_fixed_pct, grad_median_pct = aggregate_job_series(grad_job_series, threshold)
-        plt.plot(x_grad, grad_fixed_pct, label="Grad % fixed", color="#2ca02c")
-        plt.plot(x_grad, grad_median_pct, label="Grad median accuracy (%)", color="#2ca02c", linestyle="--")
+        n_grad = len(grad_job_series)
+        x_grad, grad_fixed_pct, grad_median_pct, grad_mean_pct = aggregate_job_series(grad_job_series, threshold)
+        plt.plot(x_grad, grad_fixed_pct, label=f"Grad % fixed ({n_grad} programs)", color="#2ca02c")
+        plt.plot(x_grad, grad_median_pct, label=f"Grad median accuracy (%) ({n_grad} programs)", color="#2ca02c", linestyle="--")
+        plt.plot(x_grad, grad_mean_pct, label=f"Grad avg accuracy (%) ({n_grad} programs)", color="#2ca02c", linestyle=":")
     # Exhaustive search lines (if available)
     if exhaustive_job_series:
-        x_exh, exh_fixed_pct, exh_median_pct = aggregate_job_series(exhaustive_job_series, threshold)
-        plt.plot(x_exh, exh_fixed_pct, label="Exhaustive % fixed", color="#ff7f0e")
-        plt.plot(x_exh, exh_median_pct, label="Exhaustive median accuracy (%)", color="#ff7f0e", linestyle="--")
+        n_exh = len(exhaustive_job_series)
+        x_exh, exh_fixed_pct, exh_median_pct, exh_mean_pct = aggregate_job_series(exhaustive_job_series, threshold)
+        plt.plot(x_exh, exh_fixed_pct, label=f"Exhaustive % fixed ({n_exh} programs)", color="#ff7f0e")
+        plt.plot(x_exh, exh_median_pct, label=f"Exhaustive median accuracy (%) ({n_exh} programs)", color="#ff7f0e", linestyle="--")
+        plt.plot(x_exh, exh_mean_pct, label=f"Exhaustive avg accuracy (%) ({n_exh} programs)", color="#ff7f0e", linestyle=":")
     plt.xlabel("Programs generated")
     plt.ylabel("Percentage")
     plt.ylim(0, 100)
@@ -232,7 +240,7 @@ def main():
     for job_key, hist in gp_histories.items():
         gp_job_series[job_key] = expand_gp_history_to_series(hist)
 
-    # Optionally load gradient-based series aligned on the same jobs
+    # Optionally load gradient-based series
     grad_job_series: Dict[Tuple[str, str], List[float]] = {}
     if args.saved_data_dir:
         saved_data_dir = Path(args.saved_data_dir).resolve()
@@ -244,9 +252,31 @@ def main():
         exhaustive_results_dir = Path(args.exhaustive_results_dir).resolve()
         exhaustive_histories, exhaustive_jobs = load_exhaustive_histories(exhaustive_results_dir)
         for job_key, hist in exhaustive_histories.items():
-            exhaustive_job_series[job_key] = expand_gp_history_to_series(hist)
-        # Merge jobs list to include exhaustive jobs
-        jobs = list(set(jobs) | set(exhaustive_jobs))
+            if job_key in gp_job_series:
+                exhaustive_job_series[job_key] = expand_gp_history_to_series(hist)
+
+    # Find intersection of all available series (only include jobs present in all methods)
+    all_job_sets = [set(gp_job_series.keys())]
+    if grad_job_series:
+        all_job_sets.append(set(grad_job_series.keys()))
+    if exhaustive_job_series:
+        all_job_sets.append(set(exhaustive_job_series.keys()))
+    
+    # Only compute intersection if we have at least GP jobs
+    if all_job_sets:
+        common_jobs = set.intersection(*all_job_sets)
+    else:
+        common_jobs = set()
+    
+    # Filter all series to only include common jobs
+    gp_job_series = {job: gp_job_series[job] for job in common_jobs}
+    if grad_job_series:
+        grad_job_series = {job: grad_job_series[job] for job in common_jobs}
+    if exhaustive_job_series:
+        exhaustive_job_series = {job: exhaustive_job_series[job] for job in common_jobs}
+    
+    # Update jobs list to only include common jobs
+    jobs = list(common_jobs)
 
     # Load mutation orders
     mutation_orders = load_mutation_orders()
