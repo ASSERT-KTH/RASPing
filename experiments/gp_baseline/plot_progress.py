@@ -24,17 +24,51 @@ def load_gp_histories(results_dir: Path) -> tuple[Dict[Tuple[str, str], List[Tup
                 continue
             job_key = (rec["program_name"], rec["job_id"])
             jobs.append(job_key)
-            hist = rec.get("generation_history", [])
+            hist = rec.get("program_history", [])
             if not hist:
                 continue
             series: List[Tuple[int, float]] = []
             for entry in hist:
-                steps = int(entry.get("num_programs", entry.get("num_evaluated", 0)))
-                best = float(entry.get("best_test_acc", 0.0))
-                if steps > 0:
-                    series.append((steps, best))
+                steps = int(entry.get("step", 0))
+                best = entry.get("best_test_acc")
+                if best is not None and steps > 0:
+                    series.append((steps, float(best)))
             series.sort(key=lambda x: x[0])
-            job_histories[job_key] = series
+            if series:
+                job_histories[job_key] = series
+        except Exception:
+            continue
+    return job_histories, jobs
+
+
+def load_exhaustive_histories(results_dir: Path) -> tuple[Dict[Tuple[str, str], List[Tuple[int, float]]], List[Tuple[str, str]]]:
+    """
+    Load per-job exhaustive search histories as a list of (num_programs, best_test_acc) tuples.
+    Returns (job_histories, jobs_list)
+    """
+    files = sorted(results_dir.glob("*.json"))
+    job_histories: Dict[Tuple[str, str], List[Tuple[int, float]]] = {}
+    jobs: List[Tuple[str, str]] = []
+    for fp in files:
+        try:
+            with open(fp, "r") as f:
+                rec = json.load(f)
+            if "program_name" not in rec or "job_id" not in rec:
+                continue
+            job_key = (rec["program_name"], rec["job_id"])
+            jobs.append(job_key)
+            hist = rec.get("program_history", [])
+            if not hist:
+                continue
+            series: List[Tuple[int, float]] = []
+            for entry in hist:
+                steps = int(entry.get("step", 0))
+                best = entry.get("best_test_acc")
+                if best is not None and steps > 0:
+                    series.append((steps, float(best)))
+            series.sort(key=lambda x: x[0])
+            if series:
+                job_histories[job_key] = series
         except Exception:
             continue
     return job_histories, jobs
@@ -144,6 +178,7 @@ def load_mutation_orders() -> Dict[str, int]:
 def create_plot(
     gp_job_series: Dict[Tuple[str, str], List[float]],
     grad_job_series: Optional[Dict[Tuple[str, str], List[float]]],
+    exhaustive_job_series: Optional[Dict[Tuple[str, str], List[float]]],
     threshold: float,
     title: Optional[str] = None,
 ) -> None:
@@ -161,6 +196,11 @@ def create_plot(
         x_grad, grad_fixed_pct, grad_median_pct = aggregate_job_series(grad_job_series, threshold)
         plt.plot(x_grad, grad_fixed_pct, label="Grad % fixed", color="#2ca02c")
         plt.plot(x_grad, grad_median_pct, label="Grad median accuracy (%)", color="#2ca02c", linestyle="--")
+    # Exhaustive search lines (if available)
+    if exhaustive_job_series:
+        x_exh, exh_fixed_pct, exh_median_pct = aggregate_job_series(exhaustive_job_series, threshold)
+        plt.plot(x_exh, exh_fixed_pct, label="Exhaustive % fixed", color="#ff7f0e")
+        plt.plot(x_exh, exh_median_pct, label="Exhaustive median accuracy (%)", color="#ff7f0e", linestyle="--")
     plt.xlabel("Programs generated")
     plt.ylabel("Percentage")
     plt.ylim(0, 100)
@@ -173,6 +213,7 @@ def create_plot(
 def main():
     parser = argparse.ArgumentParser(description="Plot GP baseline progress: % fixed and median accuracy vs generation evaluations")
     parser.add_argument("--results-dir", type=str, required=True, help="Directory with per-program JSON results (from GP baseline)")
+    parser.add_argument("--exhaustive-results-dir", type=str, default=None, help="Directory with per-program JSON results (from exhaustive search)")
     parser.add_argument("--threshold", type=float, default=1.0, help="Accuracy threshold to count as fixed")
     parser.add_argument("--output-dir", type=str, default="plots", help="Directory to save plots (PDF format)")
     parser.add_argument("--saved-data-dir", type=str, default=None, help="Path to train_mutations saved_data directory to overlay gradient-based progress")
@@ -197,6 +238,16 @@ def main():
         saved_data_dir = Path(args.saved_data_dir).resolve()
         grad_job_series = load_gradient_job_series(saved_data_dir, args.loss_function, jobs)
 
+    # Optionally load exhaustive search series
+    exhaustive_job_series: Dict[Tuple[str, str], List[float]] = {}
+    if args.exhaustive_results_dir:
+        exhaustive_results_dir = Path(args.exhaustive_results_dir).resolve()
+        exhaustive_histories, exhaustive_jobs = load_exhaustive_histories(exhaustive_results_dir)
+        for job_key, hist in exhaustive_histories.items():
+            exhaustive_job_series[job_key] = expand_gp_history_to_series(hist)
+        # Merge jobs list to include exhaustive jobs
+        jobs = list(set(jobs) | set(exhaustive_jobs))
+
     # Load mutation orders
     mutation_orders = load_mutation_orders()
 
@@ -205,7 +256,13 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Plot all data combined (original plot)
-    create_plot(gp_job_series, grad_job_series if grad_job_series else None, args.threshold, title="All Programs Combined")
+    create_plot(
+        gp_job_series,
+        grad_job_series if grad_job_series else None,
+        exhaustive_job_series if exhaustive_job_series else None,
+        args.threshold,
+        title="All Programs Combined"
+    )
     plt.savefig(output_dir / "all_programs.pdf", bbox_inches="tight", format="pdf")
     plt.close()
     print(f"Saved figure to {output_dir / 'all_programs.pdf'}")
@@ -240,8 +297,9 @@ def main():
     for prog, prog_jobs in jobs_by_program.items():
         prog_gp_series = {job: gp_job_series[job] for job in prog_jobs if job in gp_job_series}
         prog_grad_series = {job: grad_job_series[job] for job in prog_jobs if job in grad_job_series} if grad_job_series else None
+        prog_exh_series = {job: exhaustive_job_series[job] for job in prog_jobs if job in exhaustive_job_series} if exhaustive_job_series else None
         if prog_gp_series:
-            create_plot(prog_gp_series, prog_grad_series, args.threshold, title=f"Program: {prog}")
+            create_plot(prog_gp_series, prog_grad_series, prog_exh_series, args.threshold, title=f"Program: {prog}")
             safe_prog_name = prog.replace("/", "_")
             plt.savefig(output_dir / f"program_{safe_prog_name}.pdf", bbox_inches="tight", format="pdf")
             plt.close()
@@ -252,8 +310,9 @@ def main():
         order_jobs = jobs_by_mutation_order[order]
         order_gp_series = {job: gp_job_series[job] for job in order_jobs if job in gp_job_series}
         order_grad_series = {job: grad_job_series[job] for job in order_jobs if job in grad_job_series} if grad_job_series else None
+        order_exh_series = {job: exhaustive_job_series[job] for job in order_jobs if job in exhaustive_job_series} if exhaustive_job_series else None
         if order_gp_series:
-            create_plot(order_gp_series, order_grad_series, args.threshold, title=f"Mutation Order: {order} (All Programs)")
+            create_plot(order_gp_series, order_grad_series, order_exh_series, args.threshold, title=f"Mutation Order: {order} (All Programs)")
             plt.savefig(output_dir / f"mutation_order_{order}.pdf", bbox_inches="tight", format="pdf")
             plt.close()
             print(f"Saved figure to {output_dir / f'mutation_order_{order}.pdf'}")
@@ -262,8 +321,9 @@ def main():
     for (prog, order), prog_order_jobs in sorted(jobs_by_program_and_order.items()):
         prog_order_gp_series = {job: gp_job_series[job] for job in prog_order_jobs if job in gp_job_series}
         prog_order_grad_series = {job: grad_job_series[job] for job in prog_order_jobs if job in grad_job_series} if grad_job_series else None
+        prog_order_exh_series = {job: exhaustive_job_series[job] for job in prog_order_jobs if job in exhaustive_job_series} if exhaustive_job_series else None
         if prog_order_gp_series:
-            create_plot(prog_order_gp_series, prog_order_grad_series, args.threshold, title=f"Program: {prog}, Mutation Order: {order}")
+            create_plot(prog_order_gp_series, prog_order_grad_series, prog_order_exh_series, args.threshold, title=f"Program: {prog}, Mutation Order: {order}")
             safe_prog_name = prog.replace("/", "_")
             plt.savefig(output_dir / f"program_{safe_prog_name}_order_{order}.pdf", bbox_inches="tight", format="pdf")
             plt.close()

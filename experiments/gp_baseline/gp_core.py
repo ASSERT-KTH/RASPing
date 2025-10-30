@@ -315,25 +315,41 @@ def run_gp(
     logger.info(
         f"Starting GP search for program={program_name} with budget={budget}, pop={population_size}, k={tournament_k}, seed={seed}"
     )
+    # Track each program evaluation (like exhaustive search)
+    program_history: List[Dict[str, Any]] = []
+    
+    # Track best seen so far
+    best_train = -1.0
+    best_test = -1.0
+    
     # Count base program towards budget
     num_programs += 1
     base_eval = get_or_eval(base_source)
     if base_eval is not None:
+        best_train = base_eval[0]
+        best_test = base_eval[1]
         population.append(Candidate(base_source, base_eval[0], base_eval[1]))
         seen.add(hash_source(base_source))
         logger.info(
             f"Seeded base candidate: train={base_eval[0]:.4f} test={base_eval[1]:.4f}"
         )
-
+        status = "ok"
+        train_acc = base_eval[0]
+        test_acc = base_eval[1]
+    else:
+        status = "compile_fail"
+        train_acc = None
+        test_acc = None
+    
     generation = 0
-    # Track best candidate after each generation
-    generation_history: List[Dict[str, Any]] = []
-
-    generation_history.append({
+    program_history.append({
+        "step": num_programs,
         "generation": generation,
-        "num_programs": num_programs,
-        "best_train_acc": population[0].train_acc,
-        "best_test_acc": population[0].test_acc,
+        "status": status,
+        "train_acc": train_acc,
+        "test_acc": test_acc,
+        "best_train_acc": best_train,
+        "best_test_acc": best_test,
     })
     generation += 1
 
@@ -350,39 +366,61 @@ def run_gp(
         if h in seen:
             logger.debug(f"Duplicate candidate skipped: {h}")
             num_duplicates += 1
-            continue
-        eval_result = get_or_eval(mutated)
-        if eval_result is None:
-            continue
-        seen.add(h)
-        population.append(Candidate(mutated, eval_result[0], eval_result[1]))
-        logger.debug(
-            f"Seeded mutated candidate {h}: train={eval_result[0]:.4f} test={eval_result[1]:.4f}"
-        )
+            status = "duplicate"
+            eval_result = None
+        else:
+            eval_result = get_or_eval(mutated)
+            if eval_result is None:
+                status = "compile_fail"
+            else:
+                status = "ok"
+        
+        # Update best if we have a valid result
+        if status == "ok" and eval_result is not None:
+            train_acc = eval_result[0]
+            test_acc = eval_result[1]
+            if train_acc > best_train or (train_acc == best_train and test_acc > best_test):
+                best_train = train_acc
+                best_test = test_acc
+            seen.add(h)
+            population.append(Candidate(mutated, train_acc, test_acc))
+            logger.debug(
+                f"Seeded mutated candidate {h}: train={train_acc:.4f} test={test_acc:.4f}"
+            )
+        else:
+            train_acc = eval_result[0] if eval_result is not None else None
+            test_acc = eval_result[1] if eval_result is not None else None
+        
+        program_history.append({
+            "step": num_programs,
+            "generation": generation,
+            "status": status,
+            "train_acc": train_acc,
+            "test_acc": test_acc,
+            "best_train_acc": best_train,
+            "best_test_acc": best_test,
+        })
 
     if not population:
         # Could not seed a valid population
         return {
             "status": "failed_to_initialize",
             "num_programs": num_programs,
+            "program_history": program_history,
         }
 
-    # Track the best-by-val candidate globally
+    # Track the best-by-train candidate globally
     best_by_train = max(population, key=lambda c: c.train_acc)
+    best_train = best_by_train.train_acc
+    best_test = best_by_train.test_acc
     logger.info(
         f"Initial best: train={best_by_train.train_acc:.4f}"
     )
 
-    generation_history.append({
-        "generation": generation,
-        "num_programs": num_programs,
-        "best_train_acc": population[0].train_acc,
-        "best_test_acc": population[0].test_acc,
-    })
     generation += 1
 
-    # Early stop if we already have perfect val
-    if best_by_train.train_acc >= 1.0:
+    # Early stop if we already have perfect train
+    if best_train >= 1.0:
         test_acc = evaluate_source_test(
             best_by_train.source,
             program_name,
@@ -391,16 +429,17 @@ def run_gp(
             test_data,
         )
         logger.info(
-            f"Early stop: perfect train achieved after {num_programs} programs (dup={num_duplicates}, fails={num_compile_failures}). Test={best_by_train.test_acc:.4f}"
+            f"Early stop: perfect train achieved after {num_programs} programs (dup={num_duplicates}, fails={num_compile_failures}). Test={test_acc:.4f}"
         )
         return {
             "status": "success_early",
             "num_programs": num_programs,
             "num_duplicates": num_duplicates,
             "num_compile_failures": num_compile_failures,
-            "train_acc": best_by_train.train_acc,
+            "train_acc": best_train,
             "test_acc": test_acc,
             "best_source": best_by_train.source,
+            "program_history": program_history,
         }
 
     # Main GP loop
@@ -429,41 +468,59 @@ def run_gp(
             if h in seen:
                 logger.debug(f"Duplicate candidate skipped: {h}")
                 num_duplicates += 1
-                continue
-            eval_result = get_or_eval(mutated)
-            if eval_result is None:
-                continue
-            seen.add(h)
-            cand = Candidate(mutated, eval_result[0], eval_result[1])
-            offspring.append(cand)
-            if cand.train_acc > best_by_train.train_acc:
-                best_by_train = cand
-                logger.info(
-                    f"New best: train={best_by_train.train_acc:.4f} test={best_by_train.test_acc:.4f}"
-                )
+                status = "duplicate"
+                train_acc = None
+                test_acc = None
+                # Get cached result if available
+                if h in cache:
+                    cached_train, cached_test = cache[h]
+                    train_acc = cached_train
+                    test_acc = cached_test
+            else:
+                eval_result = get_or_eval(mutated)
+                if eval_result is None:
+                    status = "compile_fail"
+                    train_acc = None
+                    test_acc = None
+                else:
+                    status = "ok"
+                    train_acc = eval_result[0]
+                    test_acc = eval_result[1]
+                    seen.add(h)
+                    cand = Candidate(mutated, train_acc, test_acc)
+                    offspring.append(cand)
+                    if train_acc > best_train or (train_acc == best_train and test_acc > best_test):
+                        best_train = train_acc
+                        best_test = test_acc
+                        best_by_train = cand
+                        logger.info(
+                            f"New best: train={best_train:.4f} test={best_test:.4f}"
+                        )
+            
+            program_history.append({
+                "step": num_programs,
+                "generation": generation,
+                "status": status,
+                "train_acc": train_acc,
+                "test_acc": test_acc,
+                "best_train_acc": best_train,
+                "best_test_acc": best_test,
+            })
 
-            if best_by_train.train_acc >= 1.0 or num_programs >= budget:
+            if best_train >= 1.0 or num_programs >= budget:
                 break
 
-        # Replacement: (μ+λ) keep top μ by train, tiebreak by val
+        # Replacement: (μ+λ) keep top μ by train, tiebreak by test
         population = sorted(population + offspring, key=lambda c: c.train_acc, reverse=True)[:population_size]
         logger.info(
-            f"Generation {generation} end: offspring={len(offspring)}, programs={num_programs}/{budget}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_by_train.train_acc:.4f} | best_test={best_by_train.test_acc:.4f}"
+            f"Generation {generation} end: offspring={len(offspring)}, programs={num_programs}/{budget}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_train:.4f} | best_test={best_test:.4f}"
         )
 
-        # Record generation end stats
-        generation_history.append({
-            "generation": generation,
-            "num_programs": num_programs,
-            "best_train_acc": best_by_train.train_acc,
-            "best_test_acc": best_by_train.test_acc,
-        })
-
-        if best_by_train.train_acc >= 1.0 or num_programs >= budget:
+        if best_train >= 1.0 or num_programs >= budget:
             break
 
     logger.info(
-        f"Completed: programs={num_programs}/{budget}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_by_train.train_acc:.4f}, test={best_by_train.test_acc:.4f}"
+        f"Completed: programs={num_programs}/{budget}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_train:.4f}, test={best_test:.4f}"
     )
 
     return {
@@ -471,10 +528,10 @@ def run_gp(
         "num_programs": num_programs,
         "num_duplicates": num_duplicates,
         "num_compile_failures": num_compile_failures,
-        "train_acc": best_by_train.train_acc,
-        "test_acc": best_by_train.test_acc,
+        "train_acc": best_train,
+        "test_acc": best_test,
         "best_source": best_by_train.source,
-        "generation_history": generation_history,
+        "program_history": program_history,
     }
 
 
