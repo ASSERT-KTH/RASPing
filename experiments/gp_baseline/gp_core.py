@@ -139,15 +139,43 @@ def _iter_tree(node):
             yield from _iter_tree(child)
 
 
-def discover_mutation_sites(tree) -> List[MutationSite]:
+def load_custom_operators():
     provider = Provider()
-    sites: List[MutationSite] = []
-    for operator_name in provider:
+    operators = []
+    for operator_name in Provider():
         operator_cls = provider[operator_name]
-        op_instance = operator_cls()
+        operators.append((operator_name, operator_cls))
+    return operators
+
+
+def load_default_operators():
+    from cosmic_ray.operators.provider import OperatorProvider
+    provider = OperatorProvider()
+    operators = []
+    for operator_name in provider:
+        if not any(operator_name.startswith(prefix) for prefix in {
+            "ReplaceBinaryOperator",
+            "ReplaceComparisonOperator",
+            "NumberReplacer",
+            "ReplaceUnaryOperator",
+            "ZeroIterationForLoop",
+            "AddNot",
+        }):
+            continue
+        operator_cls = provider[operator_name]
+        operators.append((operator_name, operator_cls))
+    return operators
+
+
+def discover_mutation_sites(tree) -> List[MutationSite]:
+    sites: List[MutationSite] = []
+    operators = load_custom_operators()
+    operators.extend(load_default_operators())
+    for operator_name, operator_cls in operators:
         for node in _iter_tree(tree):
             try:
-                positions = list(op_instance.mutation_positions(node))
+                operator_instance = operator_cls()
+                positions = list(operator_instance.mutation_positions(node))
             except Exception:
                 # Some operators may expect specific node interfaces; ignore failures
                 continue
