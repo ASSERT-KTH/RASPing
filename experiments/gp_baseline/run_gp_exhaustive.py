@@ -79,17 +79,12 @@ def _all_single_step_neighbors(source_code: str) -> List[str]:
 
     sites = discover_mutation_sites(tree)
     neighbors: List[str] = []
-    seen_hashes: set[str] = set()
 
     for site_idx, site in enumerate(sites):
         for pos_idx in site.indices:
             mutated = _apply_mutation_by_index(source_code, site_idx, pos_idx)
             if not mutated:
                 continue
-            h = hash_source(mutated)
-            if h in seen_hashes:
-                continue
-            seen_hashes.add(h)
             neighbors.append(mutated)
     return neighbors
 
@@ -131,7 +126,6 @@ def run_exhaustive_for_bug(
     fitness_data = train_data + val_data
     max_length = compute_max_length(data_dir, dataset_name)
 
-    seen: set[str] = set()
     cache: Dict[str, Tuple[float, float]] = {}
     num_programs = 0
     num_duplicates = 0
@@ -167,7 +161,6 @@ def run_exhaustive_for_bug(
     status, base_eval, base_hash = evaluate_candidate(base_source, depth_mark=0)
     if status != "compile_fail" and base_eval is not None:
         best_train, best_test = base_eval
-        seen.add(base_hash)
         logger.info(f"Seeded base candidate: train={best_train:.4f} test={best_test:.4f}")
     program_history.append({
         "step": num_programs,
@@ -207,11 +200,6 @@ def run_exhaustive_for_bug(
         for src in frontier:
             neighbors = _all_single_step_neighbors(src)
             for msrc in neighbors:
-                h = hash_source(msrc)
-                if h in seen:
-                    num_duplicates += 1
-                    continue
-                seen.add(h)
                 next_frontier.append(msrc)
 
         # Evaluate next frontier
