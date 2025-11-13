@@ -5,6 +5,7 @@ import haiku as hk
 import numpy as np
 import jax.numpy as jnp
 import wandb
+import pickle
 
 import tqdm
 from pathlib import Path
@@ -40,9 +41,22 @@ class Trainer:
         use_wandb: bool = False,
         wandb_project: Optional[str] = None,
         wandb_name: Optional[str] = None,
+        from_pretrained: Optional[str] = None,
+        store_trajectory: bool = False,
+        trajectory_store_interval: int = 10,
     ):
         self.model = model.model
         self.params = model.model.params
+        
+        # Load pretrained weights if specified
+        if from_pretrained is not None:
+            success = model.load_model(from_pretrained)
+            if success:
+                self.params = model.model.params
+                print(f"Successfully loaded pretrained model from {from_pretrained}")
+            else:
+                print(f"Warning: Failed to load pretrained model from {from_pretrained}")
+                
         self.X_train = X_train
         self.Y_train = Y_train
         self.loss_fn = loss_fn
@@ -62,8 +76,11 @@ class Trainer:
             else None
         )
         self.valStep = valStep
-        self.output_dir = Path(output_dir)
+        self.output_dir = Path(output_dir) if output_dir else None
         self.use_wandb = use_wandb
+        self.store_trajectory = store_trajectory
+        self.trajectory_store_interval = trajectory_store_interval
+        self.trajectory = [] # List to store (step, params, loss) tuples
 
         if self.use_wandb:
             wandb.init(
@@ -129,7 +146,7 @@ class Trainer:
         ## Validation accuracy
         @hk.without_apply_rng
         @hk.transform
-        def _val_accuracy(x, y, padToken, forward):
+        def _accuracy(x, y, padToken, forward):
             logits = forward(jnp.array(x)).unembedded_output
             pred = jnp.argmax(logits, axis=-1)
 
@@ -143,8 +160,8 @@ class Trainer:
             )
             return val
 
-        _val_accuracy = jax.tree_util.Partial(_val_accuracy.apply, forward=forward)
-        self.jit_val_accuracy = jax.jit(_val_accuracy)
+        _accuracy = jax.tree_util.Partial(_accuracy.apply, forward=forward)
+        self.jit_accuracy = jax.jit(_accuracy)
 
     def train(self):
         padToken = self.model.input_encoder.encoding_map["compiler_pad"]
@@ -154,6 +171,17 @@ class Trainer:
         train_accs = []
         val_losses = []
         val_accs = []
+
+        # Calculate initial loss and store initial state if trajectory storage is enabled
+        if self.store_trajectory and self.output_dir:
+            # Calculate validation loss
+            initial_loss = self.jit_val_loss(
+                self.state.params, 
+                self.X_val, 
+                self.Y_val, 
+                padToken
+            )
+            self.trajectory.append((0, jax.device_get(self.state.params), initial_loss))
 
         # Set up early stopping validation requirements
         if self.early_stopper is not None:
@@ -174,12 +202,24 @@ class Trainer:
                 self.state, metric = self.jit_update(self.state, x, y, padToken)
                 epoch_loss += metric["loss"]
                 n_batches += 1
+                
+                # Store state at intervals if trajectory storage is enabled
+                current_step = int(self.state.step)
+                if self.store_trajectory and self.output_dir and current_step % self.trajectory_store_interval == 0:
+                    # Store step, current (updated) params, and the loss calculated with these params
+                    val_loss = self.jit_val_loss(
+                        self.state.params, 
+                        self.X_val, 
+                        self.Y_val, 
+                        padToken
+                    )
+                    self.trajectory.append((current_step, jax.device_get(self.state.params), val_loss))
 
             avg_epoch_loss = epoch_loss / n_batches
             train_losses.append(avg_epoch_loss)
 
             # Calculate training accuracy
-            train_acc = self.jit_val_accuracy(
+            train_acc = self.jit_accuracy(
                 self.state.params, self.X_train, self.Y_train, padToken
             )
             train_accs.append(train_acc)
@@ -195,7 +235,7 @@ class Trainer:
                     val_metrics["val_loss"] = val_loss
 
                     if self.valStep and epoch % self.valStep == 0:
-                        val_acc = self.jit_val_accuracy(
+                        val_acc = self.jit_accuracy(
                             self.state.params, self.X_val, self.Y_val, padToken
                         )
                         val_accs.append(val_acc)
@@ -203,7 +243,7 @@ class Trainer:
 
                     # Early stopping check with current parameters
                     if self.early_stopper is not None:
-                        if self.early_stopper(val_loss, self.state.params):
+                        if self.early_stopper(val_loss, self.state.params, int(self.state.step)):
                             print(f"Early stopping triggered after {epoch + 1} epochs")
                             stoppedTraining = True
 
@@ -229,7 +269,38 @@ class Trainer:
                         opt_state=self.state.opt_state,
                         step=self.state.step,
                     )
+                    # Truncate trajectory to only include up to the best step
+                    if self.store_trajectory and self.output_dir:
+                        best_step = self.early_stopper.best_step
+                        if best_step is not None:
+                            idx = None
+                            for i, (step, params, loss) in enumerate(self.trajectory):
+                                if step > best_step:
+                                    idx = i
+                                    break
+                            if idx is not None:
+                                self.trajectory = self.trajectory[: idx]
+                            else:
+                                print(f"Warning: No matching step found in trajectory for early stopping best step {best_step}. Trajectory will not be truncated.")
+                        else:
+                            print("Warning: Early stopper best_step is None. Trajectory will not be truncated.")
                 break
+
+        # Calculate final loss and store final state if trajectory storage is enabled
+        if self.store_trajectory and self.output_dir:
+            final_step = int(self.state.step)
+            final_params = jax.device_get(self.state.params)
+            # Ensure final state isn't identical to the last stored state due to interval
+            if not self.trajectory or self.trajectory[-1][0] != final_step:
+                # Recalculate loss for the final parameters on a training batch
+                padToken = self.model.input_encoder.encoding_map["compiler_pad"]
+                final_loss = self.jit_val_loss(
+                    final_params,
+                    self.X_val,
+                    self.Y_val,
+                    padToken
+                )
+                self.trajectory.append((final_step, final_params, final_loss))
 
         if self.plot:
             # Plot training and validation loss
@@ -262,6 +333,8 @@ class Trainer:
                 os.makedirs(self.output_dir, exist_ok=True)
             self.save_metrics(train_losses, train_accs, val_losses, val_accs)
             self.save_model()
+            if self.store_trajectory:
+                self.save_trajectory()
 
         if self.use_wandb:
             wandb.finish()
@@ -283,3 +356,30 @@ class Trainer:
 
     def save_model(self):
         np.save(self.output_dir / "model.npy", self.state.params)
+
+    def save_trajectory(self):
+        """Save the training trajectory to a pickle file."""
+        if not self.output_dir:
+            print("Warning: Output directory not set, cannot save trajectory.")
+            return
+        trajectory_path = self.output_dir / "trajectory.pkl"
+        try:
+            with open(trajectory_path, "wb") as f:
+                pickle.dump(self.trajectory, f)
+            print(f"Trajectory saved to {trajectory_path}")
+        except Exception as e:
+            print(f"Error saving trajectory to {trajectory_path}: {e}")
+
+    @staticmethod
+    def load_saved_model(model, model_path):
+        """
+        Load a saved model from a path
+        
+        Args:
+            model: A Model instance to load parameters into
+            model_path: Path to the directory containing model.npy or path to the model.npy file
+            
+        Returns:
+            True if loading was successful, False otherwise
+        """
+        return model.load_model(model_path)

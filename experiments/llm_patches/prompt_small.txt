@@ -1,0 +1,26 @@
+You are tasked with repairing a RASP (Restricted Access Sequence Processing Language) program that is not functioning as intended. Your goal is to analyze the current program, understand the expected behavior, identify the issues, and provide a corrected version of the program.
+
+Here is the current RASP program that needs to be repaired:
+
+<current_program>
+{{PROGRAM_HERE}}
+</current_program>
+
+The expected behavior of this program is:
+
+<expected_behavior>
+{{EXPECTED_BEHAVIOR}}
+</expected_behavior>
+
+However, the current behavior of the program is:
+
+<current_behavior>
+{{CURRENT_BEHAVIOR}}
+</current_behavior>
+
+To repair this program, please follow these steps:
+
+1. Carefully analyze the current program and compare it with the expected behavior.
+2. Identify any logical errors, incorrect function usage, or misunderstandings of RASP principles.
+3. Make necessary corrections to the program while adhering to RASP's core operations and principles.
+4. Ensure that your repaired program achieves the expected behavior.

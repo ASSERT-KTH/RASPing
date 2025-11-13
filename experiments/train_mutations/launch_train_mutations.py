@@ -27,6 +27,9 @@ def run_in_container(
     batch_size: int = 256,
     learning_rate: float = 1e-04,
     output_dir: str = None,
+    loss_fn_name: str = "cross_entropy_loss",
+    store_trajectory: bool = False,
+    trajectory_store_interval: int = 50,
 ):
     """Wrapper to run train_mutations.py inside the apptainer container"""
     # Get path to container.sif relative to repository root
@@ -55,7 +58,19 @@ def run_in_container(
         str(batch_size),
         "--learning_rate",
         str(learning_rate),
+        "--loss_fn_name",
+        loss_fn_name,
     ]
+
+    # Add trajectory storage options
+    if store_trajectory:
+        cmd.extend([
+            "--store-trajectory",
+            "--trajectory-store-interval",
+            str(trajectory_store_interval),
+        ])
+    else:
+        cmd.append("--no-store-trajectory")
 
     # Add output directory if specified, using full path
     if output_dir:
@@ -92,29 +107,44 @@ def main():
     )
     df = pd.read_json(mutation_path)
 
+    # List of loss functions to test
+    loss_functions = [
+        "cross_entropy_loss",
+    ]
+
     for _, row in df.iterrows():
         # We only train buggy models
         if row["execution_result"].get("status") != "BUGGY_MODEL":
             continue
 
-        # Create the job using the container wrapper
         program_name = row["program_name"]
         job_id = row["job_id"]
-        job = executor.submit(
-            run_in_container,
-            program_name=program_name,
-            job_id=job_id,
-            max_len=10,
-            n_epochs=10000,
-            batch_size=256,
-            learning_rate=1e-04,
-            output_dir=f"saved_data/{program_name}/job_{job_id}/",
-        )
-        jobs.append(job)
+
+        # Submit a job for each loss function
+        for loss_fn_name in loss_functions:
+            output_dir = Path(__file__).parent / f"saved_data/{program_name}/{loss_fn_name}/job_{job_id}"
+            if output_dir.exists():
+                print(f"Skipping {program_name} (job {job_id}) with {loss_fn_name} because it already exists")
+                continue
+
+            # Create the job using the container wrapper
+            job = executor.submit(
+                run_in_container,
+                program_name=program_name,
+                job_id=job_id,
+                max_len=10,
+                n_epochs=10000,
+                batch_size=256,
+                learning_rate=1e-04,
+                output_dir=f"saved_data/{program_name}/{loss_fn_name}/job_{job_id}/",
+                loss_fn_name=loss_fn_name,
+                store_trajectory=True,
+                trajectory_store_interval=50,
+            )
+            jobs.append(job)
 
     print(f"Submitted {len(jobs)} jobs")
 
 
 if __name__ == "__main__":
-    # No need to import train_mutated_model since we're running it through apptainer
     main()
