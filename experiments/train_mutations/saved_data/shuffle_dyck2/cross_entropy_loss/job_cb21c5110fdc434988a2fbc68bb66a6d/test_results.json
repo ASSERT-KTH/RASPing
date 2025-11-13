@@ -1,0 +1,6 @@
+{
+  "program_name": "shuffle_dyck2",
+  "job_id": "cb21c5110fdc434988a2fbc68bb66a6d",
+  "test_accuracy": 0.9906,
+  "test_samples": 5000
+}

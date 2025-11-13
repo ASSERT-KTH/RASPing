@@ -24,6 +24,7 @@ def run_in_container(
     job_id: str,
     max_len: int = 10,
     output_dir: str = None,
+    loss_fn_name: str = "cross_entropy_loss",
 ):
     """Wrapper to run test_trained_mutations.py inside the apptainer container"""
     # Get path to container.sif relative to repository root
@@ -46,6 +47,8 @@ def run_in_container(
         job_id,
         "--max_len",
         str(max_len),
+        "--loss_fn_name",
+        loss_fn_name,
     ]
 
     # Add output directory if specified, using full path
@@ -83,6 +86,11 @@ def main():
     )
     df = pd.read_json(mutation_path)
 
+    # List of loss functions to test
+    loss_functions = [
+        "cross_entropy_loss",
+    ]
+
     for _, row in df.iterrows():
         # We only test models that were buggy and then trained
         if row["execution_result"].get("status") != "BUGGY_MODEL":
@@ -91,46 +99,34 @@ def main():
         program_name = row["program_name"]
         job_id = row["job_id"]
 
-        # Check if there's a trained model for this configuration
-        output_dir = f"saved_data/{program_name}/job_{job_id}/"
-        model_path = Path(__file__).parent / output_dir / "model.npy"
+        # Check each loss function variant
+        for loss_fn_name in loss_functions:
+            # Check if there's a trained model for this configuration
+            output_dir = f"saved_data/{program_name}/{loss_fn_name}/job_{job_id}/"
+            model_path = Path(__file__).parent / output_dir / "model.npy"
 
-        if not (model_path.exists()):
-            print(f"Skipping {program_name} job {job_id}: no trained model found")
-            continue
+            if not model_path.exists():
+                print(f"Skipping {program_name} job {job_id} with {loss_fn_name}: no trained model found")
+                continue
 
-        # Create the job using the container wrapper
-        job = executor.submit(
-            run_in_container,
-            program_name=program_name,
-            job_id=job_id,
-            max_len=10,
-            output_dir=output_dir,
-        )
-        jobs.append(job)
+            # Check if the model has already been tested
+            test_path = Path(__file__).parent / output_dir / "test_results.json"
+            if test_path.exists():
+                print(f"Skipping {program_name} job {job_id} with {loss_fn_name}: model has already been tested")
+                continue
+
+            # Create the job using the container wrapper
+            job = executor.submit(
+                run_in_container,
+                program_name=program_name,
+                job_id=job_id,
+                max_len=10,
+                output_dir=output_dir,
+                loss_fn_name=loss_fn_name,
+            )
+            jobs.append(job)
 
     print(f"Submitted {len(jobs)} test jobs")
-
-    # Wait for all jobs to complete and aggregate results
-    results = []
-    for job in jobs:
-        job.wait()
-
-    # Aggregate all test results
-    all_results = []
-    base_path = Path(__file__).parent / "saved_data"
-    for program_dir in base_path.glob("*"):
-        if not program_dir.is_dir():
-            continue
-        for job_dir in program_dir.glob("job_*"):
-            result_file = job_dir / "test_results.json"
-            if result_file.exists():
-                with open(result_file, "r") as f:
-                    all_results.append(json.load(f))
-
-    # Save aggregated results
-    with open(Path(__file__).parent / "test_results_aggregated.json", "w") as f:
-        json.dump(all_results, f, indent=2)
 
 
 if __name__ == "__main__":

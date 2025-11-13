@@ -1,98 +1,562 @@
 {
   "0.0": {
-    "sort": {
-      "fixed": 6,
-      "total": 39,
-      "percentage": 15.384615384615385
+    "programs": {
+      "sort": {
+        "fixed": 64,
+        "total": 249,
+        "percentage": 25.702811244979916
+      },
+      "shuffle_dyck2": {
+        "fixed": 5,
+        "total": 288,
+        "percentage": 1.7361111111111112
+      },
+      "reverse": {
+        "fixed": 62,
+        "total": 268,
+        "percentage": 23.134328358208954
+      },
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "shuffle_dyck": {
+        "fixed": 6,
+        "total": 331,
+        "percentage": 1.812688821752266
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      }
     },
-    "hist": {
-      "fixed": 3,
-      "total": 9,
-      "percentage": 33.33333333333333
+    "loss_functions": {
+      "cross_entropy_loss": {
+        "fixed": 156,
+        "total": 1466,
+        "percentage": 10.641200545702592
+      }
     },
-    "most_freq": {
-      "fixed": 0,
-      "total": 63,
-      "percentage": 0.0
+    "program_loss_functions": {
+      "sort": {
+        "cross_entropy_loss": {
+          "fixed": 64,
+          "total": 249,
+          "percentage": 25.702811244979916
+        }
+      },
+      "shuffle_dyck2": {
+        "cross_entropy_loss": {
+          "fixed": 5,
+          "total": 288,
+          "percentage": 1.7361111111111112
+        }
+      },
+      "reverse": {
+        "cross_entropy_loss": {
+          "fixed": 62,
+          "total": 268,
+          "percentage": 23.134328358208954
+        }
+      },
+      "most_freq": {
+        "cross_entropy_loss": {
+          "fixed": 0,
+          "total": 284,
+          "percentage": 0.0
+        }
+      },
+      "shuffle_dyck": {
+        "cross_entropy_loss": {
+          "fixed": 6,
+          "total": 331,
+          "percentage": 1.812688821752266
+        }
+      },
+      "hist": {
+        "cross_entropy_loss": {
+          "fixed": 19,
+          "total": 46,
+          "percentage": 41.30434782608695
+        }
+      }
     },
-    "shuffle_dyck": {
-      "fixed": 0,
-      "total": 92,
-      "percentage": 0.0
-    },
-    "shuffle_dyck2": {
-      "fixed": 3,
-      "total": 121,
-      "percentage": 2.479338842975207
-    },
-    "reverse": {
-      "fixed": 12,
-      "total": 35,
-      "percentage": 34.285714285714285
+    "mutation_orders": {
+      "2": {
+        "fixed": 56,
+        "total": 481,
+        "percentage": 11.642411642411643
+      },
+      "5": {
+        "fixed": 9,
+        "total": 134,
+        "percentage": 6.7164179104477615
+      },
+      "3": {
+        "fixed": 33,
+        "total": 311,
+        "percentage": 10.610932475884244
+      },
+      "1": {
+        "fixed": 25,
+        "total": 322,
+        "percentage": 7.763975155279502
+      },
+      "4": {
+        "fixed": 33,
+        "total": 218,
+        "percentage": 15.137614678899084
+      }
     }
   },
-  "0.001": {
-    "sort": {
-      "fixed": 11,
-      "total": 39,
-      "percentage": 28.205128205128204
+  "0.0025": {
+    "programs": {
+      "sort": {
+        "fixed": 131,
+        "total": 249,
+        "percentage": 52.610441767068274
+      },
+      "shuffle_dyck2": {
+        "fixed": 52,
+        "total": 288,
+        "percentage": 18.055555555555554
+      },
+      "reverse": {
+        "fixed": 125,
+        "total": 268,
+        "percentage": 46.64179104477612
+      },
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "shuffle_dyck": {
+        "fixed": 6,
+        "total": 331,
+        "percentage": 1.812688821752266
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      }
     },
-    "hist": {
-      "fixed": 3,
-      "total": 9,
-      "percentage": 33.33333333333333
+    "loss_functions": {
+      "cross_entropy_loss": {
+        "fixed": 333,
+        "total": 1466,
+        "percentage": 22.714870395634378
+      }
     },
-    "most_freq": {
-      "fixed": 0,
-      "total": 63,
-      "percentage": 0.0
+    "program_loss_functions": {
+      "sort": {
+        "cross_entropy_loss": {
+          "fixed": 131,
+          "total": 249,
+          "percentage": 52.610441767068274
+        }
+      },
+      "shuffle_dyck2": {
+        "cross_entropy_loss": {
+          "fixed": 52,
+          "total": 288,
+          "percentage": 18.055555555555554
+        }
+      },
+      "reverse": {
+        "cross_entropy_loss": {
+          "fixed": 125,
+          "total": 268,
+          "percentage": 46.64179104477612
+        }
+      },
+      "most_freq": {
+        "cross_entropy_loss": {
+          "fixed": 0,
+          "total": 284,
+          "percentage": 0.0
+        }
+      },
+      "shuffle_dyck": {
+        "cross_entropy_loss": {
+          "fixed": 6,
+          "total": 331,
+          "percentage": 1.812688821752266
+        }
+      },
+      "hist": {
+        "cross_entropy_loss": {
+          "fixed": 19,
+          "total": 46,
+          "percentage": 41.30434782608695
+        }
+      }
     },
-    "shuffle_dyck": {
-      "fixed": 0,
-      "total": 92,
-      "percentage": 0.0
+    "mutation_orders": {
+      "2": {
+        "fixed": 128,
+        "total": 481,
+        "percentage": 26.611226611226613
+      },
+      "5": {
+        "fixed": 24,
+        "total": 134,
+        "percentage": 17.91044776119403
+      },
+      "3": {
+        "fixed": 63,
+        "total": 311,
+        "percentage": 20.257234726688104
+      },
+      "1": {
+        "fixed": 53,
+        "total": 322,
+        "percentage": 16.459627329192546
+      },
+      "4": {
+        "fixed": 65,
+        "total": 218,
+        "percentage": 29.81651376146789
+      }
+    }
+  },
+  "0.005": {
+    "programs": {
+      "sort": {
+        "fixed": 148,
+        "total": 249,
+        "percentage": 59.43775100401606
+      },
+      "shuffle_dyck2": {
+        "fixed": 77,
+        "total": 288,
+        "percentage": 26.73611111111111
+      },
+      "reverse": {
+        "fixed": 127,
+        "total": 268,
+        "percentage": 47.38805970149254
+      },
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "shuffle_dyck": {
+        "fixed": 14,
+        "total": 331,
+        "percentage": 4.229607250755287
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      }
     },
-    "shuffle_dyck2": {
-      "fixed": 6,
-      "total": 121,
-      "percentage": 4.958677685950414
+    "loss_functions": {
+      "cross_entropy_loss": {
+        "fixed": 385,
+        "total": 1466,
+        "percentage": 26.26193724420191
+      }
     },
-    "reverse": {
-      "fixed": 19,
-      "total": 35,
-      "percentage": 54.285714285714285
+    "program_loss_functions": {
+      "sort": {
+        "cross_entropy_loss": {
+          "fixed": 148,
+          "total": 249,
+          "percentage": 59.43775100401606
+        }
+      },
+      "shuffle_dyck2": {
+        "cross_entropy_loss": {
+          "fixed": 77,
+          "total": 288,
+          "percentage": 26.73611111111111
+        }
+      },
+      "reverse": {
+        "cross_entropy_loss": {
+          "fixed": 127,
+          "total": 268,
+          "percentage": 47.38805970149254
+        }
+      },
+      "most_freq": {
+        "cross_entropy_loss": {
+          "fixed": 0,
+          "total": 284,
+          "percentage": 0.0
+        }
+      },
+      "shuffle_dyck": {
+        "cross_entropy_loss": {
+          "fixed": 14,
+          "total": 331,
+          "percentage": 4.229607250755287
+        }
+      },
+      "hist": {
+        "cross_entropy_loss": {
+          "fixed": 19,
+          "total": 46,
+          "percentage": 41.30434782608695
+        }
+      }
+    },
+    "mutation_orders": {
+      "2": {
+        "fixed": 145,
+        "total": 481,
+        "percentage": 30.14553014553015
+      },
+      "5": {
+        "fixed": 28,
+        "total": 134,
+        "percentage": 20.8955223880597
+      },
+      "3": {
+        "fixed": 77,
+        "total": 311,
+        "percentage": 24.758842443729904
+      },
+      "1": {
+        "fixed": 62,
+        "total": 322,
+        "percentage": 19.25465838509317
+      },
+      "4": {
+        "fixed": 73,
+        "total": 218,
+        "percentage": 33.48623853211009
+      }
+    }
+  },
+  "0.0075": {
+    "programs": {
+      "sort": {
+        "fixed": 159,
+        "total": 249,
+        "percentage": 63.85542168674698
+      },
+      "shuffle_dyck2": {
+        "fixed": 267,
+        "total": 288,
+        "percentage": 92.70833333333334
+      },
+      "reverse": {
+        "fixed": 127,
+        "total": 268,
+        "percentage": 47.38805970149254
+      },
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "shuffle_dyck": {
+        "fixed": 14,
+        "total": 331,
+        "percentage": 4.229607250755287
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      }
+    },
+    "loss_functions": {
+      "cross_entropy_loss": {
+        "fixed": 586,
+        "total": 1466,
+        "percentage": 39.972714870395635
+      }
+    },
+    "program_loss_functions": {
+      "sort": {
+        "cross_entropy_loss": {
+          "fixed": 159,
+          "total": 249,
+          "percentage": 63.85542168674698
+        }
+      },
+      "shuffle_dyck2": {
+        "cross_entropy_loss": {
+          "fixed": 267,
+          "total": 288,
+          "percentage": 92.70833333333334
+        }
+      },
+      "reverse": {
+        "cross_entropy_loss": {
+          "fixed": 127,
+          "total": 268,
+          "percentage": 47.38805970149254
+        }
+      },
+      "most_freq": {
+        "cross_entropy_loss": {
+          "fixed": 0,
+          "total": 284,
+          "percentage": 0.0
+        }
+      },
+      "shuffle_dyck": {
+        "cross_entropy_loss": {
+          "fixed": 14,
+          "total": 331,
+          "percentage": 4.229607250755287
+        }
+      },
+      "hist": {
+        "cross_entropy_loss": {
+          "fixed": 19,
+          "total": 46,
+          "percentage": 41.30434782608695
+        }
+      }
+    },
+    "mutation_orders": {
+      "2": {
+        "fixed": 199,
+        "total": 481,
+        "percentage": 41.37214137214137
+      },
+      "5": {
+        "fixed": 45,
+        "total": 134,
+        "percentage": 33.582089552238806
+      },
+      "3": {
+        "fixed": 109,
+        "total": 311,
+        "percentage": 35.048231511254016
+      },
+      "1": {
+        "fixed": 134,
+        "total": 322,
+        "percentage": 41.61490683229814
+      },
+      "4": {
+        "fixed": 99,
+        "total": 218,
+        "percentage": 45.412844036697244
+      }
     }
   },
   "0.01": {
-    "sort": {
-      "fixed": 20,
-      "total": 39,
-      "percentage": 51.28205128205128
+    "programs": {
+      "sort": {
+        "fixed": 162,
+        "total": 249,
+        "percentage": 65.06024096385542
+      },
+      "shuffle_dyck2": {
+        "fixed": 287,
+        "total": 288,
+        "percentage": 99.65277777777779
+      },
+      "reverse": {
+        "fixed": 128,
+        "total": 268,
+        "percentage": 47.76119402985074
+      },
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "shuffle_dyck": {
+        "fixed": 26,
+        "total": 331,
+        "percentage": 7.854984894259818
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      }
     },
-    "hist": {
-      "fixed": 3,
-      "total": 9,
-      "percentage": 33.33333333333333
+    "loss_functions": {
+      "cross_entropy_loss": {
+        "fixed": 622,
+        "total": 1466,
+        "percentage": 42.42837653478854
+      }
     },
-    "most_freq": {
-      "fixed": 0,
-      "total": 63,
-      "percentage": 0.0
+    "program_loss_functions": {
+      "sort": {
+        "cross_entropy_loss": {
+          "fixed": 162,
+          "total": 249,
+          "percentage": 65.06024096385542
+        }
+      },
+      "shuffle_dyck2": {
+        "cross_entropy_loss": {
+          "fixed": 287,
+          "total": 288,
+          "percentage": 99.65277777777779
+        }
+      },
+      "reverse": {
+        "cross_entropy_loss": {
+          "fixed": 128,
+          "total": 268,
+          "percentage": 47.76119402985074
+        }
+      },
+      "most_freq": {
+        "cross_entropy_loss": {
+          "fixed": 0,
+          "total": 284,
+          "percentage": 0.0
+        }
+      },
+      "shuffle_dyck": {
+        "cross_entropy_loss": {
+          "fixed": 26,
+          "total": 331,
+          "percentage": 7.854984894259818
+        }
+      },
+      "hist": {
+        "cross_entropy_loss": {
+          "fixed": 19,
+          "total": 46,
+          "percentage": 41.30434782608695
+        }
+      }
     },
-    "shuffle_dyck": {
-      "fixed": 3,
-      "total": 92,
-      "percentage": 3.260869565217391
-    },
-    "shuffle_dyck2": {
-      "fixed": 121,
-      "total": 121,
-      "percentage": 100.0
-    },
-    "reverse": {
-      "fixed": 20,
-      "total": 35,
-      "percentage": 57.14285714285714
+    "mutation_orders": {
+      "2": {
+        "fixed": 208,
+        "total": 481,
+        "percentage": 43.24324324324324
+      },
+      "5": {
+        "fixed": 47,
+        "total": 134,
+        "percentage": 35.07462686567165
+      },
+      "3": {
+        "fixed": 119,
+        "total": 311,
+        "percentage": 38.263665594855304
+      },
+      "1": {
+        "fixed": 146,
+        "total": 322,
+        "percentage": 45.3416149068323
+      },
+      "4": {
+        "fixed": 102,
+        "total": 218,
+        "percentage": 46.788990825688074
+      }
     }
   }
 }

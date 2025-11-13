@@ -1,0 +1,91 @@
+=== Statistics for Loss Function: cross_entropy_loss ===
+
+--- Aggregate Statistics (All Programs) ---
+Original Buggy Model Accuracy (Before GBPR):
+  Number of models: 1466
+  Median accuracy: 2.00%
+  Average accuracy: 36.69%
+  Stddev: 44.05%
+  Min accuracy: 0.00%
+  Max accuracy: 98.00%
+Test Accuracy (After GBPR):
+  Number of models: 1466
+  Median accuracy: 98.54%
+  Average accuracy: 80.11%
+  Stddev: 31.17%
+  Min accuracy: 0.08%
+  Max accuracy: 100.00%
+
+--- Per-Program Statistics ---
+
+Program: hist
+  Original Buggy Model Accuracy (Before GBPR):
+    Number of models: 46
+    Median accuracy: 0.00%
+    Min accuracy: 0.00%
+    Max accuracy: 0.00%
+  Test Accuracy (After GBPR):
+    Number of models: 46
+    Median accuracy: 53.02%
+    Min accuracy: 0.76%
+    Max accuracy: 100.00%
+
+Program: most_freq
+  Original Buggy Model Accuracy (Before GBPR):
+    Number of models: 284
+    Median accuracy: 0.00%
+    Min accuracy: 0.00%
+    Max accuracy: 74.00%
+  Test Accuracy (After GBPR):
+    Number of models: 284
+    Median accuracy: 35.58%
+    Min accuracy: 1.68%
+    Max accuracy: 96.26%
+
+Program: reverse
+  Original Buggy Model Accuracy (Before GBPR):
+    Number of models: 268
+    Median accuracy: 0.00%
+    Min accuracy: 0.00%
+    Max accuracy: 2.00%
+  Test Accuracy (After GBPR):
+    Number of models: 268
+    Median accuracy: 98.71%
+    Min accuracy: 0.08%
+    Max accuracy: 100.00%
+
+Program: shuffle_dyck
+  Original Buggy Model Accuracy (Before GBPR):
+    Number of models: 331
+    Median accuracy: 94.00%
+    Min accuracy: 0.00%
+    Max accuracy: 98.00%
+  Test Accuracy (After GBPR):
+    Number of models: 331
+    Median accuracy: 98.54%
+    Min accuracy: 90.24%
+    Max accuracy: 100.00%
+
+Program: shuffle_dyck2
+  Original Buggy Model Accuracy (Before GBPR):
+    Number of models: 288
+    Median accuracy: 96.00%
+    Min accuracy: 0.00%
+    Max accuracy: 98.00%
+  Test Accuracy (After GBPR):
+    Number of models: 288
+    Median accuracy: 99.34%
+    Min accuracy: 98.98%
+    Max accuracy: 100.00%
+
+Program: sort
+  Original Buggy Model Accuracy (Before GBPR):
+    Number of models: 249
+    Median accuracy: 0.00%
+    Min accuracy: 0.00%
+    Max accuracy: 18.00%
+  Test Accuracy (After GBPR):
+    Number of models: 249
+    Median accuracy: 99.80%
+    Min accuracy: 9.60%
+    Max accuracy: 100.00%

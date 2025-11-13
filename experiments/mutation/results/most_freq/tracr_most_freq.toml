@@ -1,8 +1,0 @@
-[cosmic-ray]
-module-path = "source/most_freq.py"
-timeout = 60.0
-excluded-modules = []
-test-command = "pytest -s tests/test_most_freq.py"
-
-[cosmic-ray.distributor]
-name = "local"

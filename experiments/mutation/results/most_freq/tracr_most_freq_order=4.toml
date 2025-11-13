@@ -1,0 +1,12 @@
+[cosmic-ray]
+module-path = "source/most_freq.py"
+timeout = 60.0
+excluded-modules = []
+test-command = "pytest -s tests/test_most_freq.py"
+mutation-order = 4
+specific-order = 4
+mutation-limit = 200
+disable-overlapping-mutations = true
+
+[cosmic-ray.distributor]
+name = "local"

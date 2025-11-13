@@ -11,8 +11,19 @@ if module_path not in sys.path:
 
 from src.trainer import Trainer
 from src.functions import load_dataset, encodeAndPadData
-from src.loss import cross_entropy_loss
+from src.loss import (
+    cross_entropy_loss,
+    cross_entropy_loss_smoothed_accuracy,
+    cross_entropy_loss_with_perfect_sequence,
+)
 from experiments.mutation.load_mutations import load_buggy_models
+
+
+LOSS_FUNCTIONS = {
+    "cross_entropy_loss": cross_entropy_loss,
+    "cross_entropy_loss_smoothed_accuracy": cross_entropy_loss_smoothed_accuracy,
+    "cross_entropy_loss_with_perfect_sequence": cross_entropy_loss_with_perfect_sequence,
+}
 
 
 def train_mutated_model(
@@ -25,7 +36,14 @@ def train_mutated_model(
     early_stopping_patience: int = 10,
     early_stopping_min_delta: float = 1e-4,
     output_dir: str = None,
+    loss_fn_name: str = "cross_entropy_loss",
+    store_trajectory: bool = False,
+    trajectory_store_interval: int = 10,
 ):
+    if loss_fn_name not in LOSS_FUNCTIONS:
+        raise ValueError(f"Loss function {loss_fn_name} not found")
+    loss_fn = LOSS_FUNCTIONS[loss_fn_name]
+
     # Load the buggy model
     model = load_buggy_models(
         max_length=max_len, program_name=program_name, job_id=job_id
@@ -54,7 +72,7 @@ def train_mutated_model(
         model=model,
         X_train=X_train,
         Y_train=Y_train,
-        loss_fn=cross_entropy_loss,
+        loss_fn=loss_fn,
         n_epochs=n_epochs,
         batch_size=batch_size,
         lr=learning_rate,
@@ -67,7 +85,9 @@ def train_mutated_model(
         output_dir=output_dir,
         use_wandb=True,
         wandb_project="dpr-mutation-training",
-        wandb_name=f"{program_name}_{job_id}",
+        wandb_name=f"{program_name}_{job_id}_{loss_fn_name}",
+        store_trajectory=store_trajectory,
+        trajectory_store_interval=trajectory_store_interval,
     )
 
     # Trainer will train the model log metrics, and save metrics and results to output_dir
@@ -98,6 +118,23 @@ def train_mutated_model(
     help="Minimum change in monitored value to qualify as an improvement",
 )
 @click.option("--output_dir", type=str, help="Directory to save training outputs")
+@click.option(
+    "--loss_fn_name",
+    type=click.Choice(list(LOSS_FUNCTIONS.keys())),
+    default="cross_entropy_loss",
+    help="Loss function to use for training",
+)
+@click.option(
+    "--store-trajectory/--no-store-trajectory",
+    default=False,
+    help="Store the training trajectory (parameter history)"
+)
+@click.option(
+    "--trajectory-store-interval",
+    type=int,
+    default=10,
+    help="Interval (in steps) for storing trajectory points"
+)
 def run_test(
     program_name,
     job_id,
@@ -108,10 +145,13 @@ def run_test(
     early_stopping_patience,
     early_stopping_min_delta,
     output_dir,
+    loss_fn_name,
+    store_trajectory,
+    trajectory_store_interval,
 ):
-    print(f"Training mutated model {program_name} (job {job_id})...")
+    print(f"Training mutated model {program_name} (job {job_id}) with {loss_fn_name}...")
     if not output_dir:
-        output_dir = f"saved_data/{program_name}/job_{job_id}/"
+        output_dir = f"saved_data/{program_name}/{loss_fn_name}/job_{job_id}/"
     train_mutated_model(
         program_name=program_name,
         job_id=job_id,
@@ -122,6 +162,9 @@ def run_test(
         early_stopping_patience=early_stopping_patience,
         early_stopping_min_delta=early_stopping_min_delta,
         output_dir=output_dir,
+        loss_fn_name=loss_fn_name,
+        store_trajectory=store_trajectory,
+        trajectory_store_interval=trajectory_store_interval,
     )
 
 
