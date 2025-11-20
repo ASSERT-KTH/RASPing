@@ -1,9 +1,10 @@
 import argparse
+import csv
 import logging
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -22,6 +23,22 @@ from src.functions import getAcceptedNamesAndInput, load_dataset
 
 
 logger = logging.getLogger(__name__)
+
+
+CSV_PATH = Path(__file__).parent.parent / "train_mutations" / "analysis_outputs" / "all_test_accuracies.csv"
+
+
+def load_job_ids_from_csv(csv_path: Path) -> Set[str]:
+    """Load job_ids from the CSV file."""
+    job_ids = set()
+    if not csv_path.exists():
+        logging.warning(f"CSV file not found: {csv_path}")
+        return job_ids
+    with open(csv_path, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            job_ids.add(row['job_id'])
+    return job_ids
 
 
 # -----------------------------
@@ -301,12 +318,20 @@ def main():
 
     logging.basicConfig(level=getattr(logging, args.log_level), format='[%(asctime)s] %(levelname)s %(name)s: %(message)s')
 
+    # Load job IDs from CSV
+    csv_job_ids = load_job_ids_from_csv(CSV_PATH)
+    logging.info(f"Loaded {len(csv_job_ids)} job IDs from CSV")
+
     # Load matching mutation entries
     mutations: Dict[str, Dict[str, Any]] = load_mutation(
         mutation_path=args.mutation_path,
         program_name=args.program_name if args.program_name else None,
         job_id=args.job_id if args.job_id else None,
     )
+
+    # Filter mutations to only include those in CSV
+    mutations = {job_id: entry for job_id, entry in mutations.items() if job_id in csv_job_ids}
+    logging.info(f"Filtered to {len(mutations)} mutations that appear in CSV")
 
     if args.job_id:
         to_run: List[Dict[str, Any]] = [mutations[args.job_id]] if args.job_id in mutations else []
