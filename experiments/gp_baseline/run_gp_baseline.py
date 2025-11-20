@@ -2,6 +2,7 @@ import argparse
 import csv
 import logging
 import json
+import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
 
@@ -28,17 +29,26 @@ def load_job_ids_from_csv(csv_path: Path) -> Set[str]:
     return job_ids
 
 
-def _run_single_job(entry: Dict[str, Any], data_dir: Path, accepted_inputs: List[Any], args) -> Tuple[str, Dict[str, Any]]:
+def _run_single_job(
+    entry: Dict[str, Any],
+    data_dir: Path,
+    accepted_inputs: List[Any],
+    budget: int,
+    population_size: int,
+    tournament_k: int,
+    seed: int,
+    log_every: int,
+) -> Tuple[str, Dict[str, Any]]:
     dataset_name = canonicalize_for_dataset(entry["program_name"])
     result = run_gp_for_bug(
         mutation_entry=entry,
         data_dir=data_dir,
         accepted_inputs=accepted_inputs,
-        budget=args.budget,
-        population_size=args.population_size,
-        tournament_k=args.tournament_k,
-        seed=args.seed,
-        log_every=args.log_every,
+        budget=budget,
+        population_size=population_size,
+        tournament_k=tournament_k,
+        seed=seed,
+        log_every=log_every,
     )
     return dataset_name, result
 
@@ -129,13 +139,26 @@ def main():
                 logging.error(f"Unsupported program_name: {program_name_raw}")
                 continue
             accepted_inputs = accepted_inputs_map[dataset_name]
-            futures[ex.submit(_run_single_job, entry, data_dir, accepted_inputs, args)] = entry
+            # Extract args values to avoid pickling issues with argparse.Namespace
+            futures[ex.submit(
+                _run_single_job,
+                entry,
+                data_dir,
+                accepted_inputs,
+                args.budget,
+                args.population_size,
+                args.tournament_k,
+                args.seed,
+                args.log_every,
+            )] = entry
         for fut in as_completed(futures):
             entry = futures[fut]
             try:
                 dataset_name, result = fut.result()
             except Exception as e:
-                logging.error(f"Job {entry.get('job_id')} failed: {e}")
+                job_id = entry.get('job_id', 'unknown')
+                logging.error(f"Job {job_id} failed: {e}")
+                logging.debug(f"Job {job_id} traceback: {traceback.format_exc()}")
                 continue
             job_id = entry.get("job_id", "unknown")
             out_path = output_dir / f"{dataset_name}_{job_id}.json"
