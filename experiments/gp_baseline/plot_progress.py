@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def load_gp_histories(results_dir: Path) -> tuple[Dict[Tuple[str, str], List[Tuple[int, float]]], List[Tuple[str, str]]]:
+def load_gp_histories(
+    results_dir: Path,
+) -> tuple[Dict[Tuple[str, str], List[Tuple[int, float]]], List[Tuple[str, str]]]:
     """
     Load per-job GP histories as a list of (num_programs, best_test_acc) tuples.
     Returns (job_histories, jobs_list)
@@ -41,7 +43,9 @@ def load_gp_histories(results_dir: Path) -> tuple[Dict[Tuple[str, str], List[Tup
     return job_histories, jobs
 
 
-def load_exhaustive_histories(results_dir: Path) -> tuple[Dict[Tuple[str, str], List[Tuple[int, float]]], List[Tuple[str, str]]]:
+def load_exhaustive_histories(
+    results_dir: Path,
+) -> tuple[Dict[Tuple[str, str], List[Tuple[int, float]]], List[Tuple[str, str]]]:
     """
     Load per-job exhaustive search histories as a list of (num_programs, best_test_acc) tuples.
     Returns (job_histories, jobs_list)
@@ -82,7 +86,9 @@ def _map_program_for_saved(prog: str) -> str:
     return prog
 
 
-def load_gradient_job_series(saved_data_dir: Path, loss_fn: str, jobs: List[Tuple[str, str]]) -> Dict[Tuple[str, str], List[float]]:
+def load_gradient_job_series(
+    saved_data_dir: Path, loss_fn: str, jobs: List[Tuple[str, str]]
+) -> Dict[Tuple[str, str], List[float]]:
     """
     Load gradient-based repair progress as a single flattened series across jobs.
     Uses per-epoch validation accuracy when available; applies cumulative best per job.
@@ -111,7 +117,9 @@ def load_gradient_job_series(saved_data_dir: Path, loss_fn: str, jobs: List[Tupl
     return job_to_series
 
 
-def aggregate_job_series(job_to_series: Dict[Tuple[str, str], List[float]], threshold: float) -> tuple[List[int], List[float], List[float], List[float]]:
+def aggregate_job_series(
+    job_to_series: Dict[Tuple[str, str], List[float]], threshold: float
+) -> tuple[List[int], List[float], List[float], List[float]]:
     """
     Given per-job best-so-far accuracy series (per step), compute aggregated
     median accuracy (%), mean accuracy (%), and % fixed across jobs at each global step.
@@ -188,27 +196,79 @@ def create_plot(
     Create a plot from the given job series data.
     """
     n_gp = len(gp_job_series)
-    x_gp, gp_fixed_pct, gp_median_pct, gp_mean_pct = aggregate_job_series(gp_job_series, threshold)
-    
+    x_gp, gp_fixed_pct, gp_median_pct, gp_mean_pct = aggregate_job_series(
+        gp_job_series, threshold
+    )
+
     plt.figure(figsize=(8, 5))
     # GP baseline lines
     plt.plot(x_gp, gp_fixed_pct, label=f"GP % fixed ({n_gp} programs)", color="#1f77b4")
-    plt.plot(x_gp, gp_median_pct, label=f"GP median accuracy (%) ({n_gp} programs)", color="#1f77b4", linestyle="--")
-    plt.plot(x_gp, gp_mean_pct, label=f"GP avg accuracy (%) ({n_gp} programs)", color="#1f77b4", linestyle=":")
+    plt.plot(
+        x_gp,
+        gp_median_pct,
+        label=f"GP median accuracy (%) ({n_gp} programs)",
+        color="#1f77b4",
+        linestyle="--",
+    )
+    plt.plot(
+        x_gp,
+        gp_mean_pct,
+        label=f"GP avg accuracy (%) ({n_gp} programs)",
+        color="#1f77b4",
+        linestyle=":",
+    )
     # Gradient-based lines (if available)
     if grad_job_series:
         n_grad = len(grad_job_series)
-        x_grad, grad_fixed_pct, grad_median_pct, grad_mean_pct = aggregate_job_series(grad_job_series, threshold)
-        plt.plot(x_grad, grad_fixed_pct, label=f"Grad % fixed ({n_grad} programs)", color="#2ca02c")
-        plt.plot(x_grad, grad_median_pct, label=f"Grad median accuracy (%) ({n_grad} programs)", color="#2ca02c", linestyle="--")
-        plt.plot(x_grad, grad_mean_pct, label=f"Grad avg accuracy (%) ({n_grad} programs)", color="#2ca02c", linestyle=":")
+        x_grad, grad_fixed_pct, grad_median_pct, grad_mean_pct = aggregate_job_series(
+            grad_job_series, threshold
+        )
+        plt.plot(
+            x_grad,
+            grad_fixed_pct,
+            label=f"Grad % fixed ({n_grad} programs)",
+            color="#2ca02c",
+        )
+        plt.plot(
+            x_grad,
+            grad_median_pct,
+            label=f"Grad median accuracy (%) ({n_grad} programs)",
+            color="#2ca02c",
+            linestyle="--",
+        )
+        plt.plot(
+            x_grad,
+            grad_mean_pct,
+            label=f"Grad avg accuracy (%) ({n_grad} programs)",
+            color="#2ca02c",
+            linestyle=":",
+        )
     # Exhaustive search lines (if available)
     if exhaustive_job_series:
         n_exh = len(exhaustive_job_series)
-        x_exh, exh_fixed_pct, exh_median_pct, exh_mean_pct = aggregate_job_series(exhaustive_job_series, threshold)
-        plt.plot(x_exh, exh_fixed_pct, label=f"Exhaustive % fixed ({n_exh} programs)", color="#ff7f0e")
-        plt.plot(x_exh, exh_median_pct, label=f"Exhaustive median accuracy (%) ({n_exh} programs)", color="#ff7f0e", linestyle="--")
-        plt.plot(x_exh, exh_mean_pct, label=f"Exhaustive avg accuracy (%) ({n_exh} programs)", color="#ff7f0e", linestyle=":")
+        x_exh, exh_fixed_pct, exh_median_pct, exh_mean_pct = aggregate_job_series(
+            exhaustive_job_series, threshold
+        )
+        plt.plot(
+            x_exh,
+            exh_fixed_pct,
+            label=f"Exhaustive % fixed ({n_exh} programs)",
+            color="#ff7f0e",
+        )
+        plt.plot(
+            x_exh,
+            exh_median_pct,
+            label=f"Exhaustive median accuracy (%) ({n_exh} programs)",
+            color="#ff7f0e",
+            linestyle="--",
+        )
+        plt.plot(
+            x_exh,
+            exh_mean_pct,
+            label=f"Exhaustive avg accuracy (%) ({n_exh} programs)",
+            color="#ff7f0e",
+            linestyle=":",
+        )
     plt.xlabel("Programs generated")
     plt.ylabel("Percentage")
     plt.ylim(0, 100)
@@ -219,13 +279,45 @@ def create_plot(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Plot GP baseline progress: % fixed and median accuracy vs generation evaluations")
-    parser.add_argument("--results-dir", type=str, required=True, help="Directory with per-program JSON results (from GP baseline)")
-    parser.add_argument("--exhaustive-results-dir", type=str, default=None, help="Directory with per-program JSON results (from exhaustive search)")
-    parser.add_argument("--threshold", type=float, default=1.0, help="Accuracy threshold to count as fixed")
-    parser.add_argument("--output-dir", type=str, default="plots", help="Directory to save plots (PDF format)")
-    parser.add_argument("--saved-data-dir", type=str, default=None, help="Path to train_mutations saved_data directory to overlay gradient-based progress")
-    parser.add_argument("--loss-function", type=str, default="cross_entropy_loss", help="Loss function subdirectory name under saved_data (e.g., cross_entropy_loss)")
+    parser = argparse.ArgumentParser(
+        description="Plot GP baseline progress: % fixed and median accuracy vs generation evaluations"
+    )
+    parser.add_argument(
+        "--results-dir",
+        type=str,
+        required=True,
+        help="Directory with per-program JSON results (from GP baseline)",
+    )
+    parser.add_argument(
+        "--exhaustive-results-dir",
+        type=str,
+        default=None,
+        help="Directory with per-program JSON results (from exhaustive search)",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=1.0,
+        help="Accuracy threshold to count as fixed",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="plots",
+        help="Directory to save plots (PDF format)",
+    )
+    parser.add_argument(
+        "--saved-data-dir",
+        type=str,
+        default=None,
+        help="Path to train_mutations saved_data directory to overlay gradient-based progress",
+    )
+    parser.add_argument(
+        "--loss-function",
+        type=str,
+        default="cross_entropy_loss",
+        help="Loss function subdirectory name under saved_data (e.g., cross_entropy_loss)",
+    )
 
     args = parser.parse_args()
 
@@ -244,13 +336,17 @@ def main():
     grad_job_series: Dict[Tuple[str, str], List[float]] = {}
     if args.saved_data_dir:
         saved_data_dir = Path(args.saved_data_dir).resolve()
-        grad_job_series = load_gradient_job_series(saved_data_dir, args.loss_function, jobs)
+        grad_job_series = load_gradient_job_series(
+            saved_data_dir, args.loss_function, jobs
+        )
 
     # Optionally load exhaustive search series
     exhaustive_job_series: Dict[Tuple[str, str], List[float]] = {}
     if args.exhaustive_results_dir:
         exhaustive_results_dir = Path(args.exhaustive_results_dir).resolve()
-        exhaustive_histories, exhaustive_jobs = load_exhaustive_histories(exhaustive_results_dir)
+        exhaustive_histories, exhaustive_jobs = load_exhaustive_histories(
+            exhaustive_results_dir
+        )
         for job_key, hist in exhaustive_histories.items():
             if job_key in gp_job_series:
                 exhaustive_job_series[job_key] = expand_gp_history_to_series(hist)
@@ -261,20 +357,20 @@ def main():
         all_job_sets.append(set(grad_job_series.keys()))
     if exhaustive_job_series:
         all_job_sets.append(set(exhaustive_job_series.keys()))
-    
+
     # Only compute intersection if we have at least GP jobs
     if all_job_sets:
         common_jobs = set.intersection(*all_job_sets)
     else:
         common_jobs = set()
-    
+
     # Filter all series to only include common jobs
     gp_job_series = {job: gp_job_series[job] for job in common_jobs}
     if grad_job_series:
         grad_job_series = {job: grad_job_series[job] for job in common_jobs}
     if exhaustive_job_series:
         exhaustive_job_series = {job: exhaustive_job_series[job] for job in common_jobs}
-    
+
     # Update jobs list to only include common jobs
     jobs = list(common_jobs)
 
@@ -291,7 +387,7 @@ def main():
         grad_job_series if grad_job_series else None,
         exhaustive_job_series if exhaustive_job_series else None,
         args.threshold,
-        title="All Programs Combined"
+        title="All Programs Combined",
     )
     plt.savefig(output_dir / "all_programs.pdf", bbox_inches="tight", format="pdf")
     plt.close()
@@ -303,6 +399,64 @@ def main():
         if prog not in jobs_by_program:
             jobs_by_program[prog] = []
         jobs_by_program[prog].append((prog, job_id))
+
+    # Find the "most_freq" program (by name, not by frequency)
+    most_freq_program = None
+    for prog in jobs_by_program.keys():
+        if prog == "most_freq" or prog == "most-freq":
+            most_freq_program = prog
+            break
+
+    if most_freq_program:
+        print(
+            f"Excluding program: {most_freq_program} ({len(jobs_by_program[most_freq_program])} jobs)"
+        )
+    else:
+        print("Warning: 'most_freq' or 'most-freq' program not found in data")
+
+    # Create filtered job series excluding the "most_freq" program
+    filtered_jobs = (
+        [job for job in jobs if job[0] != most_freq_program]
+        if most_freq_program
+        else jobs
+    )
+    filtered_gp_job_series = {
+        job: gp_job_series[job] for job in filtered_jobs if job in gp_job_series
+    }
+    filtered_grad_job_series = (
+        {job: grad_job_series[job] for job in filtered_jobs if job in grad_job_series}
+        if grad_job_series
+        else None
+    )
+    filtered_exh_job_series = (
+        {
+            job: exhaustive_job_series[job]
+            for job in filtered_jobs
+            if job in exhaustive_job_series
+        }
+        if exhaustive_job_series
+        else None
+    )
+
+    # 1b. Plot aggregate excluding "most_freq" program
+    if most_freq_program and filtered_gp_job_series:
+        create_plot(
+            filtered_gp_job_series,
+            filtered_grad_job_series if filtered_grad_job_series else None,
+            filtered_exh_job_series if filtered_exh_job_series else None,
+            args.threshold,
+            title=f"All Programs Combined (excluding {most_freq_program})",
+        )
+        safe_prog_name = most_freq_program.replace("/", "_")
+        plt.savefig(
+            output_dir / f"all_programs_excluding_{safe_prog_name}.pdf",
+            bbox_inches="tight",
+            format="pdf",
+        )
+        plt.close()
+        print(
+            f"Saved figure to {output_dir / f'all_programs_excluding_{safe_prog_name}.pdf'}"
+        )
 
     # Group jobs by mutation order
     jobs_by_mutation_order: Dict[int, List[Tuple[str, str]]] = {}
@@ -325,44 +479,278 @@ def main():
 
     # 2. Plots per program
     for prog, prog_jobs in jobs_by_program.items():
-        prog_gp_series = {job: gp_job_series[job] for job in prog_jobs if job in gp_job_series}
-        prog_grad_series = {job: grad_job_series[job] for job in prog_jobs if job in grad_job_series} if grad_job_series else None
-        prog_exh_series = {job: exhaustive_job_series[job] for job in prog_jobs if job in exhaustive_job_series} if exhaustive_job_series else None
+        prog_gp_series = {
+            job: gp_job_series[job] for job in prog_jobs if job in gp_job_series
+        }
+        prog_grad_series = (
+            {job: grad_job_series[job] for job in prog_jobs if job in grad_job_series}
+            if grad_job_series
+            else None
+        )
+        prog_exh_series = (
+            {
+                job: exhaustive_job_series[job]
+                for job in prog_jobs
+                if job in exhaustive_job_series
+            }
+            if exhaustive_job_series
+            else None
+        )
         if prog_gp_series:
-            create_plot(prog_gp_series, prog_grad_series, prog_exh_series, args.threshold, title=f"Program: {prog}")
+            create_plot(
+                prog_gp_series,
+                prog_grad_series,
+                prog_exh_series,
+                args.threshold,
+                title=f"Program: {prog}",
+            )
             safe_prog_name = prog.replace("/", "_")
-            plt.savefig(output_dir / f"program_{safe_prog_name}.pdf", bbox_inches="tight", format="pdf")
+            plt.savefig(
+                output_dir / f"program_{safe_prog_name}.pdf",
+                bbox_inches="tight",
+                format="pdf",
+            )
             plt.close()
             print(f"Saved figure to {output_dir / f'program_{safe_prog_name}.pdf'}")
 
     # 3. Plots per mutation order (all programs combined)
     for order in sorted(jobs_by_mutation_order.keys()):
         order_jobs = jobs_by_mutation_order[order]
-        order_gp_series = {job: gp_job_series[job] for job in order_jobs if job in gp_job_series}
-        order_grad_series = {job: grad_job_series[job] for job in order_jobs if job in grad_job_series} if grad_job_series else None
-        order_exh_series = {job: exhaustive_job_series[job] for job in order_jobs if job in exhaustive_job_series} if exhaustive_job_series else None
+        order_gp_series = {
+            job: gp_job_series[job] for job in order_jobs if job in gp_job_series
+        }
+        order_grad_series = (
+            {job: grad_job_series[job] for job in order_jobs if job in grad_job_series}
+            if grad_job_series
+            else None
+        )
+        order_exh_series = (
+            {
+                job: exhaustive_job_series[job]
+                for job in order_jobs
+                if job in exhaustive_job_series
+            }
+            if exhaustive_job_series
+            else None
+        )
         if order_gp_series:
-            create_plot(order_gp_series, order_grad_series, order_exh_series, args.threshold, title=f"Mutation Order: {order} (All Programs)")
-            plt.savefig(output_dir / f"mutation_order_{order}.pdf", bbox_inches="tight", format="pdf")
+            create_plot(
+                order_gp_series,
+                order_grad_series,
+                order_exh_series,
+                args.threshold,
+                title=f"Mutation Order: {order} (All Programs)",
+            )
+            plt.savefig(
+                output_dir / f"mutation_order_{order}.pdf",
+                bbox_inches="tight",
+                format="pdf",
+            )
             plt.close()
             print(f"Saved figure to {output_dir / f'mutation_order_{order}.pdf'}")
 
+    # 3b. Plots per mutation order excluding "most_freq" program
+    if most_freq_program:
+        jobs_by_mutation_order_filtered: Dict[int, List[Tuple[str, str]]] = {}
+        for prog, job_id in filtered_jobs:
+            order = mutation_orders.get(job_id)
+            if order is not None:
+                if order not in jobs_by_mutation_order_filtered:
+                    jobs_by_mutation_order_filtered[order] = []
+                jobs_by_mutation_order_filtered[order].append((prog, job_id))
+
+        for order in sorted(jobs_by_mutation_order_filtered.keys()):
+            order_jobs = jobs_by_mutation_order_filtered[order]
+            order_gp_series = {
+                job: filtered_gp_job_series[job]
+                for job in order_jobs
+                if job in filtered_gp_job_series
+            }
+            order_grad_series = (
+                {
+                    job: filtered_grad_job_series[job]
+                    for job in order_jobs
+                    if job in filtered_grad_job_series
+                }
+                if filtered_grad_job_series
+                else None
+            )
+            order_exh_series = (
+                {
+                    job: filtered_exh_job_series[job]
+                    for job in order_jobs
+                    if job in filtered_exh_job_series
+                }
+                if filtered_exh_job_series
+                else None
+            )
+            if order_gp_series:
+                safe_prog_name = most_freq_program.replace("/", "_")
+                create_plot(
+                    order_gp_series,
+                    order_grad_series,
+                    order_exh_series,
+                    args.threshold,
+                    title=f"Mutation Order: {order} (All Programs, excluding {most_freq_program})",
+                )
+                plt.savefig(
+                    output_dir
+                    / f"mutation_order_{order}_excluding_{safe_prog_name}.pdf",
+                    bbox_inches="tight",
+                    format="pdf",
+                )
+                plt.close()
+                print(
+                    f"Saved figure to {output_dir / f'mutation_order_{order}_excluding_{safe_prog_name}.pdf'}"
+                )
+
+    # 3c. Plots for mutation order >= N (where N in [2, 3, 4])
+    for min_order in [2, 3, 4]:
+        # Collect all jobs with mutation_order >= min_order
+        order_ge_jobs = []
+        for prog, job_id in jobs:
+            order = mutation_orders.get(job_id)
+            if order is not None and order >= min_order:
+                order_ge_jobs.append((prog, job_id))
+
+        if order_ge_jobs:
+            order_ge_gp_series = {
+                job: gp_job_series[job] for job in order_ge_jobs if job in gp_job_series
+            }
+            order_ge_grad_series = (
+                {
+                    job: grad_job_series[job]
+                    for job in order_ge_jobs
+                    if job in grad_job_series
+                }
+                if grad_job_series
+                else None
+            )
+            order_ge_exh_series = (
+                {
+                    job: exhaustive_job_series[job]
+                    for job in order_ge_jobs
+                    if job in exhaustive_job_series
+                }
+                if exhaustive_job_series
+                else None
+            )
+            if order_ge_gp_series:
+                create_plot(
+                    order_ge_gp_series,
+                    order_ge_grad_series,
+                    order_ge_exh_series,
+                    args.threshold,
+                    title=f"Mutation Order >= {min_order} (All Programs)",
+                )
+                plt.savefig(
+                    output_dir / f"mutation_order_ge_{min_order}.pdf",
+                    bbox_inches="tight",
+                    format="pdf",
+                )
+                plt.close()
+                print(
+                    f"Saved figure to {output_dir / f'mutation_order_ge_{min_order}.pdf'}"
+                )
+
+    # 3d. Plots for mutation order >= N excluding "most_freq" program
+    if most_freq_program:
+        for min_order in [2, 3, 4]:
+            # Collect all filtered jobs with mutation_order >= min_order
+            order_ge_filtered_jobs = []
+            for prog, job_id in filtered_jobs:
+                order = mutation_orders.get(job_id)
+                if order is not None and order >= min_order:
+                    order_ge_filtered_jobs.append((prog, job_id))
+
+            if order_ge_filtered_jobs:
+                order_ge_gp_series = {
+                    job: filtered_gp_job_series[job]
+                    for job in order_ge_filtered_jobs
+                    if job in filtered_gp_job_series
+                }
+                order_ge_grad_series = (
+                    {
+                        job: filtered_grad_job_series[job]
+                        for job in order_ge_filtered_jobs
+                        if job in filtered_grad_job_series
+                    }
+                    if filtered_grad_job_series
+                    else None
+                )
+                order_ge_exh_series = (
+                    {
+                        job: filtered_exh_job_series[job]
+                        for job in order_ge_filtered_jobs
+                        if job in filtered_exh_job_series
+                    }
+                    if filtered_exh_job_series
+                    else None
+                )
+                if order_ge_gp_series:
+                    safe_prog_name = most_freq_program.replace("/", "_")
+                    create_plot(
+                        order_ge_gp_series,
+                        order_ge_grad_series,
+                        order_ge_exh_series,
+                        args.threshold,
+                        title=f"Mutation Order >= {min_order} (All Programs, excluding {most_freq_program})",
+                    )
+                    plt.savefig(
+                        output_dir
+                        / f"mutation_order_ge_{min_order}_excluding_{safe_prog_name}.pdf",
+                        bbox_inches="tight",
+                        format="pdf",
+                    )
+                    plt.close()
+                    print(
+                        f"Saved figure to {output_dir / f'mutation_order_ge_{min_order}_excluding_{safe_prog_name}.pdf'}"
+                    )
+
     # 4. Plots per program and mutation order
     for (prog, order), prog_order_jobs in sorted(jobs_by_program_and_order.items()):
-        prog_order_gp_series = {job: gp_job_series[job] for job in prog_order_jobs if job in gp_job_series}
-        prog_order_grad_series = {job: grad_job_series[job] for job in prog_order_jobs if job in grad_job_series} if grad_job_series else None
-        prog_order_exh_series = {job: exhaustive_job_series[job] for job in prog_order_jobs if job in exhaustive_job_series} if exhaustive_job_series else None
+        prog_order_gp_series = {
+            job: gp_job_series[job] for job in prog_order_jobs if job in gp_job_series
+        }
+        prog_order_grad_series = (
+            {
+                job: grad_job_series[job]
+                for job in prog_order_jobs
+                if job in grad_job_series
+            }
+            if grad_job_series
+            else None
+        )
+        prog_order_exh_series = (
+            {
+                job: exhaustive_job_series[job]
+                for job in prog_order_jobs
+                if job in exhaustive_job_series
+            }
+            if exhaustive_job_series
+            else None
+        )
         if prog_order_gp_series:
-            create_plot(prog_order_gp_series, prog_order_grad_series, prog_order_exh_series, args.threshold, title=f"Program: {prog}, Mutation Order: {order}")
+            create_plot(
+                prog_order_gp_series,
+                prog_order_grad_series,
+                prog_order_exh_series,
+                args.threshold,
+                title=f"Program: {prog}, Mutation Order: {order}",
+            )
             safe_prog_name = prog.replace("/", "_")
-            plt.savefig(output_dir / f"program_{safe_prog_name}_order_{order}.pdf", bbox_inches="tight", format="pdf")
+            plt.savefig(
+                output_dir / f"program_{safe_prog_name}_order_{order}.pdf",
+                bbox_inches="tight",
+                format="pdf",
+            )
             plt.close()
-            print(f"Saved figure to {output_dir / f'program_{safe_prog_name}_order_{order}.pdf'}")
+            print(
+                f"Saved figure to {output_dir / f'program_{safe_prog_name}_order_{order}.pdf'}"
+            )
 
     print(f"\nAll plots saved to {output_dir}")
 
 
 if __name__ == "__main__":
     main()
-
-
