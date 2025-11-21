@@ -63,41 +63,58 @@ def build_program_from_source(
     program_name: str,
     max_length: int,
     accepted_inputs: Sequence[Any],
+    timeout: float = 30.0,
 ) -> Any:
     """
     Build a RASP SOp from mutated program source, following the same conventions
     used in experiments/mutation/load_mutations.py, but without compiling to a model.
+    
+    Args:
+        timeout: Maximum time (in seconds) allowed for building the program
     """
-    module_name = (
-        f"gp_candidate_{hashlib.sha1(source_code.encode('utf-8')).hexdigest()[:10]}"
-    )
-    module = create_module_from_source(source_code, module_name)
-
-    factory_name = canonicalize_for_factory(program_name)
-
-    # Build the RASP program using the expected factory function in the module
-    if factory_name == "hist":
-        program = module.make_hist()
-    elif factory_name == "sort":
-        # min_key required by make_sort
-        program = module.make_sort(
-            rasp.tokens,
-            rasp.tokens,
-            max_seq_len=max_length,
-            min_key=min(accepted_inputs),
+    def _build():
+        module_name = (
+            f"gp_candidate_{hashlib.sha1(source_code.encode('utf-8')).hexdigest()[:10]}"
         )
-    elif factory_name == "reverse":
-        program = module.make_reverse(rasp.tokens)
-    elif factory_name == "most_freq":
-        program = module.make_sort_freq(max_length)
-    elif factory_name == "shuffle_dyck":
-        program = module.make_shuffle_dyck(["()"])
-    elif factory_name == "shuffle_dyck2":
-        program = module.make_shuffle_dyck2()
-    else:
-        raise NotImplementedError(f"Program factory not implemented for {program_name}")
+        module = create_module_from_source(source_code, module_name)
 
-    return program
+        factory_name = canonicalize_for_factory(program_name)
+
+        # Build the RASP program using the expected factory function in the module
+        if factory_name == "hist":
+            program = module.make_hist()
+        elif factory_name == "sort":
+            # min_key required by make_sort
+            program = module.make_sort(
+                rasp.tokens,
+                rasp.tokens,
+                max_seq_len=max_length,
+                min_key=min(accepted_inputs),
+            )
+        elif factory_name == "reverse":
+            program = module.make_reverse(rasp.tokens)
+        elif factory_name == "most_freq":
+            program = module.make_sort_freq(max_length)
+        elif factory_name == "shuffle_dyck":
+            program = module.make_shuffle_dyck(["()"])
+        elif factory_name == "shuffle_dyck2":
+            program = module.make_shuffle_dyck2()
+        else:
+            raise NotImplementedError(f"Program factory not implemented for {program_name}")
+
+        return program
+    
+    # Use ThreadPoolExecutor with timeout to prevent hangs during program building
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_build)
+            return future.result(timeout=timeout)
+    except FutureTimeoutError:
+        logger.warning(f"Program building timeout after {timeout}s")
+        raise TimeoutError(f"Program building exceeded {timeout}s timeout")
+    except Exception as e:
+        logger.debug(f"Program building failed: {e}")
+        raise
 
 
 def evaluate_program_on_split(
@@ -121,7 +138,13 @@ def evaluate_program_on_split(
         """Evaluate the program on all samples."""
         correct = 0
         total = 0
-        for input_seq, target_seq in data:
+        start_time = time.time()
+        for idx, (input_seq, target_seq) in enumerate(data):
+            # Log progress every 10% of samples
+            if len(data) > 10 and idx % max(1, len(data) // 10) == 0:
+                elapsed = time.time() - start_time
+                logger.debug(f"Evaluating sample {idx}/{len(data)} (elapsed: {elapsed:.2f}s)")
+            
             # Remove BOS-like token at position 0
             x = input_seq[1:]
             y = target_seq[1:]
@@ -133,23 +156,32 @@ def evaluate_program_on_split(
             total += 1
             if pred is not None and list(pred) == list(y):
                 correct += 1
+        elapsed = time.time() - start_time
+        logger.debug(f"Completed evaluation of {total} samples in {elapsed:.2f}s")
         return correct / total if total > 0 else 0.0
 
     # Use ThreadPoolExecutor with timeout to prevent infinite loops
     # The timeout applies to the entire evaluation of all samples
+    logger.debug(f"Starting evaluation of {len(data)} samples with {timeout}s timeout")
+    start_time = time.time()
     try:
         with ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(evaluate_all_samples)
-            return future.result(timeout=timeout)
+            result = future.result(timeout=timeout)
+            elapsed = time.time() - start_time
+            logger.debug(f"Evaluation completed in {elapsed:.2f}s, accuracy: {result:.4f}")
+            return result
     except FutureTimeoutError:
         # Timeout occurred - treat entire evaluation as failed (return 0.0)
-        logger.debug(
-            f"Evaluation timeout after {timeout}s for dataset with {len(data)} samples"
+        elapsed = time.time() - start_time
+        logger.warning(
+            f"Evaluation timeout after {elapsed:.2f}s (limit: {timeout}s) for dataset with {len(data)} samples"
         )
         return 0.0
     except Exception as e:
         # Other exceptions - treat as failed
-        logger.debug(f"Evaluation error: {e}")
+        elapsed = time.time() - start_time
+        logger.debug(f"Evaluation error after {elapsed:.2f}s: {e}")
         return 0.0
 
 
@@ -289,9 +321,20 @@ def evaluate_source(
     train_data: List[Tuple[List[Any], List[Any]]],
     timeout: float = 30.0,
 ) -> Tuple[float, float]:
-    program = build_program_from_source(
-        source_code, program_name, max_length, accepted_inputs
-    )
+    logger.debug(f"Building program from source (timeout: {timeout}s)")
+    build_start = time.time()
+    try:
+        program = build_program_from_source(
+            source_code, program_name, max_length, accepted_inputs, timeout=timeout
+        )
+        build_elapsed = time.time() - build_start
+        logger.debug(f"Program built successfully in {build_elapsed:.2f}s")
+    except Exception as e:
+        build_elapsed = time.time() - build_start
+        logger.debug(f"Program building failed after {build_elapsed:.2f}s: {e}")
+        raise
+    
+    logger.debug(f"Evaluating on train data ({len(train_data)} samples)")
     train_acc = evaluate_program_on_split(program, train_data, timeout=timeout)
     return train_acc
 
@@ -304,9 +347,20 @@ def evaluate_source_test(
     test_data: List[Tuple[List[Any], List[Any]]],
     timeout: float = 30.0,
 ) -> float:
-    program = build_program_from_source(
-        source_code, program_name, max_length, accepted_inputs
-    )
+    logger.debug(f"Building program from source for test (timeout: {timeout}s)")
+    build_start = time.time()
+    try:
+        program = build_program_from_source(
+            source_code, program_name, max_length, accepted_inputs, timeout=timeout
+        )
+        build_elapsed = time.time() - build_start
+        logger.debug(f"Program built successfully in {build_elapsed:.2f}s")
+    except Exception as e:
+        build_elapsed = time.time() - build_start
+        logger.debug(f"Program building failed after {build_elapsed:.2f}s: {e}")
+        raise
+    
+    logger.debug(f"Evaluating on test data ({len(test_data)} samples)")
     return evaluate_program_on_split(program, test_data, timeout=timeout)
 
 
@@ -347,6 +401,8 @@ def run_gp(
             num_duplicates += 1
             return cache[h]
         # Try to compile and evaluate; treat compile failures as invalid (not counted)
+        eval_start = time.time()
+        logger.debug(f"Evaluating candidate {h[:8]}... (program #{num_programs})")
         try:
             train_acc = evaluate_source(
                 src,
@@ -364,9 +420,12 @@ def run_gp(
                 test_data,
                 timeout=eval_timeout,
             )
+            eval_elapsed = time.time() - eval_start
+            logger.debug(f"Candidate {h[:8]}... evaluated in {eval_elapsed:.2f}s: train={train_acc:.4f}, test={test_acc:.4f}")
         except Exception as e:
             num_compile_failures += 1
-            logger.debug(f"Compile/eval failed for candidate {h}: {e}")
+            eval_elapsed = time.time() - eval_start
+            logger.debug(f"Compile/eval failed for candidate {h[:8]}... after {eval_elapsed:.2f}s: {e}")
             return None
         cache[h] = (train_acc, test_acc)
         if log_every and num_programs % max(1, log_every) == 0:
