@@ -56,7 +56,9 @@ def test_run_gp_respects_attempt_budget(tmp_path: Path):
         {"input": ["BOS", 2, 1], "output": ["BOS", 1, 2]},
         {"input": ["BOS", 3, 2], "output": ["BOS", 2, 3]},
     ]
-    (data_dir / "sort_train.jsonl").write_text("\n".join(json.dumps(x) for x in samples))
+    (data_dir / "sort_train.jsonl").write_text(
+        "\n".join(json.dumps(x) for x in samples)
+    )
     (data_dir / "sort_val.jsonl").write_text("\n".join(json.dumps(x) for x in samples))
     (data_dir / "sort_test.jsonl").write_text("\n".join(json.dumps(x) for x in samples))
 
