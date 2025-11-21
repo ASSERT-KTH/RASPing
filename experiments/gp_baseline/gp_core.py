@@ -1,6 +1,7 @@
 import hashlib
 import random
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -91,30 +92,53 @@ def build_program_from_source(
     return program
 
 
-def evaluate_program_on_split(program: Any, data: List[Tuple[List[Any], List[Any]]]) -> float:
+def evaluate_program_on_split(program: Any, data: List[Tuple[List[Any], List[Any]]], timeout: float = 30.0) -> float:
     """
     Evaluate a RASP SOp directly on input sequences.
 
     We ignore the first position (BOS-like) when computing sequence-level exact
     match, comparing positions 1..N of the output to the targets.
+    
+    Args:
+        program: The RASP program to evaluate
+        data: List of (input_seq, target_seq) tuples
+        timeout: Maximum time (in seconds) allowed for evaluating all input sequences
     """
     if not data:
         return 0.0
-    correct = 0
-    total = 0
-    for input_seq, target_seq in data:
-        # Remove BOS-like token at position 0
-        x = input_seq[1:]
-        y = target_seq[1:]
-        try:
-            pred = program(x)
-        except Exception:
-            # Treat runtime errors as incorrect
-            pred = None
-        total += 1
-        if pred is not None and list(pred) == list(y):
-            correct += 1
-    return correct / total if total > 0 else 0.0
+    
+    def evaluate_all_samples():
+        """Evaluate the program on all samples."""
+        correct = 0
+        total = 0
+        for input_seq, target_seq in data:
+            # Remove BOS-like token at position 0
+            x = input_seq[1:]
+            y = target_seq[1:]
+            try:
+                pred = program(x)
+            except Exception:
+                # Treat runtime errors as incorrect
+                pred = None
+            total += 1
+            if pred is not None and list(pred) == list(y):
+                correct += 1
+        return correct / total if total > 0 else 0.0
+    
+    # Use ThreadPoolExecutor with timeout to prevent infinite loops
+    # The timeout applies to the entire evaluation of all samples
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(evaluate_all_samples)
+            return future.result(timeout=timeout)
+    except FutureTimeoutError:
+        # Timeout occurred - treat entire evaluation as failed (return 0.0)
+        logger.debug(f"Evaluation timeout after {timeout}s for dataset with {len(data)} samples")
+        return 0.0
+    except Exception as e:
+        # Other exceptions - treat as failed
+        logger.debug(f"Evaluation error: {e}")
+        return 0.0
 
 
 # -----------------------------
@@ -241,9 +265,10 @@ def evaluate_source(
     max_length: int,
     accepted_inputs: Sequence[Any],
     train_data: List[Tuple[List[Any], List[Any]]],
+    timeout: float = 30.0,
 ) -> Tuple[float, float]:
     program = build_program_from_source(source_code, program_name, max_length, accepted_inputs)
-    train_acc = evaluate_program_on_split(program, train_data)
+    train_acc = evaluate_program_on_split(program, train_data, timeout=timeout)
     return train_acc
 
 
@@ -253,9 +278,10 @@ def evaluate_source_test(
     max_length: int,
     accepted_inputs: Sequence[Any],
     test_data: List[Tuple[List[Any], List[Any]]],
+    timeout: float = 30.0,
 ) -> float:
     program = build_program_from_source(source_code, program_name, max_length, accepted_inputs)
-    return evaluate_program_on_split(program, test_data)
+    return evaluate_program_on_split(program, test_data, timeout=timeout)
 
 
 def run_gp(
@@ -268,6 +294,7 @@ def run_gp(
     tournament_k: int = 3,
     seed: int = 42,
     log_every: int = 25,
+    eval_timeout: float = 30.0,
 ) -> Dict[str, Any]:
     rng = random.Random(seed)
     program_name = canonicalize_for_dataset(program_name_raw)
@@ -296,9 +323,9 @@ def run_gp(
         # Try to compile and evaluate; treat compile failures as invalid (not counted)
         try:
             train_acc = evaluate_source(
-                src, program_name, max_length, accepted_inputs, fitness_data
+                src, program_name, max_length, accepted_inputs, fitness_data, timeout=eval_timeout
             )
-            test_acc = evaluate_source_test(src, program_name, max_length, accepted_inputs, test_data)
+            test_acc = evaluate_source_test(src, program_name, max_length, accepted_inputs, test_data, timeout=eval_timeout)
         except Exception as e:
             num_compile_failures += 1
             logger.debug(f"Compile/eval failed for candidate {h}: {e}")
@@ -427,6 +454,7 @@ def run_gp(
             max_length,
             accepted_inputs,
             test_data,
+            timeout=eval_timeout,
         )
         logger.info(
             f"Early stop: perfect train achieved after {num_programs} programs (dup={num_duplicates}, fails={num_compile_failures}). Test={test_acc:.4f}"
@@ -544,6 +572,7 @@ def run_gp_for_bug(
     tournament_k: int = 4,
     seed: int = 42,
     log_every: int = 25,
+    eval_timeout: float = 30.0,
 ) -> Dict[str, Any]:
     program_name_raw = mutation_entry["program_name"]
     base_source = mutation_entry["program_source_after"]
@@ -559,6 +588,7 @@ def run_gp_for_bug(
         tournament_k=tournament_k,
         seed=seed,
         log_every=log_every,
+        eval_timeout=eval_timeout,
     )
     end_time = time.time()
 

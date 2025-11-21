@@ -38,6 +38,7 @@ def _run_single_job(
     tournament_k: int,
     seed: int,
     log_every: int,
+    eval_timeout: float,
 ) -> Tuple[str, Dict[str, Any]]:
     dataset_name = canonicalize_for_dataset(entry["program_name"])
     result = run_gp_for_bug(
@@ -49,6 +50,7 @@ def _run_single_job(
         tournament_k=tournament_k,
         seed=seed,
         log_every=log_every,
+        eval_timeout=eval_timeout,
     )
     return dataset_name, result
 
@@ -68,6 +70,7 @@ def main():
     parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level")
     parser.add_argument("--log-every", type=int, default=25, help="Log progress every N successful evals")
     parser.add_argument("--workers", type=int, default=1, help="Number of parallel workers")
+    parser.add_argument("--eval-timeout", type=float, default=30.0, help="Timeout in seconds for evaluating all samples in a dataset (default: 30.0)")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing results instead of skipping")
 
     args = parser.parse_args()
@@ -150,6 +153,7 @@ def main():
                 args.tournament_k,
                 args.seed,
                 args.log_every,
+                args.eval_timeout,
             )] = entry
         for fut in as_completed(futures):
             entry = futures[fut]
