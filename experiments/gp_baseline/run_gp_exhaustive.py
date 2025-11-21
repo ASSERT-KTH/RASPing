@@ -25,7 +25,12 @@ from src.functions import getAcceptedNamesAndInput, load_dataset
 logger = logging.getLogger(__name__)
 
 
-CSV_PATH = Path(__file__).parent.parent / "train_mutations" / "analysis_outputs" / "all_test_accuracies.csv"
+CSV_PATH = (
+    Path(__file__).parent.parent
+    / "train_mutations"
+    / "analysis_outputs"
+    / "all_test_accuracies.csv"
+)
 
 
 def load_job_ids_from_csv(csv_path: Path) -> Set[str]:
@@ -34,10 +39,10 @@ def load_job_ids_from_csv(csv_path: Path) -> Set[str]:
     if not csv_path.exists():
         logging.warning(f"CSV file not found: {csv_path}")
         return job_ids
-    with open(csv_path, 'r') as f:
+    with open(csv_path, "r") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            job_ids.add(row['job_id'])
+            job_ids.add(row["job_id"])
     return job_ids
 
 
@@ -45,7 +50,10 @@ def load_job_ids_from_csv(csv_path: Path) -> Set[str]:
 # Deterministic neighbor generation
 # -----------------------------
 
-def _apply_mutation_by_index(source_code: str, site_index: int, position_index: int) -> Optional[str]:
+
+def _apply_mutation_by_index(
+    source_code: str, site_index: int, position_index: int
+) -> Optional[str]:
     """
     Apply one mutation deterministically by choosing the Nth discovered site and the Mth
     mutation position for that site. Returns mutated source code or None if invalid.
@@ -71,7 +79,11 @@ def _apply_mutation_by_index(source_code: str, site_index: int, position_index: 
 
     if mutated_node is not site.node:
         parent = getattr(site.node, "parent", None)
-        if parent is not None and hasattr(parent, "children") and parent.children is not None:
+        if (
+            parent is not None
+            and hasattr(parent, "children")
+            and parent.children is not None
+        ):
             for i, child in enumerate(parent.children):
                 if child is site.node:
                     parent.children[i] = mutated_node
@@ -109,6 +121,7 @@ def _all_single_step_neighbors(source_code: str) -> List[str]:
 # -----------------------------
 # Exhaustive search core
 # -----------------------------
+
 
 @dataclass
 class ExhaustiveResult:
@@ -154,7 +167,9 @@ def run_exhaustive_for_bug(
 
     program_history: List[Dict[str, Any]] = []
 
-    def evaluate_candidate(src: str, *, depth_mark: int) -> Tuple[str, Optional[Tuple[float, float]], str]:
+    def evaluate_candidate(
+        src: str, *, depth_mark: int
+    ) -> Tuple[str, Optional[Tuple[float, float]], str]:
         """Evaluate a candidate and return (status, (train,test) or None, hash)."""
         nonlocal num_programs, num_compile_failures, num_duplicates
         h = hash_source(src)
@@ -164,8 +179,12 @@ def run_exhaustive_for_bug(
             num_duplicates += 1
             return "duplicate", cache[h], h
         try:
-            train_acc = evaluate_source(src, dataset_name, max_length, accepted_inputs, fitness_data)
-            test_acc = evaluate_source_test(src, dataset_name, max_length, accepted_inputs, test_data)
+            train_acc = evaluate_source(
+                src, dataset_name, max_length, accepted_inputs, fitness_data
+            )
+            test_acc = evaluate_source_test(
+                src, dataset_name, max_length, accepted_inputs, test_data
+            )
         except Exception as e:
             num_compile_failures += 1
             logger.debug(f"Compile/eval failed for candidate {h}: {e}")
@@ -178,16 +197,20 @@ def run_exhaustive_for_bug(
     status, base_eval, base_hash = evaluate_candidate(base_source, depth_mark=0)
     if status != "compile_fail" and base_eval is not None:
         best_train, best_test = base_eval
-        logger.info(f"Seeded base candidate: train={best_train:.4f} test={best_test:.4f}")
-    program_history.append({
-        "step": num_programs,
-        "depth": 0,
-        "status": status,
-        "train_acc": None if base_eval is None else base_eval[0],
-        "test_acc": None if base_eval is None else base_eval[1],
-        "best_train_acc": best_train,
-        "best_test_acc": best_test,
-    })
+        logger.info(
+            f"Seeded base candidate: train={best_train:.4f} test={best_test:.4f}"
+        )
+    program_history.append(
+        {
+            "step": num_programs,
+            "depth": 0,
+            "status": status,
+            "train_acc": None if base_eval is None else base_eval[0],
+            "test_acc": None if base_eval is None else base_eval[1],
+            "best_train_acc": best_train,
+            "best_test_acc": best_test,
+        }
+    )
 
     depth = 0
     frontier: List[str] = [base_source]
@@ -230,20 +253,26 @@ def run_exhaustive_for_bug(
             test_acc = eval_res[1] if eval_res is not None else None
             if status_i == "ok" and eval_res is not None:
                 new_frontier.append(src)
-                if train_acc > best_train or (train_acc == best_train and test_acc > best_test):
+                if train_acc > best_train or (
+                    train_acc == best_train and test_acc > best_test
+                ):
                     best_train = train_acc
                     best_test = test_acc
                     best_source = src
-                    logger.info(f"New best: train={best_train:.4f} test={best_test:.4f}")
-            program_history.append({
-                "step": num_programs,
-                "depth": depth,
-                "status": status_i,
-                "train_acc": train_acc,
-                "test_acc": test_acc,
-                "best_train_acc": best_train,
-                "best_test_acc": best_test,
-            })
+                    logger.info(
+                        f"New best: train={best_train:.4f} test={best_test:.4f}"
+                    )
+            program_history.append(
+                {
+                    "step": num_programs,
+                    "depth": depth,
+                    "status": status_i,
+                    "train_acc": train_acc,
+                    "test_acc": test_acc,
+                    "best_train_acc": best_train,
+                    "best_test_acc": best_test,
+                }
+            )
             if log_every and num_programs % max(1, log_every) == 0:
                 logger.info(
                     f"Progress: depth={depth} programs={num_programs}/{budget} dup={num_duplicates} fails={num_compile_failures} best_train={best_train:.4f} best_test={best_test:.4f}"
@@ -278,7 +307,10 @@ def run_exhaustive_for_bug(
 # CLI runner mirroring baseline
 # -----------------------------
 
-def _run_single_job(entry: Dict[str, Any], data_dir: Path, accepted_inputs: List[Any], args) -> Tuple[str, Dict[str, Any]]:
+
+def _run_single_job(
+    entry: Dict[str, Any], data_dir: Path, accepted_inputs: List[Any], args
+) -> Tuple[str, Dict[str, Any]]:
     dataset_name = canonicalize_for_dataset(entry["program_name"])
     # Get max_depth from mutation_order: if mutation_order is 1, max_depth should be 1
     mutation_order = entry.get("mutation_order")
@@ -296,19 +328,75 @@ def _run_single_job(entry: Dict[str, Any], data_dir: Path, accepted_inputs: List
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run exhaustive AST mutation search to repair buggy RASP programs")
-    parser.add_argument("--mutation-path", type=str, required=True, help="Path to aggregated_mutations.json")
-    parser.add_argument("--program-name", type=str, default=None, help="Program name to filter (e.g., reverse, sort, hist, most-freq, shuffle_dyck1, shuffle_dyck2)")
-    parser.add_argument("--job-id", type=str, default=None, help="Specific job_id to run (overrides --n-jobs if provided)")
-    parser.add_argument("--n-jobs", type=int, default=None, help="Number of jobs to run for the program name (ignored if --job-id is set)")
-    parser.add_argument("--data-dir", type=str, default="data", help="Directory containing program datasets")
-    parser.add_argument("--budget", type=int, default=10000, help="Attempt budget (candidate eval attempts) per bug")
-    parser.add_argument("--seed", type=int, default=42, help="RNG seed (unused; kept for interface consistency)")
-    parser.add_argument("--output-dir", type=str, default="experiments/gp_baseline/results", help="Directory to write per-bug JSON results")
-    parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level")
-    parser.add_argument("--log-every", type=int, default=50, help="Log progress every N attempts")
-    parser.add_argument("--workers", type=int, default=1, help="Number of parallel workers")
-    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing results instead of skipping")
+    parser = argparse.ArgumentParser(
+        description="Run exhaustive AST mutation search to repair buggy RASP programs"
+    )
+    parser.add_argument(
+        "--mutation-path",
+        type=str,
+        required=True,
+        help="Path to aggregated_mutations.json",
+    )
+    parser.add_argument(
+        "--program-name",
+        type=str,
+        default=None,
+        help="Program name to filter (e.g., reverse, sort, hist, most-freq, shuffle_dyck1, shuffle_dyck2)",
+    )
+    parser.add_argument(
+        "--job-id",
+        type=str,
+        default=None,
+        help="Specific job_id to run (overrides --n-jobs if provided)",
+    )
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=None,
+        help="Number of jobs to run for the program name (ignored if --job-id is set)",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default="data",
+        help="Directory containing program datasets",
+    )
+    parser.add_argument(
+        "--budget",
+        type=int,
+        default=10000,
+        help="Attempt budget (candidate eval attempts) per bug",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="RNG seed (unused; kept for interface consistency)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="experiments/gp_baseline/results",
+        help="Directory to write per-bug JSON results",
+    )
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging level",
+    )
+    parser.add_argument(
+        "--log-every", type=int, default=50, help="Log progress every N attempts"
+    )
+    parser.add_argument(
+        "--workers", type=int, default=1, help="Number of parallel workers"
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing results instead of skipping",
+    )
 
     args = parser.parse_args()
 
@@ -316,7 +404,10 @@ def main():
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logging.basicConfig(level=getattr(logging, args.log_level), format='[%(asctime)s] %(levelname)s %(name)s: %(message)s')
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format="[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+    )
 
     # Load job IDs from CSV
     csv_job_ids = load_job_ids_from_csv(CSV_PATH)
@@ -330,11 +421,15 @@ def main():
     )
 
     # Filter mutations to only include those in CSV
-    mutations = {job_id: entry for job_id, entry in mutations.items() if job_id in csv_job_ids}
+    mutations = {
+        job_id: entry for job_id, entry in mutations.items() if job_id in csv_job_ids
+    }
     logging.info(f"Filtered to {len(mutations)} mutations that appear in CSV")
 
     if args.job_id:
-        to_run: List[Dict[str, Any]] = [mutations[args.job_id]] if args.job_id in mutations else []
+        to_run: List[Dict[str, Any]] = (
+            [mutations[args.job_id]] if args.job_id in mutations else []
+        )
     elif args.n_jobs:
         to_run = [row for _, row in list(mutations.items())[: max(args.n_jobs, 0)]]
     else:
@@ -374,7 +469,9 @@ def main():
                 logging.error(f"Unsupported program_name: {program_name_raw}")
                 continue
             accepted_inputs = accepted_inputs_map[dataset_name]
-            futures[ex.submit(_run_single_job, entry, data_dir, accepted_inputs, args)] = entry
+            futures[
+                ex.submit(_run_single_job, entry, data_dir, accepted_inputs, args)
+            ] = entry
         for fut in as_completed(futures):
             entry = futures[fut]
             try:
@@ -393,5 +490,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

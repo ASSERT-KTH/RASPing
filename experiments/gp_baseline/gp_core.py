@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 # Name canonicalization helpers
 # -----------------------------
 
+
 def canonicalize_for_dataset(program_name: str) -> str:
     if program_name == "most_freq":
         return "most-freq"
@@ -44,6 +45,7 @@ def canonicalize_for_factory(program_name: str) -> str:
 # Data utilities
 # -----------------------------
 
+
 def compute_max_length(data_dir: Path, dataset_program_name: str) -> int:
     train = load_dataset(data_dir, dataset_program_name, "train")
     val = load_dataset(data_dir, dataset_program_name, "val")
@@ -55,6 +57,7 @@ def compute_max_length(data_dir: Path, dataset_program_name: str) -> int:
 # Model building and evaluation
 # -----------------------------
 
+
 def build_program_from_source(
     source_code: str,
     program_name: str,
@@ -65,7 +68,9 @@ def build_program_from_source(
     Build a RASP SOp from mutated program source, following the same conventions
     used in experiments/mutation/load_mutations.py, but without compiling to a model.
     """
-    module_name = f"gp_candidate_{hashlib.sha1(source_code.encode('utf-8')).hexdigest()[:10]}"
+    module_name = (
+        f"gp_candidate_{hashlib.sha1(source_code.encode('utf-8')).hexdigest()[:10]}"
+    )
     module = create_module_from_source(source_code, module_name)
 
     factory_name = canonicalize_for_factory(program_name)
@@ -76,7 +81,10 @@ def build_program_from_source(
     elif factory_name == "sort":
         # min_key required by make_sort
         program = module.make_sort(
-            rasp.tokens, rasp.tokens, max_seq_len=max_length, min_key=min(accepted_inputs)
+            rasp.tokens,
+            rasp.tokens,
+            max_seq_len=max_length,
+            min_key=min(accepted_inputs),
         )
     elif factory_name == "reverse":
         program = module.make_reverse(rasp.tokens)
@@ -92,13 +100,15 @@ def build_program_from_source(
     return program
 
 
-def evaluate_program_on_split(program: Any, data: List[Tuple[List[Any], List[Any]]], timeout: float = 30.0) -> float:
+def evaluate_program_on_split(
+    program: Any, data: List[Tuple[List[Any], List[Any]]], timeout: float = 30.0
+) -> float:
     """
     Evaluate a RASP SOp directly on input sequences.
 
     We ignore the first position (BOS-like) when computing sequence-level exact
     match, comparing positions 1..N of the output to the targets.
-    
+
     Args:
         program: The RASP program to evaluate
         data: List of (input_seq, target_seq) tuples
@@ -106,7 +116,7 @@ def evaluate_program_on_split(program: Any, data: List[Tuple[List[Any], List[Any
     """
     if not data:
         return 0.0
-    
+
     def evaluate_all_samples():
         """Evaluate the program on all samples."""
         correct = 0
@@ -124,7 +134,7 @@ def evaluate_program_on_split(program: Any, data: List[Tuple[List[Any], List[Any
             if pred is not None and list(pred) == list(y):
                 correct += 1
         return correct / total if total > 0 else 0.0
-    
+
     # Use ThreadPoolExecutor with timeout to prevent infinite loops
     # The timeout applies to the entire evaluation of all samples
     try:
@@ -133,7 +143,9 @@ def evaluate_program_on_split(program: Any, data: List[Tuple[List[Any], List[Any
             return future.result(timeout=timeout)
     except FutureTimeoutError:
         # Timeout occurred - treat entire evaluation as failed (return 0.0)
-        logger.debug(f"Evaluation timeout after {timeout}s for dataset with {len(data)} samples")
+        logger.debug(
+            f"Evaluation timeout after {timeout}s for dataset with {len(data)} samples"
+        )
         return 0.0
     except Exception as e:
         # Other exceptions - treat as failed
@@ -144,6 +156,7 @@ def evaluate_program_on_split(program: Any, data: List[Tuple[List[Any], List[Any
 # -----------------------------
 # AST mutation engine
 # -----------------------------
+
 
 @dataclass
 class MutationSite:
@@ -174,17 +187,21 @@ def load_custom_operators():
 
 def load_default_operators():
     from cosmic_ray.operators.provider import OperatorProvider
+
     provider = OperatorProvider()
     operators = []
     for operator_name in provider:
-        if not any(operator_name.startswith(prefix) for prefix in {
-            "ReplaceBinaryOperator",
-            "ReplaceComparisonOperator",
-            "NumberReplacer",
-            "ReplaceUnaryOperator",
-            "ZeroIterationForLoop",
-            "AddNot",
-        }):
+        if not any(
+            operator_name.startswith(prefix)
+            for prefix in {
+                "ReplaceBinaryOperator",
+                "ReplaceComparisonOperator",
+                "NumberReplacer",
+                "ReplaceUnaryOperator",
+                "ZeroIterationForLoop",
+                "AddNot",
+            }
+        ):
             continue
         operator_cls = provider[operator_name]
         operators.append((operator_name, operator_cls))
@@ -232,7 +249,11 @@ def apply_mutation_once(source_code: str, rng: random.Random) -> Optional[str]:
     if mutated_node is not site.node:
         # Replace in parent if possible
         parent = getattr(site.node, "parent", None)
-        if parent is not None and hasattr(parent, "children") and parent.children is not None:
+        if (
+            parent is not None
+            and hasattr(parent, "children")
+            and parent.children is not None
+        ):
             for i, child in enumerate(parent.children):
                 if child is site.node:
                     parent.children[i] = mutated_node
@@ -244,6 +265,7 @@ def apply_mutation_once(source_code: str, rng: random.Random) -> Optional[str]:
 # -----------------------------
 # GP core
 # -----------------------------
+
 
 @dataclass
 class Candidate:
@@ -267,7 +289,9 @@ def evaluate_source(
     train_data: List[Tuple[List[Any], List[Any]]],
     timeout: float = 30.0,
 ) -> Tuple[float, float]:
-    program = build_program_from_source(source_code, program_name, max_length, accepted_inputs)
+    program = build_program_from_source(
+        source_code, program_name, max_length, accepted_inputs
+    )
     train_acc = evaluate_program_on_split(program, train_data, timeout=timeout)
     return train_acc
 
@@ -280,7 +304,9 @@ def evaluate_source_test(
     test_data: List[Tuple[List[Any], List[Any]]],
     timeout: float = 30.0,
 ) -> float:
-    program = build_program_from_source(source_code, program_name, max_length, accepted_inputs)
+    program = build_program_from_source(
+        source_code, program_name, max_length, accepted_inputs
+    )
     return evaluate_program_on_split(program, test_data, timeout=timeout)
 
 
@@ -323,9 +349,21 @@ def run_gp(
         # Try to compile and evaluate; treat compile failures as invalid (not counted)
         try:
             train_acc = evaluate_source(
-                src, program_name, max_length, accepted_inputs, fitness_data, timeout=eval_timeout
+                src,
+                program_name,
+                max_length,
+                accepted_inputs,
+                fitness_data,
+                timeout=eval_timeout,
             )
-            test_acc = evaluate_source_test(src, program_name, max_length, accepted_inputs, test_data, timeout=eval_timeout)
+            test_acc = evaluate_source_test(
+                src,
+                program_name,
+                max_length,
+                accepted_inputs,
+                test_data,
+                timeout=eval_timeout,
+            )
         except Exception as e:
             num_compile_failures += 1
             logger.debug(f"Compile/eval failed for candidate {h}: {e}")
@@ -344,11 +382,11 @@ def run_gp(
     )
     # Track each program evaluation (like exhaustive search)
     program_history: List[Dict[str, Any]] = []
-    
+
     # Track best seen so far
     best_train = -1.0
     best_test = -1.0
-    
+
     # Count base program towards budget
     num_programs += 1
     base_eval = get_or_eval(base_source)
@@ -367,22 +405,28 @@ def run_gp(
         status = "compile_fail"
         train_acc = None
         test_acc = None
-    
+
     generation = 0
-    program_history.append({
-        "step": num_programs,
-        "generation": generation,
-        "status": status,
-        "train_acc": train_acc,
-        "test_acc": test_acc,
-        "best_train_acc": best_train,
-        "best_test_acc": best_test,
-    })
+    program_history.append(
+        {
+            "step": num_programs,
+            "generation": generation,
+            "status": status,
+            "train_acc": train_acc,
+            "test_acc": test_acc,
+            "best_train_acc": best_train,
+            "best_test_acc": best_test,
+        }
+    )
     generation += 1
 
     # Fill remaining with random single-step mutations
     attempts = 0
-    while len(population) < population_size and attempts < population_size * 20 and num_programs < budget:
+    while (
+        len(population) < population_size
+        and attempts < population_size * 20
+        and num_programs < budget
+    ):
         attempts += 1
         mutated = apply_mutation_once(base_source, rng)
         if mutated is None:
@@ -401,12 +445,14 @@ def run_gp(
                 status = "compile_fail"
             else:
                 status = "ok"
-        
+
         # Update best if we have a valid result
         if status == "ok" and eval_result is not None:
             train_acc = eval_result[0]
             test_acc = eval_result[1]
-            if train_acc > best_train or (train_acc == best_train and test_acc > best_test):
+            if train_acc > best_train or (
+                train_acc == best_train and test_acc > best_test
+            ):
                 best_train = train_acc
                 best_test = test_acc
             seen.add(h)
@@ -417,16 +463,18 @@ def run_gp(
         else:
             train_acc = eval_result[0] if eval_result is not None else None
             test_acc = eval_result[1] if eval_result is not None else None
-        
-        program_history.append({
-            "step": num_programs,
-            "generation": generation,
-            "status": status,
-            "train_acc": train_acc,
-            "test_acc": test_acc,
-            "best_train_acc": best_train,
-            "best_test_acc": best_test,
-        })
+
+        program_history.append(
+            {
+                "step": num_programs,
+                "generation": generation,
+                "status": status,
+                "train_acc": train_acc,
+                "test_acc": test_acc,
+                "best_train_acc": best_train,
+                "best_test_acc": best_test,
+            }
+        )
 
     if not population:
         # Could not seed a valid population
@@ -440,9 +488,7 @@ def run_gp(
     best_by_train = max(population, key=lambda c: c.train_acc)
     best_train = best_by_train.train_acc
     best_test = best_by_train.test_acc
-    logger.info(
-        f"Initial best: train={best_by_train.train_acc:.4f}"
-    )
+    logger.info(f"Initial best: train={best_by_train.train_acc:.4f}")
 
     generation += 1
 
@@ -484,7 +530,11 @@ def run_gp(
 
         # Generate up to population_size offspring (μ=λ)
         gen_attempts = 0
-        while len(offspring) < population_size and num_programs < budget and gen_attempts < population_size * 50:
+        while (
+            len(offspring) < population_size
+            and num_programs < budget
+            and gen_attempts < population_size * 50
+        ):
             gen_attempts += 1
             parent = tournament_select(population)
             mutated = apply_mutation_once(parent.source, rng)
@@ -517,29 +567,35 @@ def run_gp(
                     seen.add(h)
                     cand = Candidate(mutated, train_acc, test_acc)
                     offspring.append(cand)
-                    if train_acc > best_train or (train_acc == best_train and test_acc > best_test):
+                    if train_acc > best_train or (
+                        train_acc == best_train and test_acc > best_test
+                    ):
                         best_train = train_acc
                         best_test = test_acc
                         best_by_train = cand
                         logger.info(
                             f"New best: train={best_train:.4f} test={best_test:.4f}"
                         )
-            
-            program_history.append({
-                "step": num_programs,
-                "generation": generation,
-                "status": status,
-                "train_acc": train_acc,
-                "test_acc": test_acc,
-                "best_train_acc": best_train,
-                "best_test_acc": best_test,
-            })
+
+            program_history.append(
+                {
+                    "step": num_programs,
+                    "generation": generation,
+                    "status": status,
+                    "train_acc": train_acc,
+                    "test_acc": test_acc,
+                    "best_train_acc": best_train,
+                    "best_test_acc": best_test,
+                }
+            )
 
             if best_train >= 1.0 or num_programs >= budget:
                 break
 
         # Replacement: (μ+λ) keep top μ by train, tiebreak by test
-        population = sorted(population + offspring, key=lambda c: c.train_acc, reverse=True)[:population_size]
+        population = sorted(
+            population + offspring, key=lambda c: c.train_acc, reverse=True
+        )[:population_size]
         logger.info(
             f"Generation {generation} end: offspring={len(offspring)}, programs={num_programs}/{budget}, dup={num_duplicates}, fails={num_compile_failures}, best_train={best_train:.4f} | best_test={best_test:.4f}"
         )
@@ -601,5 +657,3 @@ def run_gp_for_bug(
         }
     )
     return result
-
-
