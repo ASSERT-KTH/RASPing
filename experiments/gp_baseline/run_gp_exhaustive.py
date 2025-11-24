@@ -142,6 +142,7 @@ def run_exhaustive_for_bug(
     max_depth: int = 2,
     budget: int = 10000,
     log_every: int = 50,
+    eval_timeout: float = 30.0,
 ) -> Dict[str, Any]:
     import time
 
@@ -180,10 +181,20 @@ def run_exhaustive_for_bug(
             return "duplicate", cache[h], h
         try:
             train_acc = evaluate_source(
-                src, dataset_name, max_length, accepted_inputs, fitness_data
+                src,
+                dataset_name,
+                max_length,
+                accepted_inputs,
+                fitness_data,
+                timeout=eval_timeout,
             )
             test_acc = evaluate_source_test(
-                src, dataset_name, max_length, accepted_inputs, test_data
+                src,
+                dataset_name,
+                max_length,
+                accepted_inputs,
+                test_data,
+                timeout=eval_timeout,
             )
         except Exception as e:
             num_compile_failures += 1
@@ -323,6 +334,7 @@ def _run_single_job(
         max_depth=max_depth,
         budget=args.budget,
         log_every=args.log_every,
+        eval_timeout=args.eval_timeout,
     )
     return dataset_name, result
 
@@ -391,6 +403,12 @@ def main():
     )
     parser.add_argument(
         "--workers", type=int, default=1, help="Number of parallel workers"
+    )
+    parser.add_argument(
+        "--eval-timeout",
+        type=float,
+        default=30.0,
+        help="Timeout in seconds for evaluating all samples in a dataset (default: 30.0)",
     )
     parser.add_argument(
         "--overwrite",
