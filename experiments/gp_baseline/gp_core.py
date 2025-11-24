@@ -1,14 +1,13 @@
 import hashlib
 import random
 import time
-import signal
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import parso
 import logging
+import multiprocessing
 
 # Reuse existing utilities from the repo
 from experiments.mutation.load_mutations import create_module_from_source
@@ -18,37 +17,6 @@ from tracr.rasp import rasp
 
 
 logger = logging.getLogger(__name__)
-
-
-class TimeoutError(Exception):
-    """Raised when an operation times out."""
-    pass
-
-
-class TimeoutHandler:
-    """Context manager for timeout using signals (Unix only)."""
-    
-    def __init__(self, timeout: float):
-        self.timeout = timeout
-        self.old_handler = None
-        
-    def __enter__(self):
-        if sys.platform == 'win32':
-            # Windows doesn't support SIGALRM, fall back to no timeout
-            logger.warning("Signal-based timeout not supported on Windows, timeout disabled")
-            return self
-        self.old_handler = signal.signal(signal.SIGALRM, self._timeout_handler)
-        signal.setitimer(signal.ITIMER_REAL, self.timeout)
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if sys.platform != 'win32':
-            signal.setitimer(signal.ITIMER_REAL, 0)
-            signal.signal(signal.SIGALRM, self.old_handler)
-        return False
-    
-    def _timeout_handler(self, signum, frame):
-        raise TimeoutError(f"Operation timed out after {self.timeout}s")
 
 
 # -----------------------------
@@ -95,58 +63,45 @@ def build_program_from_source(
     program_name: str,
     max_length: int,
     accepted_inputs: Sequence[Any],
-    timeout: float = 30.0,
 ) -> Any:
     """
     Build a RASP SOp from mutated program source, following the same conventions
     used in experiments/mutation/load_mutations.py, but without compiling to a model.
-    
-    Args:
-        timeout: Maximum time (in seconds) allowed for building the program
     """
-    # Use signal-based timeout to interrupt blocking operations
-    try:
-        with TimeoutHandler(timeout):
-            module_name = (
-                f"gp_candidate_{hashlib.sha1(source_code.encode('utf-8')).hexdigest()[:10]}"
-            )
-            module = create_module_from_source(source_code, module_name)
+    module_name = (
+        f"gp_candidate_{hashlib.sha1(source_code.encode('utf-8')).hexdigest()[:10]}"
+    )
+    module = create_module_from_source(source_code, module_name)
 
-            factory_name = canonicalize_for_factory(program_name)
+    factory_name = canonicalize_for_factory(program_name)
 
-            # Build the RASP program using the expected factory function in the module
-            if factory_name == "hist":
-                program = module.make_hist()
-            elif factory_name == "sort":
-                # min_key required by make_sort
-                program = module.make_sort(
-                    rasp.tokens,
-                    rasp.tokens,
-                    max_seq_len=max_length,
-                    min_key=min(accepted_inputs),
-                )
-            elif factory_name == "reverse":
-                program = module.make_reverse(rasp.tokens)
-            elif factory_name == "most_freq":
-                program = module.make_sort_freq(max_length)
-            elif factory_name == "shuffle_dyck":
-                program = module.make_shuffle_dyck(["()"])
-            elif factory_name == "shuffle_dyck2":
-                program = module.make_shuffle_dyck2()
-            else:
-                raise NotImplementedError(f"Program factory not implemented for {program_name}")
+    # Build the RASP program using the expected factory function in the module
+    if factory_name == "hist":
+        program = module.make_hist()
+    elif factory_name == "sort":
+        # min_key required by make_sort
+        program = module.make_sort(
+            rasp.tokens,
+            rasp.tokens,
+            max_seq_len=max_length,
+            min_key=min(accepted_inputs),
+        )
+    elif factory_name == "reverse":
+        program = module.make_reverse(rasp.tokens)
+    elif factory_name == "most_freq":
+        program = module.make_sort_freq(max_length)
+    elif factory_name == "shuffle_dyck":
+        program = module.make_shuffle_dyck(["()"])
+    elif factory_name == "shuffle_dyck2":
+        program = module.make_shuffle_dyck2()
+    else:
+        raise NotImplementedError(f"Program factory not implemented for {program_name}")
 
-            return program
-    except TimeoutError:
-        logger.warning(f"Program building timeout after {timeout}s")
-        raise TimeoutError(f"Program building exceeded {timeout}s timeout")
-    except Exception as e:
-        logger.debug(f"Program building failed: {e}")
-        raise
+    return program
 
 
 def evaluate_program_on_split(
-    program: Any, data: List[Tuple[List[Any], List[Any]]], timeout: float = 30.0
+    program: Any, data: List[Tuple[List[Any], List[Any]]]
 ) -> float:
     """
     Evaluate a RASP SOp directly on input sequences.
@@ -157,54 +112,92 @@ def evaluate_program_on_split(
     Args:
         program: The RASP program to evaluate
         data: List of (input_seq, target_seq) tuples
-        timeout: Maximum time (in seconds) allowed for evaluating all input sequences
     """
     if not data:
         return 0.0
 
-    # Use signal-based timeout to interrupt blocking operations
-    logger.debug(f"Starting evaluation of {len(data)} samples with {timeout}s timeout")
+    correct = 0
+    total = 0
     start_time = time.time()
-    
-    try:
-        with TimeoutHandler(timeout):
-            correct = 0
-            total = 0
-            for idx, (input_seq, target_seq) in enumerate(data):
-                # Log progress every 10% of samples
-                if len(data) > 10 and idx % max(1, len(data) // 10) == 0:
-                    elapsed = time.time() - start_time
-                    logger.debug(f"Evaluating sample {idx}/{len(data)} (elapsed: {elapsed:.2f}s)")
-                
-                # Remove BOS-like token at position 0
-                x = input_seq[1:]
-                y = target_seq[1:]
-                try:
-                    pred = program(x)
-                except Exception:
-                    # Treat runtime errors as incorrect
-                    pred = None
-                total += 1
-                if pred is not None and list(pred) == list(y):
-                    correct += 1
-            
+    for idx, (input_seq, target_seq) in enumerate(data):
+        # Log progress every 10% of samples
+        if len(data) > 10 and idx % max(1, len(data) // 10) == 0:
             elapsed = time.time() - start_time
-            logger.debug(f"Completed evaluation of {total} samples in {elapsed:.2f}s")
-            result = correct / total if total > 0 else 0.0
-            logger.debug(f"Evaluation completed in {elapsed:.2f}s, accuracy: {result:.4f}")
-            return result
-    except TimeoutError:
-        # Timeout occurred - treat entire evaluation as failed (return 0.0)
-        elapsed = time.time() - start_time
-        logger.warning(
-            f"Evaluation timeout after {elapsed:.2f}s (limit: {timeout}s) for dataset with {len(data)} samples"
+            logger.debug(f"Evaluating sample {idx}/{len(data)} (elapsed: {elapsed:.2f}s)")
+        
+        # Remove BOS-like token at position 0
+        x = input_seq[1:]
+        y = target_seq[1:]
+        try:
+            pred = program(x)
+        except Exception:
+            # Treat runtime errors as incorrect
+            pred = None
+        total += 1
+        if pred is not None and list(pred) == list(y):
+            correct += 1
+    
+    elapsed = time.time() - start_time
+    logger.debug(f"Completed evaluation of {total} samples in {elapsed:.2f}s")
+    return correct / total if total > 0 else 0.0
+
+
+def _evaluate_worker(
+    result_queue: multiprocessing.Queue,
+    source_code: str,
+    program_name: str,
+    max_length: int,
+    accepted_inputs: Sequence[Any],
+    data: List[Tuple[List[Any], List[Any]]],
+):
+    """Worker to build and evaluate program in a separate process."""
+    try:
+        # Build program inside the worker process
+        program = build_program_from_source(
+            source_code, program_name, max_length, accepted_inputs
         )
-        return 0.0
+        # Evaluate
+        accuracy = evaluate_program_on_split(program, data)
+        result_queue.put(("success", accuracy))
     except Exception as e:
-        # Other exceptions - treat as failed
-        elapsed = time.time() - start_time
-        logger.debug(f"Evaluation error after {elapsed:.2f}s: {e}")
-        return 0.0
+        result_queue.put(("error", e))
+
+
+def evaluate_with_timeout(
+    source_code: str,
+    program_name: str,
+    max_length: int,
+    accepted_inputs: Sequence[Any],
+    data: List[Tuple[List[Any], List[Any]]],
+    timeout: float = 30.0,
+) -> float:
+    """Run evaluation in a separate process with timeout."""
+    # Use multiprocessing to isolate evaluation and allow termination on timeout
+    result_queue = multiprocessing.Queue()
+    process = multiprocessing.Process(
+        target=_evaluate_worker,
+        args=(result_queue, source_code, program_name, max_length, accepted_inputs, data)
+    )
+    process.start()
+    process.join(timeout=timeout)
+    
+    if process.is_alive():
+        logger.warning(f"Evaluation timeout after {timeout}s, terminating process")
+        process.terminate()
+        process.join(timeout=5.0)
+        if process.is_alive():
+            process.kill()
+            process.join()
+        return 0.0  # Treat timeout as failure
+        
+    if not result_queue.empty():
+        status, result = result_queue.get()
+        if status == "success":
+            return result
+        else:
+            logger.debug(f"Evaluation failed: {result}")
+            return 0.0
+    return 0.0
 
 
 # -----------------------------
@@ -343,22 +336,9 @@ def evaluate_source(
     train_data: List[Tuple[List[Any], List[Any]]],
     timeout: float = 30.0,
 ) -> Tuple[float, float]:
-    logger.debug(f"Building program from source (timeout: {timeout}s)")
-    build_start = time.time()
-    try:
-        program = build_program_from_source(
-            source_code, program_name, max_length, accepted_inputs, timeout=timeout
-        )
-        build_elapsed = time.time() - build_start
-        logger.debug(f"Program built successfully in {build_elapsed:.2f}s")
-    except Exception as e:
-        build_elapsed = time.time() - build_start
-        logger.debug(f"Program building failed after {build_elapsed:.2f}s: {e}")
-        raise
-    
-    logger.debug(f"Evaluating on train data ({len(train_data)} samples)")
-    train_acc = evaluate_program_on_split(program, train_data, timeout=timeout)
-    return train_acc
+    return evaluate_with_timeout(
+        source_code, program_name, max_length, accepted_inputs, train_data, timeout
+    )
 
 
 def evaluate_source_test(
@@ -369,21 +349,9 @@ def evaluate_source_test(
     test_data: List[Tuple[List[Any], List[Any]]],
     timeout: float = 30.0,
 ) -> float:
-    logger.debug(f"Building program from source for test (timeout: {timeout}s)")
-    build_start = time.time()
-    try:
-        program = build_program_from_source(
-            source_code, program_name, max_length, accepted_inputs, timeout=timeout
-        )
-        build_elapsed = time.time() - build_start
-        logger.debug(f"Program built successfully in {build_elapsed:.2f}s")
-    except Exception as e:
-        build_elapsed = time.time() - build_start
-        logger.debug(f"Program building failed after {build_elapsed:.2f}s: {e}")
-        raise
-    
-    logger.debug(f"Evaluating on test data ({len(test_data)} samples)")
-    return evaluate_program_on_split(program, test_data, timeout=timeout)
+    return evaluate_with_timeout(
+        source_code, program_name, max_length, accepted_inputs, test_data, timeout
+    )
 
 
 def run_gp(
