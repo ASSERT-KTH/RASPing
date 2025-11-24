@@ -1,7 +1,8 @@
 import hashlib
 import random
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+import signal
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -17,6 +18,37 @@ from tracr.rasp import rasp
 
 
 logger = logging.getLogger(__name__)
+
+
+class TimeoutError(Exception):
+    """Raised when an operation times out."""
+    pass
+
+
+class TimeoutHandler:
+    """Context manager for timeout using signals (Unix only)."""
+    
+    def __init__(self, timeout: float):
+        self.timeout = timeout
+        self.old_handler = None
+        
+    def __enter__(self):
+        if sys.platform == 'win32':
+            # Windows doesn't support SIGALRM, fall back to no timeout
+            logger.warning("Signal-based timeout not supported on Windows, timeout disabled")
+            return self
+        self.old_handler = signal.signal(signal.SIGALRM, self._timeout_handler)
+        signal.setitimer(signal.ITIMER_REAL, self.timeout)
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if sys.platform != 'win32':
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, self.old_handler)
+        return False
+    
+    def _timeout_handler(self, signum, frame):
+        raise TimeoutError(f"Operation timed out after {self.timeout}s")
 
 
 # -----------------------------
@@ -72,44 +104,40 @@ def build_program_from_source(
     Args:
         timeout: Maximum time (in seconds) allowed for building the program
     """
-    def _build():
-        module_name = (
-            f"gp_candidate_{hashlib.sha1(source_code.encode('utf-8')).hexdigest()[:10]}"
-        )
-        module = create_module_from_source(source_code, module_name)
-
-        factory_name = canonicalize_for_factory(program_name)
-
-        # Build the RASP program using the expected factory function in the module
-        if factory_name == "hist":
-            program = module.make_hist()
-        elif factory_name == "sort":
-            # min_key required by make_sort
-            program = module.make_sort(
-                rasp.tokens,
-                rasp.tokens,
-                max_seq_len=max_length,
-                min_key=min(accepted_inputs),
-            )
-        elif factory_name == "reverse":
-            program = module.make_reverse(rasp.tokens)
-        elif factory_name == "most_freq":
-            program = module.make_sort_freq(max_length)
-        elif factory_name == "shuffle_dyck":
-            program = module.make_shuffle_dyck(["()"])
-        elif factory_name == "shuffle_dyck2":
-            program = module.make_shuffle_dyck2()
-        else:
-            raise NotImplementedError(f"Program factory not implemented for {program_name}")
-
-        return program
-    
-    # Use ThreadPoolExecutor with timeout to prevent hangs during program building
+    # Use signal-based timeout to interrupt blocking operations
     try:
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_build)
-            return future.result(timeout=timeout)
-    except FutureTimeoutError:
+        with TimeoutHandler(timeout):
+            module_name = (
+                f"gp_candidate_{hashlib.sha1(source_code.encode('utf-8')).hexdigest()[:10]}"
+            )
+            module = create_module_from_source(source_code, module_name)
+
+            factory_name = canonicalize_for_factory(program_name)
+
+            # Build the RASP program using the expected factory function in the module
+            if factory_name == "hist":
+                program = module.make_hist()
+            elif factory_name == "sort":
+                # min_key required by make_sort
+                program = module.make_sort(
+                    rasp.tokens,
+                    rasp.tokens,
+                    max_seq_len=max_length,
+                    min_key=min(accepted_inputs),
+                )
+            elif factory_name == "reverse":
+                program = module.make_reverse(rasp.tokens)
+            elif factory_name == "most_freq":
+                program = module.make_sort_freq(max_length)
+            elif factory_name == "shuffle_dyck":
+                program = module.make_shuffle_dyck(["()"])
+            elif factory_name == "shuffle_dyck2":
+                program = module.make_shuffle_dyck2()
+            else:
+                raise NotImplementedError(f"Program factory not implemented for {program_name}")
+
+            return program
+    except TimeoutError:
         logger.warning(f"Program building timeout after {timeout}s")
         raise TimeoutError(f"Program building exceeded {timeout}s timeout")
     except Exception as e:
@@ -134,44 +162,38 @@ def evaluate_program_on_split(
     if not data:
         return 0.0
 
-    def evaluate_all_samples():
-        """Evaluate the program on all samples."""
-        correct = 0
-        total = 0
-        start_time = time.time()
-        for idx, (input_seq, target_seq) in enumerate(data):
-            # Log progress every 10% of samples
-            if len(data) > 10 and idx % max(1, len(data) // 10) == 0:
-                elapsed = time.time() - start_time
-                logger.debug(f"Evaluating sample {idx}/{len(data)} (elapsed: {elapsed:.2f}s)")
-            
-            # Remove BOS-like token at position 0
-            x = input_seq[1:]
-            y = target_seq[1:]
-            try:
-                pred = program(x)
-            except Exception:
-                # Treat runtime errors as incorrect
-                pred = None
-            total += 1
-            if pred is not None and list(pred) == list(y):
-                correct += 1
-        elapsed = time.time() - start_time
-        logger.debug(f"Completed evaluation of {total} samples in {elapsed:.2f}s")
-        return correct / total if total > 0 else 0.0
-
-    # Use ThreadPoolExecutor with timeout to prevent infinite loops
-    # The timeout applies to the entire evaluation of all samples
+    # Use signal-based timeout to interrupt blocking operations
     logger.debug(f"Starting evaluation of {len(data)} samples with {timeout}s timeout")
     start_time = time.time()
+    
     try:
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(evaluate_all_samples)
-            result = future.result(timeout=timeout)
+        with TimeoutHandler(timeout):
+            correct = 0
+            total = 0
+            for idx, (input_seq, target_seq) in enumerate(data):
+                # Log progress every 10% of samples
+                if len(data) > 10 and idx % max(1, len(data) // 10) == 0:
+                    elapsed = time.time() - start_time
+                    logger.debug(f"Evaluating sample {idx}/{len(data)} (elapsed: {elapsed:.2f}s)")
+                
+                # Remove BOS-like token at position 0
+                x = input_seq[1:]
+                y = target_seq[1:]
+                try:
+                    pred = program(x)
+                except Exception:
+                    # Treat runtime errors as incorrect
+                    pred = None
+                total += 1
+                if pred is not None and list(pred) == list(y):
+                    correct += 1
+            
             elapsed = time.time() - start_time
+            logger.debug(f"Completed evaluation of {total} samples in {elapsed:.2f}s")
+            result = correct / total if total > 0 else 0.0
             logger.debug(f"Evaluation completed in {elapsed:.2f}s, accuracy: {result:.4f}")
             return result
-    except FutureTimeoutError:
+    except TimeoutError:
         # Timeout occurred - treat entire evaluation as failed (return 0.0)
         elapsed = time.time() - start_time
         logger.warning(
