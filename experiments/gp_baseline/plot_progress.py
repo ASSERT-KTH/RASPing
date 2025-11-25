@@ -191,9 +191,13 @@ def create_plot(
     exhaustive_job_series: Optional[Dict[Tuple[str, str], List[float]]],
     threshold: float,
     title: Optional[str] = None,
+    show_median_avg: bool = False,
 ) -> None:
     """
     Create a plot from the given job series data.
+    
+    Args:
+        show_median_avg: If True, show median and average accuracy lines. Default False.
     """
     n_gp = len(gp_job_series)
     x_gp, gp_fixed_pct, gp_median_pct, gp_mean_pct = aggregate_job_series(
@@ -202,80 +206,84 @@ def create_plot(
 
     plt.figure(figsize=(8, 5))
     # GP baseline lines
-    plt.plot(x_gp, gp_fixed_pct, label=f"GP % fixed ({n_gp} programs)", color="#1f77b4")
-    plt.plot(
-        x_gp,
-        gp_median_pct,
-        label=f"GP median accuracy (%) ({n_gp} programs)",
-        color="#1f77b4",
-        linestyle="--",
-    )
-    plt.plot(
-        x_gp,
-        gp_mean_pct,
-        label=f"GP avg accuracy (%) ({n_gp} programs)",
-        color="#1f77b4",
-        linestyle=":",
-    )
+    plt.plot(x_gp, gp_fixed_pct, label="GP", color="#1f77b4")
+    if show_median_avg:
+        plt.plot(
+            x_gp,
+            gp_median_pct,
+            label="GP median accuracy (%)",
+            color="#1f77b4",
+            linestyle="--",
+        )
+        plt.plot(
+            x_gp,
+            gp_mean_pct,
+            label="GP avg accuracy (%)",
+            color="#1f77b4",
+            linestyle=":",
+        )
     # Gradient-based lines (if available)
     if grad_job_series:
-        n_grad = len(grad_job_series)
         x_grad, grad_fixed_pct, grad_median_pct, grad_mean_pct = aggregate_job_series(
             grad_job_series, threshold
         )
         plt.plot(
             x_grad,
             grad_fixed_pct,
-            label=f"Grad % fixed ({n_grad} programs)",
+            label="GBPR",
             color="#2ca02c",
         )
-        plt.plot(
-            x_grad,
-            grad_median_pct,
-            label=f"Grad median accuracy (%) ({n_grad} programs)",
-            color="#2ca02c",
-            linestyle="--",
-        )
-        plt.plot(
-            x_grad,
-            grad_mean_pct,
-            label=f"Grad avg accuracy (%) ({n_grad} programs)",
-            color="#2ca02c",
-            linestyle=":",
-        )
+        if show_median_avg:
+            plt.plot(
+                x_grad,
+                grad_median_pct,
+                label="GBPR median accuracy (%)",
+                color="#2ca02c",
+                linestyle="--",
+            )
+            plt.plot(
+                x_grad,
+                grad_mean_pct,
+                label="GBPR avg accuracy (%)",
+                color="#2ca02c",
+                linestyle=":",
+            )
     # Exhaustive search lines (if available)
     if exhaustive_job_series:
-        n_exh = len(exhaustive_job_series)
         x_exh, exh_fixed_pct, exh_median_pct, exh_mean_pct = aggregate_job_series(
             exhaustive_job_series, threshold
         )
         plt.plot(
             x_exh,
             exh_fixed_pct,
-            label=f"Exhaustive % fixed ({n_exh} programs)",
+            label="BFS",
             color="#ff7f0e",
         )
-        plt.plot(
-            x_exh,
-            exh_median_pct,
-            label=f"Exhaustive median accuracy (%) ({n_exh} programs)",
-            color="#ff7f0e",
-            linestyle="--",
-        )
-        plt.plot(
-            x_exh,
-            exh_mean_pct,
-            label=f"Exhaustive avg accuracy (%) ({n_exh} programs)",
-            color="#ff7f0e",
-            linestyle=":",
-        )
-    plt.xlabel("Programs generated")
-    plt.ylabel("Percentage")
+        if show_median_avg:
+            plt.plot(
+                x_exh,
+                exh_median_pct,
+                label="BFS median accuracy (%)",
+                color="#ff7f0e",
+                linestyle="--",
+            )
+            plt.plot(
+                x_exh,
+                exh_mean_pct,
+                label="BFS avg accuracy (%)",
+                color="#ff7f0e",
+                linestyle=":",
+            )
+    plt.xlabel("Epochs")
+    plt.ylabel("% fixed programs")
     plt.ylim(0, 100)
     plt.grid(True, alpha=0.3)
     plt.legend()
+    # Add program count to title
     if title:
-        plt.title(title)
+        plt.title(f"{title} ({n_gp} programs)")
+    else:
+        plt.title(f"({n_gp} programs)")
 
 
 def main():
@@ -317,6 +325,12 @@ def main():
         type=str,
         default="cross_entropy_loss",
         help="Loss function subdirectory name under saved_data (e.g., cross_entropy_loss)",
+    )
+    parser.add_argument(
+        "--show-median-avg",
+        action="store_true",
+        default=False,
+        help="Show median and average accuracy lines in plots (default: False)",
     )
 
     args = parser.parse_args()
@@ -388,6 +402,7 @@ def main():
         exhaustive_job_series if exhaustive_job_series else None,
         args.threshold,
         title="All Programs Combined",
+        show_median_avg=args.show_median_avg,
     )
     plt.savefig(output_dir / "all_programs.pdf", bbox_inches="tight", format="pdf")
     plt.close()
@@ -446,6 +461,7 @@ def main():
             filtered_exh_job_series if filtered_exh_job_series else None,
             args.threshold,
             title=f"All Programs Combined (excluding {most_freq_program})",
+            show_median_avg=args.show_median_avg,
         )
         safe_prog_name = most_freq_program.replace("/", "_")
         plt.savefig(
@@ -503,6 +519,7 @@ def main():
                 prog_exh_series,
                 args.threshold,
                 title=f"Program: {prog}",
+                show_median_avg=args.show_median_avg,
             )
             safe_prog_name = prog.replace("/", "_")
             plt.savefig(
@@ -539,7 +556,8 @@ def main():
                 order_grad_series,
                 order_exh_series,
                 args.threshold,
-                title=f"Mutation Order: {order} (All Programs)",
+                title=f"Mutation Order: {order}",
+                show_median_avg=args.show_median_avg,
             )
             plt.savefig(
                 output_dir / f"mutation_order_{order}.pdf",
@@ -550,8 +568,8 @@ def main():
             print(f"Saved figure to {output_dir / f'mutation_order_{order}.pdf'}")
 
     # 3b. Plots per mutation order excluding "most_freq" program
+    jobs_by_mutation_order_filtered: Dict[int, List[Tuple[str, str]]] = {}
     if most_freq_program:
-        jobs_by_mutation_order_filtered: Dict[int, List[Tuple[str, str]]] = {}
         for prog, job_id in filtered_jobs:
             order = mutation_orders.get(job_id)
             if order is not None:
@@ -592,6 +610,7 @@ def main():
                     order_exh_series,
                     args.threshold,
                     title=f"Mutation Order: {order} (All Programs, excluding {most_freq_program})",
+                    show_median_avg=args.show_median_avg,
                 )
                 plt.savefig(
                     output_dir
@@ -641,7 +660,8 @@ def main():
                     order_ge_grad_series,
                     order_ge_exh_series,
                     args.threshold,
-                    title=f"Mutation Order >= {min_order} (All Programs)",
+                    title=f"Mutation Order >= {min_order}",
+                    show_median_avg=args.show_median_avg,
                 )
                 plt.savefig(
                     output_dir / f"mutation_order_ge_{min_order}.pdf",
@@ -695,6 +715,7 @@ def main():
                         order_ge_exh_series,
                         args.threshold,
                         title=f"Mutation Order >= {min_order} (All Programs, excluding {most_freq_program})",
+                        show_median_avg=args.show_median_avg,
                     )
                     plt.savefig(
                         output_dir
@@ -737,6 +758,7 @@ def main():
                 prog_order_exh_series,
                 args.threshold,
                 title=f"Program: {prog}, Mutation Order: {order}",
+                show_median_avg=args.show_median_avg,
             )
             safe_prog_name = prog.replace("/", "_")
             plt.savefig(
@@ -748,6 +770,188 @@ def main():
             print(
                 f"Saved figure to {output_dir / f'program_{safe_prog_name}_order_{order}.pdf'}"
             )
+
+    # 5. Plot pass rate by mutation order (with and without most-freq)
+    def compute_pass_rate_by_order(
+        job_series: Dict[Tuple[str, str], List[float]],
+        jobs_by_order: Dict[int, List[Tuple[str, str]]],
+        threshold: float,
+    ) -> Dict[int, float]:
+        """Compute final pass rate for each mutation order."""
+        pass_rates = {}
+        for order in sorted(jobs_by_order.keys()):
+            order_jobs = jobs_by_order[order]
+            passed = 0
+            total = 0
+            for job in order_jobs:
+                if job in job_series:
+                    series = job_series[job]
+                    if series:
+                        final_acc = series[-1]
+                        if final_acc >= threshold:
+                            passed += 1
+                        total += 1
+            if total > 0:
+                pass_rates[order] = 100.0 * passed / total
+            else:
+                pass_rates[order] = 0.0
+        return pass_rates
+
+    def plot_pass_rate_by_mutation_order(
+        gp_series: Dict[Tuple[str, str], List[float]],
+        grad_series: Optional[Dict[Tuple[str, str], List[float]]],
+        exh_series: Optional[Dict[Tuple[str, str], List[float]]],
+        jobs_by_order: Dict[int, List[Tuple[str, str]]],
+        threshold: float,
+        title_suffix: str,
+        filename_base: str,
+        output_dir: Path,
+    ) -> Dict:
+        """Create plots showing pass rate by mutation order for GP, GBPR, and BFS.
+        Returns the data dictionary for JSON output."""
+        # Compute pass rates for each method
+        gp_rates = compute_pass_rate_by_order(gp_series, jobs_by_order, threshold)
+        
+        grad_rates = {}
+        if grad_series:
+            grad_rates = compute_pass_rate_by_order(grad_series, jobs_by_order, threshold)
+        
+        exh_rates = {}
+        if exh_series:
+            exh_rates = compute_pass_rate_by_order(exh_series, jobs_by_order, threshold)
+        
+        # Get all mutation orders
+        all_orders = sorted(set(list(gp_rates.keys()) + list(grad_rates.keys()) + list(exh_rates.keys())))
+        if not all_orders:
+            return {}
+        
+        # Prepare data for plotting
+        gp_values = [gp_rates.get(order, 0.0) for order in all_orders]
+        grad_values = [grad_rates.get(order, 0.0) for order in all_orders] if grad_rates else []
+        exh_values = [exh_rates.get(order, 0.0) for order in all_orders] if exh_rates else []
+        
+        # Prepare data dictionary for JSON
+        data_dict = {
+            "mutation_orders": all_orders,
+            "gp": {order: gp_rates.get(order, 0.0) for order in all_orders},
+        }
+        if grad_rates:
+            data_dict["gbpr"] = {order: grad_rates.get(order, 0.0) for order in all_orders}
+        if exh_rates:
+            data_dict["bfs"] = {order: exh_rates.get(order, 0.0) for order in all_orders}
+        
+        # Create grouped bar chart
+        x = np.arange(len(all_orders))
+        num_methods = sum([1, bool(grad_values), bool(exh_values)])
+        width = 0.8 / num_methods if num_methods > 0 else 0.8
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        bars = []
+        offset = -width * (num_methods - 1) / 2
+        
+        # GP bars
+        bars.append(ax.bar(x + offset, gp_values, width, label='GP', color='#1f77b4'))
+        offset += width
+        
+        # GBPR bars
+        if grad_values:
+            bars.append(ax.bar(x + offset, grad_values, width, label='GBPR', color='#2ca02c'))
+            offset += width
+        
+        # BFS (Exhaustive) bars
+        if exh_values:
+            bars.append(ax.bar(x + offset, exh_values, width, label='BFS', color='#ff7f0e'))
+            offset += width
+        
+        ax.set_xlabel('Mutation Order')
+        ax.set_ylabel('Pass Rate (%)')
+        ax.set_title(f'Pass Rate by Mutation Order{title_suffix}')
+        ax.set_xticks(x)
+        ax.set_xticklabels(all_orders)
+        ax.legend()
+        ax.set_ylim(0, 100)
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # Add value labels on bars
+        for bar_group in bars:
+            for bar in bar_group:
+                height = bar.get_height()
+                if height > 0:
+                    ax.text(bar.get_x() + bar.get_width()/2., height,
+                           f'{height:.1f}%',
+                           ha='center', va='bottom', fontsize=8)
+        
+        plt.tight_layout()
+        bar_filename = filename_base.replace('.pdf', '_bars.pdf')
+        plt.savefig(output_dir / bar_filename, bbox_inches="tight", format="pdf")
+        plt.close()
+        print(f"Saved figure to {output_dir / bar_filename}")
+        
+        # Create line plot
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        ax.plot(all_orders, gp_values, marker='o', label='GP', color='#1f77b4', linewidth=2, markersize=8)
+        if grad_values:
+            ax.plot(all_orders, grad_values, marker='s', label='GBPR', color='#2ca02c', linewidth=2, markersize=8)
+        if exh_values:
+            ax.plot(all_orders, exh_values, marker='^', label='BFS', color='#ff7f0e', linewidth=2, markersize=8)
+        
+        ax.set_xlabel('Mutation Order')
+        ax.set_ylabel('Pass Rate (%)')
+        ax.set_title(f'Pass Rate by Mutation Order{title_suffix}')
+        ax.set_xticks(all_orders)
+        ax.legend()
+        ax.set_ylim(0, 100)
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        line_filename = filename_base.replace('.pdf', '_lines.pdf')
+        plt.savefig(output_dir / line_filename, bbox_inches="tight", format="pdf")
+        plt.close()
+        print(f"Saved figure to {output_dir / line_filename}")
+        
+        return data_dict
+
+    # Plot 1: With most-freq (all programs)
+    all_data = plot_pass_rate_by_mutation_order(
+        gp_job_series,
+        grad_job_series if grad_job_series else None,
+        exhaustive_job_series if exhaustive_job_series else None,
+        jobs_by_mutation_order,
+        args.threshold,
+        "",
+        "pass_rate_by_mutation_order_all.pdf",
+        output_dir,
+    )
+    
+    # Plot 2: Without most-freq
+    filtered_data = {}
+    if most_freq_program and jobs_by_mutation_order_filtered:
+        filtered_data = plot_pass_rate_by_mutation_order(
+            filtered_gp_job_series,
+            filtered_grad_job_series if filtered_grad_job_series else None,
+            filtered_exh_job_series if filtered_exh_job_series else None,
+            jobs_by_mutation_order_filtered,
+            args.threshold,
+            f" (Excluding {most_freq_program})",
+            f"pass_rate_by_mutation_order_excluding_{most_freq_program.replace('/', '_')}.pdf",
+            output_dir,
+        )
+
+    # Print JSON results to stdout
+    results_json = {
+        "threshold": args.threshold,
+        "all_programs": all_data,
+    }
+    if filtered_data:
+        results_json["excluding_most_freq"] = filtered_data
+    
+    print("\n" + "="*80)
+    print("Pass Rate by Mutation Order Results (JSON):")
+    print("="*80)
+    print(json.dumps(results_json, indent=2))
+    print("="*80)
 
     print(f"\nAll plots saved to {output_dir}")
 
