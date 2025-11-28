@@ -204,9 +204,19 @@ def create_plot(
         gp_job_series, threshold
     )
 
+    target_epoch = 500
     plt.figure(figsize=(8, 5))
     # GP baseline lines
     plt.plot(x_gp, gp_fixed_pct, label="GP", color="#1f77b4")
+    if x_gp and x_gp[-1] < target_epoch:
+        plt.plot(
+            [x_gp[-1], target_epoch],
+            [gp_fixed_pct[-1], gp_fixed_pct[-1]],
+            color="#1f77b4",
+            linestyle="--",
+            dashes=(1, 1),
+        )
+
     if show_median_avg:
         plt.plot(
             x_gp,
@@ -215,6 +225,14 @@ def create_plot(
             color="#1f77b4",
             linestyle="--",
         )
+        if x_gp and x_gp[-1] < target_epoch:
+            plt.plot(
+                [x_gp[-1], target_epoch],
+                [gp_median_pct[-1], gp_median_pct[-1]],
+                color="#1f77b4",
+                linestyle="--",
+                dashes=(1, 1),
+            )
         plt.plot(
             x_gp,
             gp_mean_pct,
@@ -222,6 +240,14 @@ def create_plot(
             color="#1f77b4",
             linestyle=":",
         )
+        if x_gp and x_gp[-1] < target_epoch:
+            plt.plot(
+                [x_gp[-1], target_epoch],
+                [gp_mean_pct[-1], gp_mean_pct[-1]],
+                color="#1f77b4",
+                linestyle="--",
+                dashes=(1, 1),
+            )
     # Gradient-based lines (if available)
     if grad_job_series:
         x_grad, grad_fixed_pct, grad_median_pct, grad_mean_pct = aggregate_job_series(
@@ -233,6 +259,14 @@ def create_plot(
             label="GBPR",
             color="#2ca02c",
         )
+        if x_grad and x_grad[-1] < target_epoch:
+            plt.plot(
+                [x_grad[-1], target_epoch],
+                [grad_fixed_pct[-1], grad_fixed_pct[-1]],
+                color="#2ca02c",
+                linestyle="--",
+                dashes=(1, 1),
+            )
         if show_median_avg:
             plt.plot(
                 x_grad,
@@ -241,6 +275,14 @@ def create_plot(
                 color="#2ca02c",
                 linestyle="--",
             )
+            if x_grad and x_grad[-1] < target_epoch:
+                plt.plot(
+                    [x_grad[-1], target_epoch],
+                    [grad_median_pct[-1], grad_median_pct[-1]],
+                    color="#2ca02c",
+                    linestyle="--",
+                    dashes=(1, 1),
+                )
             plt.plot(
                 x_grad,
                 grad_mean_pct,
@@ -248,6 +290,14 @@ def create_plot(
                 color="#2ca02c",
                 linestyle=":",
             )
+            if x_grad and x_grad[-1] < target_epoch:
+                plt.plot(
+                    [x_grad[-1], target_epoch],
+                    [grad_mean_pct[-1], grad_mean_pct[-1]],
+                    color="#2ca02c",
+                    linestyle="--",
+                    dashes=(1, 1),
+                )
     # Exhaustive search lines (if available)
     if exhaustive_job_series:
         x_exh, exh_fixed_pct, exh_median_pct, exh_mean_pct = aggregate_job_series(
@@ -259,6 +309,14 @@ def create_plot(
             label="BFS",
             color="#ff7f0e",
         )
+        if x_exh and x_exh[-1] < target_epoch:
+            plt.plot(
+                [x_exh[-1], target_epoch],
+                [exh_fixed_pct[-1], exh_fixed_pct[-1]],
+                color="#ff7f0e",
+                linestyle="--",
+                dashes=(1, 1),
+            )
         if show_median_avg:
             plt.plot(
                 x_exh,
@@ -267,6 +325,14 @@ def create_plot(
                 color="#ff7f0e",
                 linestyle="--",
             )
+            if x_exh and x_exh[-1] < target_epoch:
+                plt.plot(
+                    [x_exh[-1], target_epoch],
+                    [exh_median_pct[-1], exh_median_pct[-1]],
+                    color="#ff7f0e",
+                    linestyle="--",
+                    dashes=(1, 1),
+                )
             plt.plot(
                 x_exh,
                 exh_mean_pct,
@@ -274,6 +340,14 @@ def create_plot(
                 color="#ff7f0e",
                 linestyle=":",
             )
+            if x_exh and x_exh[-1] < target_epoch:
+                plt.plot(
+                    [x_exh[-1], target_epoch],
+                    [exh_mean_pct[-1], exh_mean_pct[-1]],
+                    color="#ff7f0e",
+                    linestyle="--",
+                    dashes=(1, 1),
+                )
     plt.xlabel("Epochs")
     plt.ylabel("% fixed programs")
     plt.ylim(0, 100)
