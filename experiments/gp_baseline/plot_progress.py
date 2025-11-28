@@ -355,9 +355,9 @@ def create_plot(
     plt.legend()
     # Add program count to title
     if title:
-        plt.title(f"{title} ({n_gp} programs)")
+        plt.title(f"{title} ({n_gp} buggy mutants)")
     else:
-        plt.title(f"({n_gp} programs)")
+        plt.title(f"({n_gp} buggy mutants)")
 
 
 def main():
@@ -475,7 +475,7 @@ def main():
         grad_job_series if grad_job_series else None,
         exhaustive_job_series if exhaustive_job_series else None,
         args.threshold,
-        title="All Programs Combined",
+        title="All Buggy Mutants Combined",
         show_median_avg=args.show_median_avg,
     )
     plt.savefig(output_dir / "all_programs.pdf", bbox_inches="tight", format="pdf")
@@ -534,7 +534,7 @@ def main():
             filtered_grad_job_series if filtered_grad_job_series else None,
             filtered_exh_job_series if filtered_exh_job_series else None,
             args.threshold,
-            title=f"All Programs Combined (excluding {most_freq_program})",
+            title=f"All Buggy Mutants Combined (excluding {most_freq_program})",
             show_median_avg=args.show_median_avg,
         )
         safe_prog_name = most_freq_program.replace("/", "_")
@@ -683,7 +683,7 @@ def main():
                     order_grad_series,
                     order_exh_series,
                     args.threshold,
-                    title=f"Mutation Order: {order} (All Programs, excluding {most_freq_program})",
+                    title=f"Mutation Order: {order} (All Buggy Mutants, excluding {most_freq_program})",
                     show_median_avg=args.show_median_avg,
                 )
                 plt.savefig(
@@ -788,7 +788,7 @@ def main():
                         order_ge_grad_series,
                         order_ge_exh_series,
                         args.threshold,
-                        title=f"Mutation Order >= {min_order} (All Programs, excluding {most_freq_program})",
+                        title=f"Mutation Order >= {min_order} (All Buggy Mutants, excluding {most_freq_program})",
                         show_median_avg=args.show_median_avg,
                     )
                     plt.savefig(
