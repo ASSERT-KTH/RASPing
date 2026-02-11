@@ -1,6 +1,7 @@
 import sys
 import os
 import click
+import numpy as np
 
 from pathlib import Path
 
@@ -39,6 +40,8 @@ def train_mutated_model(
     loss_fn_name: str = "cross_entropy_loss",
     store_trajectory: bool = False,
     trajectory_store_interval: int = 10,
+    n_train_samples: int = None,
+    seed: int = 42,
 ):
     if loss_fn_name not in LOSS_FUNCTIONS:
         raise ValueError(f"Loss function {loss_fn_name} not found")
@@ -66,6 +69,12 @@ def train_mutated_model(
     X_val, Y_val = encodeAndPadData(
         val_dataset, model.raspFunction, model.inputs, max_len
     )
+
+    # Optionally subsample the training set
+    if n_train_samples is not None and n_train_samples < len(X_train):
+        rng = np.random.default_rng(seed=seed)
+        indices = rng.choice(len(X_train), n_train_samples, replace=False)
+        X_train, Y_train = X_train[indices], Y_train[indices]
 
     # Train the model and get metrics
     trainer = Trainer(
@@ -135,6 +144,10 @@ def train_mutated_model(
     default=10,
     help="Interval (in steps) for storing trajectory points"
 )
+@click.option("--n_train_samples", type=int, default=None,
+              help="Number of training samples to use (None = use all)")
+@click.option("--seed", type=int, default=42,
+              help="Random seed for training-set subsampling")
 def run_test(
     program_name,
     job_id,
@@ -148,6 +161,8 @@ def run_test(
     loss_fn_name,
     store_trajectory,
     trajectory_store_interval,
+    n_train_samples,
+    seed,
 ):
     print(f"Training mutated model {program_name} (job {job_id}) with {loss_fn_name}...")
     if not output_dir:
@@ -165,6 +180,8 @@ def run_test(
         loss_fn_name=loss_fn_name,
         store_trajectory=store_trajectory,
         trajectory_store_interval=trajectory_store_interval,
+        n_train_samples=n_train_samples,
+        seed=seed,
     )
 
 
