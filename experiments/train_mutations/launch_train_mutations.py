@@ -30,6 +30,8 @@ def run_in_container(
     loss_fn_name: str = "cross_entropy_loss",
     store_trajectory: bool = False,
     trajectory_store_interval: int = 50,
+    n_train_samples: int = None,
+    seed: int = 42,
 ):
     """Wrapper to run train_mutations.py inside the apptainer container"""
     # Get path to container.sif relative to repository root
@@ -61,6 +63,10 @@ def run_in_container(
         "--loss_fn_name",
         loss_fn_name,
     ]
+
+    # Add n_train_samples and seed if specified
+    if n_train_samples is not None:
+        cmd.extend(["--n_train_samples", str(n_train_samples), "--seed", str(seed)])
 
     # Add trajectory storage options
     if store_trajectory:
