@@ -32,6 +32,7 @@ def run_in_container(
     trajectory_store_interval: int = 50,
     n_train_samples: int = None,
     seed: int = 42,
+    n_steps: int = None,
 ):
     """Wrapper to run train_mutations.py inside the apptainer container"""
     # Get path to container.sif relative to repository root
@@ -67,6 +68,10 @@ def run_in_container(
     # Add n_train_samples and seed if specified
     if n_train_samples is not None:
         cmd.extend(["--n_train_samples", str(n_train_samples), "--seed", str(seed)])
+
+    # Add n_steps if specified
+    if n_steps is not None:
+        cmd.extend(["--n_steps", str(n_steps)])
 
     # Add trajectory storage options
     if store_trajectory:

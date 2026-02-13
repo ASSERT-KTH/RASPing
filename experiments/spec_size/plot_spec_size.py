@@ -1,20 +1,27 @@
 """
-plot_spec_size.py  –  Specification Size Ablation Plot
+plot_spec_size.py  –  Specification Size Ablation Plots
 
-For each N in N_VALUES, reads test_results.json from all (program, job_id)
-pairs and computes pct_fixed(N) = % of mutations where test_accuracy >= threshold.
+Plot A — Final performance vs N (spec_size_ablation.pdf):
+  X-axis: N (log scale); Y-axis: % bugs fixed (test_accuracy >= threshold)
+  One GBPR curve; dashed horizontal lines for GP and BFS baselines.
 
-Optionally broken down by mutation order (from aggregated_mutations.json).
+Plot B — Learning curves at different N (spec_size_curves.pdf):
+  X-axis: gradient steps (reconstructed from val_accs.npy + steps_per_epoch)
+  Y-axis: mean val accuracy
+  One line per N value.
 
-Loads GP/BFS final performance from their result directories to show as
-horizontal reference lines.
+Directory layout expected:
+  saved_data/{program}/n_{N}/seed_{S}/{loss_fn}/job_{job_id}/
+    test_results.json
+    val_accs.npy
 
 Usage:
     python plot_spec_size.py \
         --saved-data-dir saved_data \
         --gp-results-dir ../gp_baseline/results \
         --exhaustive-results-dir ../gp_baseline/exhaustive_results \
-        --output-dir plots
+        --output-dir plots \
+        --threshold 1.0
 """
 
 import json
@@ -27,6 +34,8 @@ from typing import Dict, List, Optional, Tuple
 
 
 N_VALUES = [100, 250, 500, 1000, 2500, 5000, 10000, 25000, 40000]
+BATCH_SIZE = 256
+VAL_STEP = 10  # val_accs recorded every valStep=10 epochs
 
 
 # ---------------------------------------------------------------------------
@@ -54,14 +63,14 @@ def load_spec_size_results(
 ) -> Dict[int, List[dict]]:
     """
     For each N, collect all test_results.json files from:
-        saved_data_dir/{program}/n_{N}/{loss_fn_name}/job_{job_id}/test_results.json
+        saved_data_dir/{program}/n_{N}/seed_*/{loss_fn_name}/job_{job_id}/test_results.json
 
     Returns a dict: N -> list of result dicts.
     """
     results_by_n: Dict[int, List[dict]] = {n: [] for n in n_values}
 
     for n in n_values:
-        pattern = f"*/n_{n}/{loss_fn_name}/*/test_results.json"
+        pattern = f"*/n_{n}/seed_*/{loss_fn_name}/*/test_results.json"
         for result_file in sorted(saved_data_dir.glob(pattern)):
             try:
                 with open(result_file) as f:
@@ -71,6 +80,30 @@ def load_spec_size_results(
                 print(f"Warning: could not read {result_file}: {e}")
 
     return results_by_n
+
+
+def load_val_accs_by_n(
+    saved_data_dir: Path,
+    n_values: List[int],
+    loss_fn_name: str = "cross_entropy_loss",
+) -> Dict[int, List[np.ndarray]]:
+    """
+    For each N, collect val_accs.npy arrays from all jobs.
+
+    Returns a dict: N -> list of val_accs arrays (one per job).
+    """
+    val_accs_by_n: Dict[int, List[np.ndarray]] = {n: [] for n in n_values}
+
+    for n in n_values:
+        pattern = f"*/n_{n}/seed_*/{loss_fn_name}/*/val_accs.npy"
+        for val_file in sorted(saved_data_dir.glob(pattern)):
+            try:
+                arr = np.load(val_file)
+                val_accs_by_n[n].append(arr)
+            except (OSError, ValueError) as e:
+                print(f"Warning: could not read {val_file}: {e}")
+
+    return val_accs_by_n
 
 
 def compute_pct_fixed(results: List[dict], threshold: float = 1.0) -> Optional[float]:
@@ -118,7 +151,7 @@ def load_gp_final_pct_fixed(results_dir: Path, threshold: float) -> Optional[flo
 
 
 # ---------------------------------------------------------------------------
-# Plotting
+# Plot A — Final performance vs N
 # ---------------------------------------------------------------------------
 
 def plot_spec_size_ablation(
@@ -143,7 +176,7 @@ def plot_spec_size_ablation(
             overall_y.append(pct)
 
     if not overall_x:
-        print("No results found; skipping plot.")
+        print("No results found for Plot A; skipping.")
         return
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -194,11 +227,8 @@ def plot_spec_size_ablation(
 
     # ----- Per-mutation-order breakdown ------------------------------------
     if by_mutation_order and mutation_orders:
-        # Determine which orders exist
         all_orders = sorted(set(mutation_orders.values()))
 
-        # Build results_by_n_by_order
-        # results_by_n_by_order[order][n] = list of results
         results_by_order: Dict[int, Dict[int, List[dict]]] = {
             order: {n: [] for n in n_values} for order in all_orders
         }
@@ -279,6 +309,78 @@ def plot_spec_size_ablation(
 
 
 # ---------------------------------------------------------------------------
+# Plot B — Learning curves at different N
+# ---------------------------------------------------------------------------
+
+def plot_learning_curves(
+    val_accs_by_n: Dict[int, List[np.ndarray]],
+    n_values: List[int],
+    output_dir: Path,
+    batch_size: int = BATCH_SIZE,
+    val_step: int = VAL_STEP,
+):
+    """
+    Plot mean val accuracy vs gradient steps for each N value.
+
+    The step axis is reconstructed as:
+        step = epoch_idx * val_step * steps_per_epoch
+    where steps_per_epoch = max(1, N // batch_size).
+
+    val_accs.npy records one value every val_step epochs, so
+    epoch_idx=0 corresponds to epoch 0, epoch_idx=1 to epoch val_step, etc.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    has_data = any(len(val_accs_by_n[n]) > 0 for n in n_values)
+    if not has_data:
+        print("No val_accs.npy files found for Plot B; skipping.")
+        return
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    colors = plt.cm.viridis(np.linspace(0.1, 0.9, len(n_values)))
+
+    for n, color in zip(n_values, colors):
+        arrays = val_accs_by_n[n]
+        if not arrays:
+            continue
+
+        steps_per_epoch = max(1, n // batch_size)
+
+        # Align arrays to the shortest length so we can average
+        min_len = min(len(a) for a in arrays)
+        if min_len == 0:
+            continue
+        stacked = np.stack([a[:min_len] for a in arrays], axis=0)  # (n_jobs, T)
+        mean_acc = np.mean(stacked, axis=0)                          # (T,)
+
+        # Reconstruct gradient-step axis
+        # epoch_idx i corresponds to epoch i * val_step
+        # steps at that epoch = i * val_step * steps_per_epoch
+        steps = np.arange(len(mean_acc)) * val_step * steps_per_epoch
+
+        ax.plot(
+            steps,
+            mean_acc * 100,
+            label=f"N={n} ({len(arrays)} jobs)",
+            color=color,
+            linewidth=1.5,
+            alpha=0.9,
+        )
+
+    ax.set_xlabel("Gradient steps", fontsize=12)
+    ax.set_ylabel("Mean val accuracy (%)", fontsize=12)
+    ax.set_title("Learning Curves by Specification Size", fontsize=13)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=9, bbox_to_anchor=(1.02, 1), loc="upper left")
+
+    plt.tight_layout()
+    out_path = output_dir / "spec_size_curves.pdf"
+    plt.savefig(out_path, bbox_inches="tight", format="pdf")
+    plt.close()
+    print(f"Saved {out_path}")
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -343,6 +445,11 @@ def main(
     for n in N_VALUES:
         print(f"  N={n:>6}: {len(results_by_n[n])} results")
 
+    # Load val_accs for Plot B
+    val_accs_by_n = load_val_accs_by_n(saved_data_path, N_VALUES, loss_fn_name)
+    for n in N_VALUES:
+        print(f"  N={n:>6}: {len(val_accs_by_n[n])} val_accs arrays")
+
     # Load mutation orders for breakdown plot
     mutation_orders = load_mutation_orders(script_dir)
     print(f"Loaded mutation orders for {len(mutation_orders)} jobs")
@@ -366,6 +473,7 @@ def main(
         else:
             print(f"Warning: no BFS results loaded from {bfs_path}")
 
+    # Plot A — final performance vs N
     plot_spec_size_ablation(
         results_by_n=results_by_n,
         mutation_orders=mutation_orders,
@@ -375,6 +483,13 @@ def main(
         bfs_pct=bfs_pct,
         output_dir=output_path,
         by_mutation_order=by_mutation_order,
+    )
+
+    # Plot B — learning curves at different N
+    plot_learning_curves(
+        val_accs_by_n=val_accs_by_n,
+        n_values=N_VALUES,
+        output_dir=output_path,
     )
 
 
