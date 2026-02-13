@@ -6,8 +6,8 @@ from pathlib import Path
 
 
 N_VALUES = [100, 1000, 5000, 10000, 25000]
-
-SEED = 42
+SEEDS = [42]          # extend to [42, 123, 456] for multi-seed error bars later
+N_STEPS = 500_000     # fixed gradient-step budget for all (mutation, N) pairs
 
 
 def get_executor() -> submitit.AutoExecutor:
@@ -27,9 +27,9 @@ def run_train_and_test(
     program_name: str,
     job_id: str,
     n_train_samples: int,
-    seed: int = SEED,
+    seed: int,
+    n_steps: int = N_STEPS,
     max_len: int = 10,
-    n_epochs: int = 10000,
     batch_size: int = 256,
     learning_rate: float = 1e-04,
     loss_fn_name: str = "cross_entropy_loss",
@@ -48,7 +48,7 @@ def run_train_and_test(
     else:
         full_output_dir = (
             Path(__file__).parent
-            / f"saved_data/{program_name}/n_{n_train_samples}/{loss_fn_name}/job_{job_id}"
+            / f"saved_data/{program_name}/n_{n_train_samples}/seed_{seed}/{loss_fn_name}/job_{job_id}"
         )
 
     train_cmd = [
@@ -61,12 +61,12 @@ def run_train_and_test(
         "--program_name", program_name,
         "--job_id", job_id,
         "--max_len", str(max_len),
-        "--n_epochs", str(n_epochs),
         "--batch_size", str(batch_size),
         "--learning_rate", str(learning_rate),
         "--loss_fn_name", loss_fn_name,
         "--n_train_samples", str(n_train_samples),
         "--seed", str(seed),
+        "--n_steps", str(n_steps),
         "--no-store-trajectory",
         "--output_dir", str(full_output_dir),
     ]
@@ -88,7 +88,7 @@ def run_train_and_test(
     try:
         subprocess.run(train_cmd, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        print(f"Error training {program_name} (job {job_id}) n={n_train_samples}:")
+        print(f"Error training {program_name} (job {job_id}) n={n_train_samples} seed={seed}:")
         print(f"stdout: {e.stdout}")
         print(f"stderr: {e.stderr}")
         raise
@@ -96,7 +96,7 @@ def run_train_and_test(
     try:
         subprocess.run(test_cmd, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        print(f"Error testing {program_name} (job {job_id}) n={n_train_samples}:")
+        print(f"Error testing {program_name} (job {job_id}) n={n_train_samples} seed={seed}:")
         print(f"stdout: {e.stdout}")
         print(f"stderr: {e.stderr}")
         raise
@@ -122,31 +122,32 @@ def main():
         job_id = row["job_id"]
 
         for n in N_VALUES:
-            output_dir = (
-                f"saved_data/{program_name}/n_{n}/{loss_fn_name}/job_{job_id}"
-            )
-            # Skip if test_results.json already exists
-            results_path = Path(__file__).parent / output_dir / "test_results.json"
-            if results_path.exists():
-                print(
-                    f"Skipping {program_name} (job {job_id}) n={n}: already completed"
+            for seed in SEEDS:
+                output_dir = (
+                    f"saved_data/{program_name}/n_{n}/seed_{seed}/{loss_fn_name}/job_{job_id}"
                 )
-                continue
+                # Skip if test_results.json already exists
+                results_path = Path(__file__).parent / output_dir / "test_results.json"
+                if results_path.exists():
+                    print(
+                        f"Skipping {program_name} (job {job_id}) n={n} seed={seed}: already completed"
+                    )
+                    continue
 
-            job = executor.submit(
-                run_train_and_test,
-                program_name=program_name,
-                job_id=job_id,
-                n_train_samples=n,
-                seed=SEED,
-                max_len=10,
-                n_epochs=10000,
-                batch_size=256,
-                learning_rate=1e-04,
-                loss_fn_name=loss_fn_name,
-                output_dir=output_dir,
-            )
-            jobs.append(job)
+                job = executor.submit(
+                    run_train_and_test,
+                    program_name=program_name,
+                    job_id=job_id,
+                    n_train_samples=n,
+                    seed=seed,
+                    n_steps=N_STEPS,
+                    max_len=10,
+                    batch_size=256,
+                    learning_rate=1e-04,
+                    loss_fn_name=loss_fn_name,
+                    output_dir=output_dir,
+                )
+                jobs.append(job)
 
     print(f"Submitted {len(jobs)} jobs")
 

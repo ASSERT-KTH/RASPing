@@ -1,5 +1,6 @@
 import sys
 import os
+import math
 import click
 import numpy as np
 
@@ -42,6 +43,7 @@ def train_mutated_model(
     trajectory_store_interval: int = 10,
     n_train_samples: int = None,
     seed: int = 42,
+    n_steps: int = None,
 ):
     if loss_fn_name not in LOSS_FUNCTIONS:
         raise ValueError(f"Loss function {loss_fn_name} not found")
@@ -76,6 +78,17 @@ def train_mutated_model(
         indices = rng.choice(len(X_train), n_train_samples, replace=False)
         X_train, Y_train = X_train[indices], Y_train[indices]
 
+    # Convert n_steps to n_epochs if provided (equal compute budget across N values)
+    if n_steps is not None:
+        steps_per_epoch = max(1, len(X_train) // batch_size)
+        n_epochs = math.ceil(n_steps / steps_per_epoch)
+
+    # Build W&B run name and extra config
+    wandb_name = f"{program_name}_{job_id}_{loss_fn_name}"
+    if n_train_samples is not None:
+        wandb_name += f"_n{n_train_samples}_s{seed}"
+    wandb_extra_config = {"n_train_samples": n_train_samples or len(X_train), "seed": seed}
+
     # Train the model and get metrics
     trainer = Trainer(
         model=model,
@@ -94,9 +107,10 @@ def train_mutated_model(
         output_dir=output_dir,
         use_wandb=True,
         wandb_project="dpr-mutation-training",
-        wandb_name=f"{program_name}_{job_id}_{loss_fn_name}",
+        wandb_name=wandb_name,
         store_trajectory=store_trajectory,
         trajectory_store_interval=trajectory_store_interval,
+        wandb_extra_config=wandb_extra_config,
     )
 
     # Trainer will train the model log metrics, and save metrics and results to output_dir
@@ -148,6 +162,8 @@ def train_mutated_model(
               help="Number of training samples to use (None = use all)")
 @click.option("--seed", type=int, default=42,
               help="Random seed for training-set subsampling")
+@click.option("--n_steps", type=int, default=None,
+              help="Total gradient steps (overrides n_epochs; ensures equal compute across N values)")
 def run_test(
     program_name,
     job_id,
@@ -163,6 +179,7 @@ def run_test(
     trajectory_store_interval,
     n_train_samples,
     seed,
+    n_steps,
 ):
     print(f"Training mutated model {program_name} (job {job_id}) with {loss_fn_name}...")
     if not output_dir:
@@ -182,6 +199,7 @@ def run_test(
         trajectory_store_interval=trajectory_store_interval,
         n_train_samples=n_train_samples,
         seed=seed,
+        n_steps=n_steps,
     )
 
 
