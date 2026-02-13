@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 
 
-N_VALUES = [100, 250, 500, 1000, 2500, 5000, 10000, 25000, 40000]
+N_VALUES = [100, 1000, 5000, 10000, 25000]
 
 SEED = 42
 
