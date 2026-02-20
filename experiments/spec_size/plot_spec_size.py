@@ -36,6 +36,7 @@ from typing import Dict, List, Optional, Tuple
 N_VALUES = [100, 250, 500, 1000, 2500, 5000, 10000, 25000, 40000]
 BATCH_SIZE = 256
 VAL_STEP = 10  # val_accs recorded every valStep=10 epochs
+THRESHOLDS = [0.99, 0.999, 1.0]
 
 
 # ---------------------------------------------------------------------------
@@ -65,6 +66,7 @@ def load_spec_size_results(
     For each N, collect all test_results.json files from:
         saved_data_dir/{program}/n_{N}/seed_*/{loss_fn_name}/job_{job_id}/test_results.json
 
+    Injects '_program' (from path) into each record.
     Returns a dict: N -> list of result dicts.
     """
     results_by_n: Dict[int, List[dict]] = {n: [] for n in n_values}
@@ -75,6 +77,8 @@ def load_spec_size_results(
             try:
                 with open(result_file) as f:
                     rec = json.load(f)
+                # Inject program name from path (first component relative to saved_data_dir)
+                rec["_program"] = result_file.relative_to(saved_data_dir).parts[0]
                 results_by_n[n].append(rec)
             except (json.JSONDecodeError, OSError) as e:
                 print(f"Warning: could not read {result_file}: {e}")
@@ -112,6 +116,27 @@ def compute_pct_fixed(results: List[dict], threshold: float = 1.0) -> Optional[f
         return None
     fixed = sum(1 for r in results if r.get("test_accuracy", 0.0) >= threshold)
     return 100.0 * fixed / len(results)
+
+
+def filter_results_by_n(
+    results_by_n: Dict[int, List[dict]],
+    n_values: List[int],
+    program: Optional[str] = None,
+    mutation_order: Optional[int] = None,
+    mutation_orders: Optional[Dict[str, int]] = None,
+) -> Dict[int, List[dict]]:
+    """Return a filtered copy of results_by_n restricted to the given program and/or mutation order."""
+    filtered: Dict[int, List[dict]] = {n: [] for n in n_values}
+    for n in n_values:
+        for rec in results_by_n[n]:
+            if program is not None and rec.get("_program") != program:
+                continue
+            if mutation_order is not None:
+                job_id = rec.get("job_id")
+                if mutation_orders is None or mutation_orders.get(job_id) != mutation_order:
+                    continue
+            filtered[n].append(rec)
+    return filtered
 
 
 # ---------------------------------------------------------------------------
@@ -156,17 +181,16 @@ def load_gp_final_pct_fixed(results_dir: Path, threshold: float) -> Optional[flo
 
 def plot_spec_size_ablation(
     results_by_n: Dict[int, List[dict]],
-    mutation_orders: Dict[str, int],
     threshold: float,
     n_values: List[int],
     gp_pct: Optional[float],
     bfs_pct: Optional[float],
     output_dir: Path,
-    by_mutation_order: bool = False,
+    filename_suffix: str = "",
+    title_suffix: str = "",
 ):
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # ----- Overall curve ---------------------------------------------------
     overall_x: List[int] = []
     overall_y: List[float] = []
     for n in n_values:
@@ -176,22 +200,22 @@ def plot_spec_size_ablation(
             overall_y.append(pct)
 
     if not overall_x:
-        print("No results found for Plot A; skipping.")
+        print(f"No results found for ablation plot{title_suffix}; skipping.")
         return
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
+    total_results = sum(len(results_by_n[n]) for n in n_values if results_by_n[n])
     ax.plot(
         overall_x,
         overall_y,
         marker="o",
-        label=f"GBPR (n={sum(len(results_by_n[n]) for n in n_values if results_by_n[n])} total)",
+        label=f"GBPR (n={total_results} total)",
         color="#2ca02c",
         linewidth=2,
         markersize=7,
     )
 
-    # Reference lines for GP and BFS
     if gp_pct is not None:
         ax.axhline(
             gp_pct,
@@ -212,7 +236,10 @@ def plot_spec_size_ablation(
     ax.set_xscale("log")
     ax.set_xlabel("Number of training samples (N)", fontsize=12)
     ax.set_ylabel("% mutations fixed", fontsize=12)
-    ax.set_title("Specification Size Ablation", fontsize=13)
+    title = f"Specification Size Ablation (threshold={threshold})"
+    if title_suffix:
+        title += f"\n{title_suffix}"
+    ax.set_title(title, fontsize=13)
     ax.set_ylim(0, 100)
     ax.set_xticks(overall_x)
     ax.set_xticklabels([str(n) for n in overall_x], rotation=45, ha="right")
@@ -220,92 +247,11 @@ def plot_spec_size_ablation(
     ax.legend(fontsize=10)
 
     plt.tight_layout()
-    out_path = output_dir / "spec_size_ablation.pdf"
+    thresh_str = f"{threshold:.3f}".rstrip("0").rstrip(".")
+    out_path = output_dir / f"spec_size_ablation_thresh{thresh_str}{filename_suffix}.pdf"
     plt.savefig(out_path, bbox_inches="tight", format="pdf")
     plt.close()
     print(f"Saved {out_path}")
-
-    # ----- Per-mutation-order breakdown ------------------------------------
-    if by_mutation_order and mutation_orders:
-        all_orders = sorted(set(mutation_orders.values()))
-
-        results_by_order: Dict[int, Dict[int, List[dict]]] = {
-            order: {n: [] for n in n_values} for order in all_orders
-        }
-        for n in n_values:
-            for rec in results_by_n[n]:
-                job_id = rec.get("job_id")
-                order = mutation_orders.get(job_id)
-                if order is not None:
-                    results_by_order[order][n].append(rec)
-
-        fig, ax = plt.subplots(figsize=(9, 5))
-
-        colors = plt.cm.tab10(np.linspace(0, 1, len(all_orders)))
-        for order, color in zip(all_orders, colors):
-            xs: List[int] = []
-            ys: List[float] = []
-            for n in n_values:
-                pct = compute_pct_fixed(results_by_order[order][n], threshold)
-                if pct is not None:
-                    xs.append(n)
-                    ys.append(pct)
-            if xs:
-                n_jobs = len(results_by_order[order][n_values[-1]])
-                ax.plot(
-                    xs,
-                    ys,
-                    marker="o",
-                    label=f"Order {order} (n={n_jobs})",
-                    color=color,
-                    linewidth=1.8,
-                    markersize=6,
-                )
-
-        # Overall GBPR curve as reference
-        ax.plot(
-            overall_x,
-            overall_y,
-            marker="s",
-            label="GBPR overall",
-            color="#2ca02c",
-            linewidth=2.5,
-            markersize=7,
-            linestyle="-.",
-        )
-
-        if gp_pct is not None:
-            ax.axhline(
-                gp_pct,
-                color="#1f77b4",
-                linestyle="--",
-                linewidth=1.5,
-                label=f"GP final ({gp_pct:.1f}%)",
-            )
-        if bfs_pct is not None:
-            ax.axhline(
-                bfs_pct,
-                color="#ff7f0e",
-                linestyle="--",
-                linewidth=1.5,
-                label=f"BFS final ({bfs_pct:.1f}%)",
-            )
-
-        ax.set_xscale("log")
-        ax.set_xlabel("Number of training samples (N)", fontsize=12)
-        ax.set_ylabel("% mutations fixed", fontsize=12)
-        ax.set_title("Specification Size Ablation by Mutation Order", fontsize=13)
-        ax.set_ylim(0, 100)
-        ax.set_xticks(overall_x)
-        ax.set_xticklabels([str(n) for n in overall_x], rotation=45, ha="right")
-        ax.grid(True, alpha=0.3)
-        ax.legend(fontsize=9, bbox_to_anchor=(1.02, 1), loc="upper left")
-
-        plt.tight_layout()
-        out_path_order = output_dir / "spec_size_ablation_by_order.pdf"
-        plt.savefig(out_path_order, bbox_inches="tight", format="pdf")
-        plt.close()
-        print(f"Saved {out_path_order}")
 
 
 # ---------------------------------------------------------------------------
@@ -410,21 +356,15 @@ def plot_learning_curves(
 @click.option(
     "--threshold",
     type=float,
-    default=1.0,
+    default=None,
     show_default=True,
-    help="Accuracy threshold to count a mutation as fixed",
+    help="Accuracy threshold to count a mutation as fixed (overrides default multi-threshold sweep)",
 )
 @click.option(
     "--loss-fn-name",
     default="cross_entropy_loss",
     show_default=True,
     help="Loss function subdirectory name",
-)
-@click.option(
-    "--by-mutation-order/--no-by-mutation-order",
-    default=True,
-    show_default=True,
-    help="Also generate a per-mutation-order breakdown plot",
 )
 def main(
     saved_data_dir,
@@ -433,7 +373,6 @@ def main(
     output_dir,
     threshold,
     loss_fn_name,
-    by_mutation_order,
 ):
     """Plot GBPR % fixed vs. number of training samples (specification size ablation)."""
     script_dir = Path(__file__).parent
@@ -450,42 +389,119 @@ def main(
     for n in N_VALUES:
         print(f"  N={n:>6}: {len(val_accs_by_n[n])} val_accs arrays")
 
-    # Load mutation orders for breakdown plot
+    # Load mutation orders for breakdown plots
     mutation_orders = load_mutation_orders(script_dir)
     print(f"Loaded mutation orders for {len(mutation_orders)} jobs")
 
-    # Load GP and BFS final performance
-    gp_pct: Optional[float] = None
-    if gp_results_dir:
+    # Collect unique programs and mutation order values
+    all_programs: List[str] = sorted({
+        rec["_program"]
+        for recs in results_by_n.values()
+        for rec in recs
+        if "_program" in rec
+    })
+    all_orders: List[int] = sorted({
+        mutation_orders[rec.get("job_id")]
+        for recs in results_by_n.values()
+        for rec in recs
+        if rec.get("job_id") in mutation_orders
+    })
+    print(f"Programs: {all_programs}")
+    print(f"Mutation orders: {all_orders}")
+
+    # Load GP and BFS final performance (threshold-dependent, cached per threshold)
+    def get_gp_pct(thr: float) -> Optional[float]:
+        if not gp_results_dir:
+            return None
         gp_path = Path(gp_results_dir) if Path(gp_results_dir).is_absolute() else script_dir / gp_results_dir
-        gp_pct = load_gp_final_pct_fixed(gp_path, threshold)
-        if gp_pct is not None:
-            print(f"GP final % fixed: {gp_pct:.1f}%")
+        pct = load_gp_final_pct_fixed(gp_path, thr)
+        if pct is not None:
+            print(f"GP final % fixed (thr={thr}): {pct:.1f}%")
         else:
             print(f"Warning: no GP results loaded from {gp_path}")
+        return pct
 
-    bfs_pct: Optional[float] = None
-    if exhaustive_results_dir:
+    def get_bfs_pct(thr: float) -> Optional[float]:
+        if not exhaustive_results_dir:
+            return None
         bfs_path = Path(exhaustive_results_dir) if Path(exhaustive_results_dir).is_absolute() else script_dir / exhaustive_results_dir
-        bfs_pct = load_gp_final_pct_fixed(bfs_path, threshold)
-        if bfs_pct is not None:
-            print(f"BFS final % fixed: {bfs_pct:.1f}%")
+        pct = load_gp_final_pct_fixed(bfs_path, thr)
+        if pct is not None:
+            print(f"BFS final % fixed (thr={thr}): {pct:.1f}%")
         else:
             print(f"Warning: no BFS results loaded from {bfs_path}")
+        return pct
 
-    # Plot A — final performance vs N
-    plot_spec_size_ablation(
-        results_by_n=results_by_n,
-        mutation_orders=mutation_orders,
-        threshold=threshold,
-        n_values=N_VALUES,
-        gp_pct=gp_pct,
-        bfs_pct=bfs_pct,
-        output_dir=output_path,
-        by_mutation_order=by_mutation_order,
-    )
+    thresholds_to_run = [threshold] if threshold is not None else THRESHOLDS
 
-    # Plot B — learning curves at different N
+    for thr in thresholds_to_run:
+        gp_pct = get_gp_pct(thr)
+        bfs_pct = get_bfs_pct(thr)
+
+        # --- Overall ---
+        plot_spec_size_ablation(
+            results_by_n=results_by_n,
+            threshold=thr,
+            n_values=N_VALUES,
+            gp_pct=gp_pct,
+            bfs_pct=bfs_pct,
+            output_dir=output_path,
+        )
+
+        # --- Per program ---
+        for prog in all_programs:
+            filtered = filter_results_by_n(results_by_n, N_VALUES, program=prog)
+            safe_prog = prog.replace("/", "_")
+            plot_spec_size_ablation(
+                results_by_n=filtered,
+                threshold=thr,
+                n_values=N_VALUES,
+                gp_pct=gp_pct,
+                bfs_pct=bfs_pct,
+                output_dir=output_path,
+                filename_suffix=f"_program_{safe_prog}",
+                title_suffix=f"Program: {prog}",
+            )
+
+        # --- Per mutation order ---
+        for order in all_orders:
+            filtered = filter_results_by_n(
+                results_by_n, N_VALUES, mutation_order=order, mutation_orders=mutation_orders
+            )
+            plot_spec_size_ablation(
+                results_by_n=filtered,
+                threshold=thr,
+                n_values=N_VALUES,
+                gp_pct=gp_pct,
+                bfs_pct=bfs_pct,
+                output_dir=output_path,
+                filename_suffix=f"_order_{order}",
+                title_suffix=f"Mutation Order: {order}",
+            )
+
+        # --- Per program and mutation order ---
+        for prog in all_programs:
+            for order in all_orders:
+                filtered = filter_results_by_n(
+                    results_by_n, N_VALUES,
+                    program=prog, mutation_order=order, mutation_orders=mutation_orders,
+                )
+                # Skip if no data at any N
+                if not any(filtered[n] for n in N_VALUES):
+                    continue
+                safe_prog = prog.replace("/", "_")
+                plot_spec_size_ablation(
+                    results_by_n=filtered,
+                    threshold=thr,
+                    n_values=N_VALUES,
+                    gp_pct=gp_pct,
+                    bfs_pct=bfs_pct,
+                    output_dir=output_path,
+                    filename_suffix=f"_program_{safe_prog}_order_{order}",
+                    title_suffix=f"Program: {prog}, Mutation Order: {order}",
+                )
+
+    # Plot B — learning curves at different N (threshold-independent)
     plot_learning_curves(
         val_accs_by_n=val_accs_by_n,
         n_values=N_VALUES,
