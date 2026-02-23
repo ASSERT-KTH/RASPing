@@ -30,10 +30,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 
-N_VALUES = [100, 250, 500, 1000, 2500, 5000, 10000, 25000, 40000]
+N_VALUES = [100, 1000, 5000, 10000, 25000, 50000, 100000]
+TRAIN_MUTATIONS_N = 50000
 BATCH_SIZE = 256
 VAL_STEP = 10  # val_accs recorded every valStep=10 epochs
 THRESHOLDS = [0.99, 0.999, 1.0]
@@ -86,6 +87,30 @@ def load_spec_size_results(
     return results_by_n
 
 
+def load_train_mutations_results(
+    train_mutations_saved_data_dir: Path,
+    loss_fn_name: str = "cross_entropy_loss",
+) -> List[dict]:
+    """
+    Load test results from train_mutations-style layout:
+        {saved_data}/{program}/{loss_fn_name}/job_{job_id}/test_results.json
+    """
+    results: List[dict] = []
+    pattern = f"*/{loss_fn_name}/job_*/test_results.json"
+    for result_file in sorted(train_mutations_saved_data_dir.glob(pattern)):
+        try:
+            with open(result_file) as f:
+                rec = json.load(f)
+            rec["_program"] = rec.get(
+                "program_name",
+                result_file.relative_to(train_mutations_saved_data_dir).parts[0],
+            )
+            results.append(rec)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: could not read {result_file}: {e}")
+    return results
+
+
 def load_val_accs_by_n(
     saved_data_dir: Path,
     n_values: List[int],
@@ -108,6 +133,24 @@ def load_val_accs_by_n(
                 print(f"Warning: could not read {val_file}: {e}")
 
     return val_accs_by_n
+
+
+def load_train_mutations_val_accs(
+    train_mutations_saved_data_dir: Path,
+    loss_fn_name: str = "cross_entropy_loss",
+) -> List[np.ndarray]:
+    """
+    Load val_accs arrays from train_mutations-style layout:
+        {saved_data}/{program}/{loss_fn_name}/job_{job_id}/val_accs.npy
+    """
+    val_accs: List[np.ndarray] = []
+    pattern = f"*/{loss_fn_name}/job_*/val_accs.npy"
+    for val_file in sorted(train_mutations_saved_data_dir.glob(pattern)):
+        try:
+            val_accs.append(np.load(val_file))
+        except (OSError, ValueError) as e:
+            print(f"Warning: could not read {val_file}: {e}")
+    return val_accs
 
 
 def compute_pct_fixed(results: List[dict], threshold: float = 1.0) -> Optional[float]:
@@ -354,6 +397,15 @@ def plot_learning_curves(
     help="Directory to save output plots",
 )
 @click.option(
+    "--train-mutations-saved-data-dir",
+    default="../train_mutations/saved_data",
+    show_default=True,
+    help=(
+        "Directory with train_mutations saved_data (loaded as N=50000, "
+        "same layout used by gp_baseline/plot_progress.py)"
+    ),
+)
+@click.option(
     "--threshold",
     type=float,
     default=None,
@@ -371,6 +423,7 @@ def main(
     gp_results_dir,
     exhaustive_results_dir,
     output_dir,
+    train_mutations_saved_data_dir,
     threshold,
     loss_fn_name,
 ):
@@ -384,10 +437,41 @@ def main(
     for n in N_VALUES:
         print(f"  N={n:>6}: {len(results_by_n[n])} results")
 
+    # Also load train_mutations-style saved_data (same layout used by plot_progress.py)
+    train_mutations_saved_data_path = (
+        Path(train_mutations_saved_data_dir)
+        if Path(train_mutations_saved_data_dir).is_absolute()
+        else script_dir / train_mutations_saved_data_dir
+    )
+    if train_mutations_saved_data_path.exists():
+        train_mutation_results = load_train_mutations_results(
+            train_mutations_saved_data_path, loss_fn_name
+        )
+        results_by_n[TRAIN_MUTATIONS_N].extend(train_mutation_results)
+        print(
+            f"  N={TRAIN_MUTATIONS_N:>6}: +{len(train_mutation_results)} "
+            f"train_mutations-layout results from {train_mutations_saved_data_path}"
+        )
+    else:
+        print(
+            "Warning: train_mutations saved_data dir not found at "
+            f"{train_mutations_saved_data_path}; skipping N={TRAIN_MUTATIONS_N} load"
+        )
+
     # Load val_accs for Plot B
     val_accs_by_n = load_val_accs_by_n(saved_data_path, N_VALUES, loss_fn_name)
     for n in N_VALUES:
         print(f"  N={n:>6}: {len(val_accs_by_n[n])} val_accs arrays")
+
+    if train_mutations_saved_data_path.exists():
+        train_mutation_val_accs = load_train_mutations_val_accs(
+            train_mutations_saved_data_path, loss_fn_name
+        )
+        val_accs_by_n[TRAIN_MUTATIONS_N].extend(train_mutation_val_accs)
+        print(
+            f"  N={TRAIN_MUTATIONS_N:>6}: +{len(train_mutation_val_accs)} "
+            f"train_mutations-layout val_accs arrays from {train_mutations_saved_data_path}"
+        )
 
     # Load mutation orders for breakdown plots
     mutation_orders = load_mutation_orders(script_dir)
