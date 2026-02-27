@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 
 
-N_VALUES = [100, 1000, 5000, 10000, 25000]
+N_VALUES = [100, 1000, 5000, 10000, 25000, 100000]
 SEEDS = [42]          # extend to [42, 123, 456] for multi-seed error bars later
 N_STEPS = 500_000     # fixed gradient-step budget for all (mutation, N) pairs
 
