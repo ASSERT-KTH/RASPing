@@ -42,6 +42,7 @@ def train_mutated_model(
     store_trajectory: bool = False,
     trajectory_store_interval: int = 10,
     n_train_samples: int = None,
+    n_val_samples: int = None,
     seed: int = 42,
     n_steps: int = None,
 ):
@@ -77,6 +78,11 @@ def train_mutated_model(
         rng = np.random.default_rng(seed=seed)
         indices = rng.choice(len(X_train), n_train_samples, replace=False)
         X_train, Y_train = X_train[indices], Y_train[indices]
+
+    if n_val_samples is not None and n_val_samples < len(X_val):
+        rng_val = np.random.default_rng(seed=seed)
+        val_indices = rng_val.choice(len(X_val), n_val_samples, replace=False)
+        X_val, Y_val = X_val[val_indices], Y_val[val_indices]
 
     # Convert n_steps to n_epochs if provided (equal compute budget across N values)
     if n_steps is not None:
@@ -160,6 +166,8 @@ def train_mutated_model(
 )
 @click.option("--n_train_samples", type=int, default=None,
               help="Number of training samples to use (None = use all)")
+@click.option("--n_val_samples", type=int, default=None,
+              help="Number of val samples to use (None = use all)")
 @click.option("--seed", type=int, default=42,
               help="Random seed for training-set subsampling")
 @click.option("--n_steps", type=int, default=None,
@@ -178,6 +186,7 @@ def run_test(
     store_trajectory,
     trajectory_store_interval,
     n_train_samples,
+    n_val_samples,
     seed,
     n_steps,
 ):
@@ -198,6 +207,7 @@ def run_test(
         store_trajectory=store_trajectory,
         trajectory_store_interval=trajectory_store_interval,
         n_train_samples=n_train_samples,
+        n_val_samples=n_val_samples,
         seed=seed,
         n_steps=n_steps,
     )
