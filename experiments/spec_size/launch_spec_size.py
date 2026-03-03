@@ -29,6 +29,7 @@ def run_train_and_test(
     job_id: str,
     n_train_samples: int,
     seed: int,
+    n_val_samples: int = None,
     n_steps: int = N_STEPS,
     max_len: int = 10,
     batch_size: int = 256,
@@ -68,6 +69,7 @@ def run_train_and_test(
         "--n_train_samples", str(n_train_samples),
         "--seed", str(seed),
         "--n_steps", str(n_steps),
+        *(["--n_val_samples", str(n_val_samples)] if n_val_samples is not None else []),
         "--no-store-trajectory",
         "--output_dir", str(full_output_dir),
     ]
@@ -137,12 +139,14 @@ def main():
                     )
                     continue
 
+                n_val_samples = n // 8
                 job = executor.submit(
                     run_train_and_test,
                     program_name=program_name,
                     job_id=job_id,
                     n_train_samples=n,
                     seed=seed,
+                    n_val_samples=n_val_samples,
                     n_steps=N_STEPS,
                     max_len=10,
                     batch_size=256,
