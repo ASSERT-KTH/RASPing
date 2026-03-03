@@ -33,8 +33,9 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 
-N_VALUES = [100, 1000, 5000, 10000, 25000, 50000, 100000]
-TRAIN_MUTATIONS_N = 50000
+N_VALUES = [100, 1000, 5000, 10000, 25000, 40000]
+TRAIN_MUTATIONS_N = 40000
+PROGRAM_MAX_N = {"shuffle_dyck": 1635}
 BATCH_SIZE = 256
 VAL_STEP = 10  # val_accs recorded every valStep=10 epochs
 THRESHOLDS = [0.99, 0.999, 1.0]
@@ -75,11 +76,13 @@ def load_spec_size_results(
     for n in n_values:
         pattern = f"*/n_{n}/seed_*/{loss_fn_name}/*/test_results.json"
         for result_file in sorted(saved_data_dir.glob(pattern)):
+            program = result_file.relative_to(saved_data_dir).parts[0]
+            if n > PROGRAM_MAX_N.get(program, float("inf")):
+                continue
             try:
                 with open(result_file) as f:
                     rec = json.load(f)
-                # Inject program name from path (first component relative to saved_data_dir)
-                rec["_program"] = result_file.relative_to(saved_data_dir).parts[0]
+                rec["_program"] = program
                 results_by_n[n].append(rec)
             except (json.JSONDecodeError, OSError) as e:
                 print(f"Warning: could not read {result_file}: {e}")
@@ -126,6 +129,9 @@ def load_val_accs_by_n(
     for n in n_values:
         pattern = f"*/n_{n}/seed_*/{loss_fn_name}/*/val_accs.npy"
         for val_file in sorted(saved_data_dir.glob(pattern)):
+            program = val_file.relative_to(saved_data_dir).parts[0]
+            if n > PROGRAM_MAX_N.get(program, float("inf")):
+                continue
             try:
                 arr = np.load(val_file)
                 val_accs_by_n[n].append(arr)
