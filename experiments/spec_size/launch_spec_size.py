@@ -5,7 +5,8 @@ import pandas as pd
 from pathlib import Path
 
 
-N_VALUES = [100, 1000, 5000, 10000, 25000, 100000]
+N_VALUES = [100, 1000, 5000, 10000, 25000]
+MAX_N_BY_PROGRAM = {"shuffle_dyck": 1635}
 SEEDS = [42]          # extend to [42, 123, 456] for multi-seed error bars later
 N_STEPS = 500_000     # fixed gradient-step budget for all (mutation, N) pairs
 
@@ -122,6 +123,8 @@ def main():
         job_id = row["job_id"]
 
         for n in N_VALUES:
+            if n > MAX_N_BY_PROGRAM.get(program_name, float("inf")):
+                continue
             for seed in SEEDS:
                 output_dir = (
                     f"saved_data/{program_name}/n_{n}/seed_{seed}/{loss_fn_name}/job_{job_id}"
