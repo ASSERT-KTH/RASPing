@@ -1,378 +1,316 @@
 """
 plot_spec_size.py  –  Specification Size Ablation Plots
 
-Plot A — Final performance vs N (spec_size_ablation.pdf):
-  X-axis: N (log scale); Y-axis: % bugs fixed (test_accuracy >= threshold)
-  One GBPR curve; dashed horizontal lines for GP and BFS baselines.
+Plot A — % fixed vs N, one curve per mutation order (spec_size_ablation_by_order.pdf):
+  X-axis: N (log scale)
+  Y-axis: % bugs fixed (test_accuracy >= threshold)
+  Five GBPR curves (orders 1-5) + dashed horizontal reference lines for GP and BFS
+  per mutation order.
 
 Plot B — Learning curves at different N (spec_size_curves.pdf):
-  X-axis: gradient steps (reconstructed from val_accs.npy + steps_per_epoch)
-  Y-axis: mean val accuracy
-  One line per N value.
+  X-axis: gradient steps; Y-axis: mean val accuracy. One line per N value.
 
-Directory layout expected:
-  saved_data/{program}/n_{N}/seed_{S}/{loss_fn}/job_{job_id}/
-    test_results.json
-    val_accs.npy
+Job set: 1,135 jobs — the 1,466 N=40,000 train_mutations jobs with shuffle_dyck
+excluded entirely (shuffle_dyck only has 1,635 training samples, so it cannot
+participate at N>=5,000; excluding it at all N keeps the denominator fixed).
+GP and BFS baselines are restricted to the same 1,135 jobs.
 
-Usage:
-    python plot_spec_size.py \
-        --saved-data-dir saved_data \
-        --gp-results-dir ../gp_baseline/results \
-        --exhaustive-results-dir ../gp_baseline/exhaustive_results \
-        --output-dir plots \
-        --threshold 1.0
+Usage (from repo root):
+    python experiments/spec_size/plot_spec_size.py \
+        --gp-results-dir experiments/gp_baseline/results \
+        --exhaustive-results-dir experiments/gp_baseline/exhaustive_results
 """
 
 import json
 import click
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
+import matplotlib.lines as mlines
 from pathlib import Path
-from typing import Dict, List, Optional
+from collections import defaultdict
+from typing import Dict, List, Optional, Set
 
 
 N_VALUES = [100, 1000, 5000, 10000, 25000, 40000]
 TRAIN_MUTATIONS_N = 40000
-PROGRAM_MAX_N = {"shuffle_dyck": 1635}
 BATCH_SIZE = 256
-VAL_STEP = 10  # val_accs recorded every valStep=10 epochs
+VAL_STEP = 10
 THRESHOLDS = [0.99, 0.999, 1.0]
+ORDERS = [1, 2, 3, 4, 5]
+
+ORDER_COLORS = {
+    1: "#1f77b4",
+    2: "#ff7f0e",
+    3: "#2ca02c",
+    4: "#d62728",
+    5: "#9467bd",
+}
 
 
 # ---------------------------------------------------------------------------
-# Data loading helpers
+# Reference set + job maps
 # ---------------------------------------------------------------------------
 
-def load_mutation_orders(script_dir: Path) -> Dict[str, int]:
-    """Return mapping job_id -> mutation_order for BUGGY_MODEL entries."""
-    mutation_path = script_dir / "../mutation/results/aggregated_mutations.json"
-    if not mutation_path.exists():
-        print(f"Warning: aggregated_mutations.json not found at {mutation_path}")
-        return {}
-    df = pd.read_json(mutation_path)
-    orders: Dict[str, int] = {}
-    for _, row in df.iterrows():
-        if row["execution_result"].get("status") == "BUGGY_MODEL":
-            orders[row["job_id"]] = row["mutation_order"]
-    return orders
+def load_job_maps(script_dir: Path):
+    mutation_path = (script_dir / "../mutation/results/aggregated_mutations.json").resolve()
+    agg_data = json.loads(mutation_path.read_text())
+    keys = list(agg_data.keys())
+    n = len(agg_data[keys[0]])
+    rows = [{k: agg_data[k][str(i)] for k in keys} for i in range(n)]
+    buggy = [r for r in rows if r.get("execution_result", {}).get("status") == "BUGGY_MODEL"]
+    job_to_order = {r["job_id"]: r["mutation_order"] for r in buggy}
+    job_to_prog = {r["job_id"]: r["program_name"] for r in buggy}
+    return job_to_order, job_to_prog
 
 
-def load_spec_size_results(
-    saved_data_dir: Path,
-    n_values: List[int],
-    loss_fn_name: str = "cross_entropy_loss",
-) -> Dict[int, List[dict]]:
-    """
-    For each N, collect all test_results.json files from:
-        saved_data_dir/{program}/n_{N}/seed_*/{loss_fn_name}/job_{job_id}/test_results.json
+def load_reference_ids(train_mutations_dir: Path, job_to_prog: Dict, loss_fn: str) -> Set[str]:
+    """1,135 non-shuffle_dyck job IDs present in the N=40,000 train_mutations results."""
+    ref = set()
+    for f in train_mutations_dir.glob(f"*/{loss_fn}/job_*/test_results.json"):
+        job_id = json.loads(f.read_text()).get("job_id")
+        if job_id and job_to_prog.get(job_id) != "shuffle_dyck":
+            ref.add(job_id)
+    return ref
 
-    Injects '_program' (from path) into each record.
-    Returns a dict: N -> list of result dicts.
-    """
-    results_by_n: Dict[int, List[dict]] = {n: [] for n in n_values}
 
-    for n in n_values:
-        pattern = f"*/n_{n}/seed_*/{loss_fn_name}/*/test_results.json"
-        for result_file in sorted(saved_data_dir.glob(pattern)):
-            program = result_file.relative_to(saved_data_dir).parts[0]
-            if n > PROGRAM_MAX_N.get(program, float("inf")):
+# ---------------------------------------------------------------------------
+# GBPR data loading
+# ---------------------------------------------------------------------------
+
+def load_gbpr_by_order(
+    spec_size_dir: Path,
+    train_mutations_dir: Path,
+    job_to_order: Dict,
+    reference_ids: Set[str],
+    loss_fn: str,
+) -> Dict[int, Dict[int, List[float]]]:
+    """Returns dict: N -> order -> list[test_accuracy]."""
+    by_n_order: Dict[int, Dict[int, List[float]]] = {n: defaultdict(list) for n in N_VALUES}
+
+    for n in N_VALUES[:-1]:
+        for f in spec_size_dir.glob(f"*/n_{n}/seed_*/{loss_fn}/*/test_results.json"):
+            rec = json.loads(f.read_text())
+            job_id = rec.get("job_id")
+            if job_id not in reference_ids:
                 continue
-            try:
-                with open(result_file) as f:
-                    rec = json.load(f)
-                rec["_program"] = program
-                results_by_n[n].append(rec)
-            except (json.JSONDecodeError, OSError) as e:
-                print(f"Warning: could not read {result_file}: {e}")
+            order = job_to_order.get(job_id)
+            if order is not None:
+                by_n_order[n][order].append(rec.get("test_accuracy", 0.0))
 
-    return results_by_n
+    for f in train_mutations_dir.glob(f"*/{loss_fn}/job_*/test_results.json"):
+        rec = json.loads(f.read_text())
+        job_id = rec.get("job_id")
+        if job_id not in reference_ids:
+            continue
+        order = job_to_order.get(job_id)
+        if order is not None:
+            by_n_order[TRAIN_MUTATIONS_N][order].append(rec.get("test_accuracy", 0.0))
 
-
-def load_train_mutations_results(
-    train_mutations_saved_data_dir: Path,
-    loss_fn_name: str = "cross_entropy_loss",
-) -> List[dict]:
-    """
-    Load test results from train_mutations-style layout:
-        {saved_data}/{program}/{loss_fn_name}/job_{job_id}/test_results.json
-    """
-    results: List[dict] = []
-    pattern = f"*/{loss_fn_name}/job_*/test_results.json"
-    for result_file in sorted(train_mutations_saved_data_dir.glob(pattern)):
-        try:
-            with open(result_file) as f:
-                rec = json.load(f)
-            rec["_program"] = rec.get(
-                "program_name",
-                result_file.relative_to(train_mutations_saved_data_dir).parts[0],
-            )
-            results.append(rec)
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"Warning: could not read {result_file}: {e}")
-    return results
+    return by_n_order
 
 
 def load_val_accs_by_n(
-    saved_data_dir: Path,
-    n_values: List[int],
-    loss_fn_name: str = "cross_entropy_loss",
+    spec_size_dir: Path,
+    train_mutations_dir: Path,
+    reference_ids: Set[str],
+    job_to_order: Dict,
+    loss_fn: str,
 ) -> Dict[int, List[np.ndarray]]:
-    """
-    For each N, collect val_accs.npy arrays from all jobs.
+    """Returns dict: N -> list of val_accs arrays (reference set only)."""
+    by_n: Dict[int, List[np.ndarray]] = {n: [] for n in N_VALUES}
 
-    Returns a dict: N -> list of val_accs arrays (one per job).
-    """
-    val_accs_by_n: Dict[int, List[np.ndarray]] = {n: [] for n in n_values}
-
-    for n in n_values:
-        pattern = f"*/n_{n}/seed_*/{loss_fn_name}/*/val_accs.npy"
-        for val_file in sorted(saved_data_dir.glob(pattern)):
-            program = val_file.relative_to(saved_data_dir).parts[0]
-            if n > PROGRAM_MAX_N.get(program, float("inf")):
+    for n in N_VALUES[:-1]:
+        for f in spec_size_dir.glob(f"*/n_{n}/seed_*/{loss_fn}/*/val_accs.npy"):
+            # derive job_id from path: .../job_{job_id}/val_accs.npy
+            job_id_str = f.parent.name  # "job_{id}"
+            # find matching test_results to get job_id
+            tr = f.parent / "test_results.json"
+            if not tr.exists():
+                continue
+            job_id = json.loads(tr.read_text()).get("job_id")
+            if job_id not in reference_ids:
                 continue
             try:
-                arr = np.load(val_file)
-                val_accs_by_n[n].append(arr)
-            except (OSError, ValueError) as e:
-                print(f"Warning: could not read {val_file}: {e}")
+                by_n[n].append(np.load(f))
+            except (OSError, ValueError):
+                pass
 
-    return val_accs_by_n
-
-
-def load_train_mutations_val_accs(
-    train_mutations_saved_data_dir: Path,
-    loss_fn_name: str = "cross_entropy_loss",
-) -> List[np.ndarray]:
-    """
-    Load val_accs arrays from train_mutations-style layout:
-        {saved_data}/{program}/{loss_fn_name}/job_{job_id}/val_accs.npy
-    """
-    val_accs: List[np.ndarray] = []
-    pattern = f"*/{loss_fn_name}/job_*/val_accs.npy"
-    for val_file in sorted(train_mutations_saved_data_dir.glob(pattern)):
-        try:
-            val_accs.append(np.load(val_file))
-        except (OSError, ValueError) as e:
-            print(f"Warning: could not read {val_file}: {e}")
-    return val_accs
-
-
-def compute_pct_fixed(results: List[dict], threshold: float = 1.0) -> Optional[float]:
-    """Return % of results where test_accuracy >= threshold, or None if empty."""
-    if not results:
-        return None
-    fixed = sum(1 for r in results if r.get("test_accuracy", 0.0) >= threshold)
-    return 100.0 * fixed / len(results)
-
-
-def filter_results_by_n(
-    results_by_n: Dict[int, List[dict]],
-    n_values: List[int],
-    program: Optional[str] = None,
-    mutation_order: Optional[int] = None,
-    mutation_orders: Optional[Dict[str, int]] = None,
-) -> Dict[int, List[dict]]:
-    """Return a filtered copy of results_by_n restricted to the given program and/or mutation order."""
-    filtered: Dict[int, List[dict]] = {n: [] for n in n_values}
-    for n in n_values:
-        for rec in results_by_n[n]:
-            if program is not None and rec.get("_program") != program:
-                continue
-            if mutation_order is not None:
-                job_id = rec.get("job_id")
-                if mutation_orders is None or mutation_orders.get(job_id) != mutation_order:
-                    continue
-            filtered[n].append(rec)
-    return filtered
-
-
-# ---------------------------------------------------------------------------
-# GP / BFS final-performance loading
-# ---------------------------------------------------------------------------
-
-def load_gp_final_pct_fixed(results_dir: Path, threshold: float) -> Optional[float]:
-    """
-    Read all *.json files in results_dir.  Each file has a "program_history"
-    list of {step, best_test_acc} entries.  Use the last entry's best_test_acc
-    as the final accuracy for that job.
-
-    Returns % of jobs where final best_test_acc >= threshold.
-    """
-    if not results_dir.exists():
-        return None
-    files = sorted(results_dir.glob("*.json"))
-    finals: List[float] = []
-    for fp in files:
-        try:
-            with open(fp) as f:
-                rec = json.load(f)
-            hist = rec.get("program_history", [])
-            if hist:
-                best = max(
-                    entry.get("best_test_acc", 0.0)
-                    for entry in hist
-                    if entry.get("best_test_acc") is not None
-                )
-                finals.append(float(best))
-        except Exception:
+    for f in train_mutations_dir.glob(f"*/{loss_fn}/job_*/val_accs.npy"):
+        tr = f.parent / "test_results.json"
+        if not tr.exists():
             continue
-    if not finals:
+        job_id = json.loads(tr.read_text()).get("job_id")
+        if job_id not in reference_ids:
+            continue
+        try:
+            by_n[TRAIN_MUTATIONS_N].append(np.load(f))
+        except (OSError, ValueError):
+            pass
+
+    return by_n
+
+
+# ---------------------------------------------------------------------------
+# Baseline loading
+# ---------------------------------------------------------------------------
+
+def load_baseline_by_order(
+    results_dir: Path,
+    job_to_order: Dict,
+    reference_ids: Set[str],
+) -> Dict[int, List[float]]:
+    """Returns dict: order -> list[best_test_acc], restricted to reference_ids."""
+    by_order: Dict[int, List[float]] = defaultdict(list)
+    for f in results_dir.glob("*.json"):
+        rec = json.loads(f.read_text())
+        job_id = rec.get("job_id")
+        if job_id not in reference_ids:
+            continue
+        order = job_to_order.get(job_id)
+        hist = rec.get("program_history", [])
+        best = max((e.get("best_test_acc", 0.0) or 0.0) for e in hist) if hist else 0.0
+        if order is not None:
+            by_order[order].append(best)
+    return by_order
+
+
+# ---------------------------------------------------------------------------
+# Plot A — two-panel paper figure
+# ---------------------------------------------------------------------------
+
+def pct_fixed(values: List[float], thr: float) -> Optional[float]:
+    if not values:
         return None
-    fixed = sum(1 for v in finals if v >= threshold)
-    return 100.0 * fixed / len(finals)
+    return 100.0 * sum(1 for v in values if v >= thr) / len(values)
 
 
-# ---------------------------------------------------------------------------
-# Plot A — Final performance vs N
-# ---------------------------------------------------------------------------
+# Sequential colour palette: light (order 1) → dark (order 5)
+ORDER_PALETTE = [
+    "#a8d8f0",  # order 1 — light blue
+    "#6baed6",  # order 2
+    "#3182bd",  # order 3
+    "#08519c",  # order 4
+    "#08306b",  # order 5 — dark blue
+]
 
-def plot_spec_size_ablation(
-    results_by_n: Dict[int, List[dict]],
+
+def _thresh_suffix(threshold: float) -> str:
+    if abs(threshold - 0.99) < 1e-6:
+        return ""
+    return "_thresh" + f"{threshold:.3f}".rstrip("0").rstrip(".")
+
+
+def plot_paper_figure(
+    gbpr_by_n_order: Dict[int, Dict[int, List[float]]],
+    gp_by_order: Optional[Dict[int, List[float]]],
+    bfs_by_order: Optional[Dict[int, List[float]]],
     threshold: float,
-    n_values: List[int],
-    gp_pct: Optional[float],
-    bfs_pct: Optional[float],
     output_dir: Path,
-    filename_suffix: str = "",
-    title_suffix: str = "",
+    orders: List[int] = ORDERS,
 ):
+    """Two separate PDFs (fig:spec-size).
+
+    spec_size_passrate.pdf  — GBPR pass rate vs N, one curve per mutation order.
+    spec_size_advantage.pdf — GBPR advantage over max(GP, BFS) in pp; dashed y=0 line.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    overall_x: List[int] = []
-    overall_y: List[float] = []
-    for n in n_values:
-        pct = compute_pct_fixed(results_by_n[n], threshold)
-        if pct is not None:
-            overall_x.append(n)
-            overall_y.append(pct)
+    x_ticks = N_VALUES
+    x_labels = ["100", "1k", "5k", "10k", "25k", "40k"]
+    suf = _thresh_suffix(threshold)
 
-    if not overall_x:
-        print(f"No results found for ablation plot{title_suffix}; skipping.")
-        return
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-
-    total_results = sum(len(results_by_n[n]) for n in n_values if results_by_n[n])
-    ax.plot(
-        overall_x,
-        overall_y,
-        marker="o",
-        label=f"GBPR (n={total_results} total)",
-        color="#2ca02c",
-        linewidth=2,
-        markersize=7,
-    )
-
-    if gp_pct is not None:
-        ax.axhline(
-            gp_pct,
-            color="#1f77b4",
-            linestyle="--",
-            linewidth=1.5,
-            label=f"GP final ({gp_pct:.1f}%)",
-        )
-    if bfs_pct is not None:
-        ax.axhline(
-            bfs_pct,
-            color="#ff7f0e",
-            linestyle="--",
-            linewidth=1.5,
-            label=f"BFS final ({bfs_pct:.1f}%)",
-        )
-
-    ax.set_xscale("log")
-    ax.set_xlabel("Number of training samples (N)", fontsize=12)
-    ax.set_ylabel("% mutations fixed", fontsize=12)
-    title = f"Specification Size Ablation (threshold={threshold})"
-    if title_suffix:
-        title += f"\n{title_suffix}"
-    ax.set_title(title, fontsize=13)
-    ax.set_ylim(0, 100)
-    ax.set_xticks(overall_x)
-    ax.set_xticklabels([str(n) for n in overall_x], rotation=45, ha="right")
-    ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=10)
-
+    # ── Figure 1: raw pass rate ────────────────────────────────────────────
+    fig1, ax1 = plt.subplots(figsize=(5.5, 4.2))
+    for i, order in enumerate(orders):
+        color = ORDER_PALETTE[i]
+        ys = [pct_fixed(gbpr_by_n_order[n][order], threshold) or float("nan") for n in N_VALUES]
+        ax1.plot(N_VALUES, ys, marker="o", color=color, linewidth=2, markersize=5,
+                 label=f"Order {order}")
+    ax1.set_xscale("log")
+    ax1.set_xlabel("Specification size $N$", fontsize=11)
+    ax1.set_ylabel("Pass rate (\\%)", fontsize=11)
+    ax1.set_ylim(0, 100)
+    ax1.set_xticks(x_ticks)
+    ax1.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=9)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(fontsize=9, loc="upper left", framealpha=0.9)
     plt.tight_layout()
-    thresh_str = f"{threshold:.3f}".rstrip("0").rstrip(".")
-    out_path = output_dir / f"spec_size_ablation_thresh{thresh_str}{filename_suffix}.pdf"
-    plt.savefig(out_path, bbox_inches="tight", format="pdf")
+    out1 = output_dir / f"spec_size_passrate{suf}.pdf"
+    plt.savefig(out1, bbox_inches="tight", format="pdf")
     plt.close()
-    print(f"Saved {out_path}")
+    print(f"Saved {out1}")
+
+    # ── Figure 2: GBPR − max(GP, BFS) ─────────────────────────────────────
+    fig2, ax2 = plt.subplots(figsize=(5.5, 4.2))
+    for i, order in enumerate(orders):
+        color = ORDER_PALETTE[i]
+        gp_p = pct_fixed(gp_by_order.get(order, []), threshold) if gp_by_order else None
+        bfs_p = pct_fixed(bfs_by_order.get(order, []), threshold) if bfs_by_order else None
+        if gp_p is None and bfs_p is None:
+            continue
+        best_sym = max(v for v in [gp_p, bfs_p] if v is not None)
+        ys = []
+        for n in N_VALUES:
+            p = pct_fixed(gbpr_by_n_order[n][order], threshold)
+            ys.append((p - best_sym) if p is not None else float("nan"))
+        ax2.plot(N_VALUES, ys, marker="o", color=color, linewidth=2, markersize=5,
+                 label=f"Order {order}")
+    ax2.axhline(0, color="black", linestyle="--", linewidth=1.3, label="Symbolic baseline")
+    ax2.set_xscale("log")
+    ax2.set_xlabel("Specification size $N$", fontsize=11)
+    ax2.set_ylabel("GBPR $-$ best symbolic (pp)", fontsize=11)
+    ax2.set_xticks(x_ticks)
+    ax2.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=9)
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(fontsize=9, loc="lower right", framealpha=0.9)
+    plt.tight_layout()
+    out2 = output_dir / f"spec_size_advantage{suf}.pdf"
+    plt.savefig(out2, bbox_inches="tight", format="pdf")
+    plt.close()
+    print(f"Saved {out2}")
 
 
 # ---------------------------------------------------------------------------
-# Plot B — Learning curves at different N
+# Plot B — Learning curves
 # ---------------------------------------------------------------------------
 
 def plot_learning_curves(
     val_accs_by_n: Dict[int, List[np.ndarray]],
-    n_values: List[int],
     output_dir: Path,
     batch_size: int = BATCH_SIZE,
     val_step: int = VAL_STEP,
 ):
-    """
-    Plot mean val accuracy vs gradient steps for each N value.
-
-    The step axis is reconstructed as:
-        step = epoch_idx * val_step * steps_per_epoch
-    where steps_per_epoch = max(1, N // batch_size).
-
-    val_accs.npy records one value every val_step epochs, so
-    epoch_idx=0 corresponds to epoch 0, epoch_idx=1 to epoch val_step, etc.
-    """
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    has_data = any(len(val_accs_by_n[n]) > 0 for n in n_values)
-    if not has_data:
-        print("No val_accs.npy files found for Plot B; skipping.")
+    if not any(val_accs_by_n[n] for n in N_VALUES):
+        print("No val_accs.npy files found; skipping learning curves.")
         return
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    colors = plt.cm.viridis(np.linspace(0.1, 0.9, len(n_values)))
+    colors = plt.cm.viridis(np.linspace(0.1, 0.9, len(N_VALUES)))
 
-    for n, color in zip(n_values, colors):
+    for n, color in zip(N_VALUES, colors):
         arrays = val_accs_by_n[n]
         if not arrays:
             continue
-
         steps_per_epoch = max(1, n // batch_size)
-
-        # Align arrays to the shortest length so we can average
         min_len = min(len(a) for a in arrays)
         if min_len == 0:
             continue
-        stacked = np.stack([a[:min_len] for a in arrays], axis=0)  # (n_jobs, T)
-        mean_acc = np.mean(stacked, axis=0)                          # (T,)
-
-        # Reconstruct gradient-step axis
-        # epoch_idx i corresponds to epoch i * val_step
-        # steps at that epoch = i * val_step * steps_per_epoch
+        mean_acc = np.mean(np.stack([a[:min_len] for a in arrays], axis=0), axis=0)
         steps = np.arange(len(mean_acc)) * val_step * steps_per_epoch
-
-        ax.plot(
-            steps,
-            mean_acc * 100,
-            label=f"N={n} ({len(arrays)} jobs)",
-            color=color,
-            linewidth=1.5,
-            alpha=0.9,
-        )
+        ax.plot(steps, mean_acc * 100, label=f"N={n} ({len(arrays)} jobs)",
+                color=color, linewidth=1.5, alpha=0.9)
 
     ax.set_xlabel("Gradient steps", fontsize=12)
     ax.set_ylabel("Mean val accuracy (%)", fontsize=12)
     ax.set_title("Learning Curves by Specification Size", fontsize=13)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=9, bbox_to_anchor=(1.02, 1), loc="upper left")
-
     plt.tight_layout()
-    out_path = output_dir / "spec_size_curves.pdf"
-    plt.savefig(out_path, bbox_inches="tight", format="pdf")
+    out = output_dir / "spec_size_curves.pdf"
+    plt.savefig(out, bbox_inches="tight", format="pdf")
     plt.close()
-    print(f"Saved {out_path}")
+    print(f"Saved {out}")
 
 
 # ---------------------------------------------------------------------------
@@ -380,223 +318,74 @@ def plot_learning_curves(
 # ---------------------------------------------------------------------------
 
 @click.command()
-@click.option(
-    "--saved-data-dir",
-    default="saved_data",
-    show_default=True,
-    help="Root directory of spec_size saved data",
-)
-@click.option(
-    "--gp-results-dir",
-    default=None,
-    help="Directory with GP baseline per-job JSON results (for reference line)",
-)
-@click.option(
-    "--exhaustive-results-dir",
-    default=None,
-    help="Directory with BFS/exhaustive per-job JSON results (for reference line)",
-)
-@click.option(
-    "--output-dir",
-    default="plots",
-    show_default=True,
-    help="Directory to save output plots",
-)
-@click.option(
-    "--train-mutations-saved-data-dir",
-    default="../train_mutations/saved_data",
-    show_default=True,
-    help=(
-        "Directory with train_mutations saved_data (loaded as N=50000, "
-        "same layout used by gp_baseline/plot_progress.py)"
-    ),
-)
-@click.option(
-    "--threshold",
-    type=float,
-    default=None,
-    show_default=True,
-    help="Accuracy threshold to count a mutation as fixed (overrides default multi-threshold sweep)",
-)
-@click.option(
-    "--loss-fn-name",
-    default="cross_entropy_loss",
-    show_default=True,
-    help="Loss function subdirectory name",
-)
+@click.option("--saved-data-dir", default="experiments/spec_size/saved_data", show_default=True)
+@click.option("--train-mutations-saved-data-dir",
+              default="experiments/train_mutations/saved_data", show_default=True)
+@click.option("--gp-results-dir", default=None,
+              help="Directory with GP baseline per-job JSON results")
+@click.option("--exhaustive-results-dir", default=None,
+              help="Directory with BFS/exhaustive per-job JSON results")
+@click.option("--output-dir", default="experiments/spec_size/plots", show_default=True)
+@click.option("--threshold", type=float, default=None,
+              help="Single threshold (default: run all of 0.99, 0.999, 1.0)")
+@click.option("--loss-fn-name", default="cross_entropy_loss", show_default=True)
 def main(
     saved_data_dir,
+    train_mutations_saved_data_dir,
     gp_results_dir,
     exhaustive_results_dir,
     output_dir,
-    train_mutations_saved_data_dir,
     threshold,
     loss_fn_name,
 ):
-    """Plot GBPR % fixed vs. number of training samples (specification size ablation)."""
+    """Plot GBPR % fixed vs. N (spec size ablation), excluding shuffle_dyck throughout."""
     script_dir = Path(__file__).parent
-    saved_data_path = Path(saved_data_dir) if Path(saved_data_dir).is_absolute() else script_dir / saved_data_dir
-    output_path = Path(output_dir) if Path(output_dir).is_absolute() else script_dir / output_dir
 
-    print(f"Loading results from {saved_data_path} ...")
-    results_by_n = load_spec_size_results(saved_data_path, N_VALUES, loss_fn_name)
-    for n in N_VALUES:
-        print(f"  N={n:>6}: {len(results_by_n[n])} results")
+    def resolve(p):
+        return Path(p).resolve()
 
-    # Also load train_mutations-style saved_data (same layout used by plot_progress.py)
-    train_mutations_saved_data_path = (
-        Path(train_mutations_saved_data_dir)
-        if Path(train_mutations_saved_data_dir).is_absolute()
-        else script_dir / train_mutations_saved_data_dir
+    spec_size_dir = resolve(saved_data_dir)
+    train_mutations_dir = resolve(train_mutations_saved_data_dir)
+    output_path = resolve(output_dir)
+
+    # Load job maps and reference set
+    job_to_order, job_to_prog = load_job_maps(script_dir)
+    reference_ids = load_reference_ids(train_mutations_dir, job_to_prog, loss_fn_name)
+    print(f"Reference set: {len(reference_ids)} jobs (shuffle_dyck excluded at all N)")
+
+    # Load GBPR results
+    gbpr = load_gbpr_by_order(
+        spec_size_dir, train_mutations_dir, job_to_order, reference_ids, loss_fn_name
     )
-    if train_mutations_saved_data_path.exists():
-        train_mutation_results = load_train_mutations_results(
-            train_mutations_saved_data_path, loss_fn_name
-        )
-        results_by_n[TRAIN_MUTATIONS_N].extend(train_mutation_results)
-        print(
-            f"  N={TRAIN_MUTATIONS_N:>6}: +{len(train_mutation_results)} "
-            f"train_mutations-layout results from {train_mutations_saved_data_path}"
-        )
-    else:
-        print(
-            "Warning: train_mutations saved_data dir not found at "
-            f"{train_mutations_saved_data_path}; skipping N={TRAIN_MUTATIONS_N} load"
-        )
-
-    # Load val_accs for Plot B
-    val_accs_by_n = load_val_accs_by_n(saved_data_path, N_VALUES, loss_fn_name)
     for n in N_VALUES:
-        print(f"  N={n:>6}: {len(val_accs_by_n[n])} val_accs arrays")
+        total = sum(len(gbpr[n][o]) for o in ORDERS)
+        print(f"  N={n:>6}: {total} results")
 
-    if train_mutations_saved_data_path.exists():
-        train_mutation_val_accs = load_train_mutations_val_accs(
-            train_mutations_saved_data_path, loss_fn_name
-        )
-        val_accs_by_n[TRAIN_MUTATIONS_N].extend(train_mutation_val_accs)
-        print(
-            f"  N={TRAIN_MUTATIONS_N:>6}: +{len(train_mutation_val_accs)} "
-            f"train_mutations-layout val_accs arrays from {train_mutations_saved_data_path}"
-        )
+    # Load baselines
+    gp_by_order = None
+    if gp_results_dir:
+        gp_path = resolve(gp_results_dir)
+        gp_by_order = load_baseline_by_order(gp_path, job_to_order, reference_ids)
+        total_gp = sum(len(v) for v in gp_by_order.values())
+        print(f"GP baseline: {total_gp} results (restricted to reference set)")
 
-    # Load mutation orders for breakdown plots
-    mutation_orders = load_mutation_orders(script_dir)
-    print(f"Loaded mutation orders for {len(mutation_orders)} jobs")
-
-    # Collect unique programs and mutation order values
-    all_programs: List[str] = sorted({
-        rec["_program"]
-        for recs in results_by_n.values()
-        for rec in recs
-        if "_program" in rec
-    })
-    all_orders: List[int] = sorted({
-        mutation_orders[rec.get("job_id")]
-        for recs in results_by_n.values()
-        for rec in recs
-        if rec.get("job_id") in mutation_orders
-    })
-    print(f"Programs: {all_programs}")
-    print(f"Mutation orders: {all_orders}")
-
-    # Load GP and BFS final performance (threshold-dependent, cached per threshold)
-    def get_gp_pct(thr: float) -> Optional[float]:
-        if not gp_results_dir:
-            return None
-        gp_path = Path(gp_results_dir) if Path(gp_results_dir).is_absolute() else script_dir / gp_results_dir
-        pct = load_gp_final_pct_fixed(gp_path, thr)
-        if pct is not None:
-            print(f"GP final % fixed (thr={thr}): {pct:.1f}%")
-        else:
-            print(f"Warning: no GP results loaded from {gp_path}")
-        return pct
-
-    def get_bfs_pct(thr: float) -> Optional[float]:
-        if not exhaustive_results_dir:
-            return None
-        bfs_path = Path(exhaustive_results_dir) if Path(exhaustive_results_dir).is_absolute() else script_dir / exhaustive_results_dir
-        pct = load_gp_final_pct_fixed(bfs_path, thr)
-        if pct is not None:
-            print(f"BFS final % fixed (thr={thr}): {pct:.1f}%")
-        else:
-            print(f"Warning: no BFS results loaded from {bfs_path}")
-        return pct
+    bfs_by_order = None
+    if exhaustive_results_dir:
+        bfs_path = resolve(exhaustive_results_dir)
+        bfs_by_order = load_baseline_by_order(bfs_path, job_to_order, reference_ids)
+        total_bfs = sum(len(v) for v in bfs_by_order.values())
+        print(f"BFS baseline: {total_bfs} results (restricted to reference set)")
 
     thresholds_to_run = [threshold] if threshold is not None else THRESHOLDS
 
     for thr in thresholds_to_run:
-        gp_pct = get_gp_pct(thr)
-        bfs_pct = get_bfs_pct(thr)
+        plot_paper_figure(gbpr, gp_by_order, bfs_by_order, thr, output_path)
 
-        # --- Overall ---
-        plot_spec_size_ablation(
-            results_by_n=results_by_n,
-            threshold=thr,
-            n_values=N_VALUES,
-            gp_pct=gp_pct,
-            bfs_pct=bfs_pct,
-            output_dir=output_path,
-        )
-
-        # --- Per program ---
-        for prog in all_programs:
-            filtered = filter_results_by_n(results_by_n, N_VALUES, program=prog)
-            safe_prog = prog.replace("/", "_")
-            plot_spec_size_ablation(
-                results_by_n=filtered,
-                threshold=thr,
-                n_values=N_VALUES,
-                gp_pct=gp_pct,
-                bfs_pct=bfs_pct,
-                output_dir=output_path,
-                filename_suffix=f"_program_{safe_prog}",
-                title_suffix=f"Program: {prog}",
-            )
-
-        # --- Per mutation order ---
-        for order in all_orders:
-            filtered = filter_results_by_n(
-                results_by_n, N_VALUES, mutation_order=order, mutation_orders=mutation_orders
-            )
-            plot_spec_size_ablation(
-                results_by_n=filtered,
-                threshold=thr,
-                n_values=N_VALUES,
-                gp_pct=gp_pct,
-                bfs_pct=bfs_pct,
-                output_dir=output_path,
-                filename_suffix=f"_order_{order}",
-                title_suffix=f"Mutation Order: {order}",
-            )
-
-        # --- Per program and mutation order ---
-        for prog in all_programs:
-            for order in all_orders:
-                filtered = filter_results_by_n(
-                    results_by_n, N_VALUES,
-                    program=prog, mutation_order=order, mutation_orders=mutation_orders,
-                )
-                # Skip if no data at any N
-                if not any(filtered[n] for n in N_VALUES):
-                    continue
-                safe_prog = prog.replace("/", "_")
-                plot_spec_size_ablation(
-                    results_by_n=filtered,
-                    threshold=thr,
-                    n_values=N_VALUES,
-                    gp_pct=gp_pct,
-                    bfs_pct=bfs_pct,
-                    output_dir=output_path,
-                    filename_suffix=f"_program_{safe_prog}_order_{order}",
-                    title_suffix=f"Program: {prog}, Mutation Order: {order}",
-                )
-
-    # Plot B — learning curves at different N (threshold-independent)
-    plot_learning_curves(
-        val_accs_by_n=val_accs_by_n,
-        n_values=N_VALUES,
-        output_dir=output_path,
+    # Learning curves (threshold-independent)
+    val_accs = load_val_accs_by_n(
+        spec_size_dir, train_mutations_dir, reference_ids, job_to_order, loss_fn_name
     )
+    plot_learning_curves(val_accs, output_path)
 
 
 if __name__ == "__main__":
