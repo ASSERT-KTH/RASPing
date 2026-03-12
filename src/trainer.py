@@ -44,6 +44,7 @@ class Trainer:
         from_pretrained: Optional[str] = None,
         store_trajectory: bool = False,
         trajectory_store_interval: int = 10,
+        wandb_extra_config: Optional[dict] = None,
     ):
         self.model = model.model
         self.params = model.model.params
@@ -83,17 +84,20 @@ class Trainer:
         self.trajectory = [] # List to store (step, params, loss) tuples
 
         if self.use_wandb:
+            base_config = {
+                "learning_rate": lr,
+                "batch_size": batch_size,
+                "n_epochs": n_epochs,
+                "val_step": valStep,
+                "early_stopping_patience": early_stopping_patience,
+                "early_stopping_min_delta": early_stopping_min_delta,
+            }
+            if wandb_extra_config:
+                base_config.update(wandb_extra_config)
             wandb.init(
                 project=wandb_project or "RASPing",
                 name=wandb_name,
-                config={
-                    "learning_rate": lr,
-                    "batch_size": batch_size,
-                    "n_epochs": n_epochs,
-                    "val_step": valStep,
-                    "early_stopping_patience": early_stopping_patience,
-                    "early_stopping_min_delta": early_stopping_min_delta,
-                },
+                config=base_config,
             )
 
         self.init()
@@ -255,7 +259,7 @@ class Trainer:
                         "train_accuracy": train_acc,
                         **val_metrics,
                     }
-                    wandb.log(wandb_metrics)
+                    wandb.log(wandb_metrics, step=int(self.state.step))
 
             if stoppedTraining:
                 # Restore best model parameters
