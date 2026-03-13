@@ -2,6 +2,7 @@ import argparse
 import csv
 import logging
 import json
+import time
 import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
@@ -158,6 +159,8 @@ def main():
         level=getattr(logging, args.log_level),
         format="[%(asctime)s] %(levelname)s %(name)s: %(message)s",
     )
+    # Suppress verbose per-generation logs from gp_core; progress is reported here
+    logging.getLogger("experiments.gp_baseline.gp_core").setLevel(logging.WARNING)
 
     # Load job IDs from CSV
     csv_job_ids = load_job_ids_from_csv(CSV_PATH)
@@ -212,7 +215,12 @@ def main():
 
     # Execute jobs in parallel
     workers = max(1, args.workers)
-    logging.info(f"Launching {len(filtered)} jobs with workers={workers}")
+    n_total = len(filtered)
+    logging.info(f"Launching {n_total} jobs with workers={workers}")
+
+    wall_start = time.time()
+    n_done = 0
+    n_failed = 0
 
     with ProcessPoolExecutor(max_workers=workers) as ex:
         futures = {}
@@ -244,7 +252,15 @@ def main():
                 dataset_name, result = fut.result()
             except Exception as e:
                 job_id = entry.get("job_id", "unknown")
-                logging.error(f"Job {job_id} failed: {e}")
+                n_done += 1
+                n_failed += 1
+                elapsed = time.time() - wall_start
+                rate = n_done / elapsed if elapsed > 0 else 0
+                eta = (n_total - n_done) / rate if rate > 0 else float("inf")
+                logging.error(
+                    f"[{n_done}/{n_total} | elapsed {elapsed/3600:.2f}h | ETA {eta/3600:.2f}h] "
+                    f"Job {job_id} FAILED: {e}"
+                )
                 logging.debug(f"Job {job_id} traceback: {traceback.format_exc()}")
                 continue
             job_id = entry.get("job_id", "unknown")
@@ -253,7 +269,24 @@ def main():
             with open(tmp_path, "w") as f:
                 json.dump(result, f)
             tmp_path.replace(out_path)
-            logging.info(f"Wrote result: {out_path}")
+
+            n_done += 1
+            elapsed = time.time() - wall_start
+            rate = n_done / elapsed if elapsed > 0 else 0
+            eta = (n_total - n_done) / rate if rate > 0 else float("inf")
+            status = result.get("status", "?")
+            train_acc = result.get("train_acc")
+            test_acc = result.get("test_acc")
+            job_dur = result.get("duration_s", 0)
+            acc_str = (
+                f"train={train_acc:.3f} test={test_acc:.3f}"
+                if train_acc is not None and test_acc is not None
+                else "n/a"
+            )
+            logging.info(
+                f"[{n_done}/{n_total} | elapsed {elapsed/3600:.2f}h | ETA {eta/3600:.2f}h] "
+                f"{dataset_name}/{job_id[:8]} {status} {acc_str} ({job_dur:.0f}s)"
+            )
 
 
 if __name__ == "__main__":
