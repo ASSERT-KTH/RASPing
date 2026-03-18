@@ -38,7 +38,7 @@ def get_executor() -> submitit.AutoExecutor:
     executor.update_parameters(
         name="RASPING-BENCHMARK",
         nodes=1,
-        timeout_min=60,
+        timeout_min=120,
         slurm_additional_parameters={
             "reservation": "1g.10gb",
         },
@@ -83,7 +83,7 @@ def run_benchmark_in_container(
 def merge_results(output_path: str = "gbpr_timing.json"):
     """Average per-job benchmark results into one timing file per program."""
     per_program: dict[str, list[dict]] = {}
-    for f in sorted(BENCHMARK_RESULTS_DIR.glob("*.json")):
+    for f in sorted(BENCHMARK_RESULTS_DIR.glob("*_*.json")):  # skip old single-job files (no underscore+UUID)
         d = json.load(open(f))
         prog = d["program_name"]
         per_program.setdefault(prog, []).append(d)
