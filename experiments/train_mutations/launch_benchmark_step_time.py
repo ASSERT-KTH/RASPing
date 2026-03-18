@@ -1,37 +1,36 @@
 """
-Launch benchmark_step_time.py on the cluster for one representative job per program.
+Launch benchmark_step_time.py on the cluster for 10 jobs per base program (60 total).
+Timing is averaged across the 10 jobs per program to get a robust estimate.
 
-After all jobs complete, merge results into a single gbpr_timing.json:
-    python -c "
-    import json
-    from pathlib import Path
-    results = {}
-    for f in Path('benchmark_results').glob('*.json'):
-        d = json.load(open(f))
-        results[d['program_name']] = {
-            'seconds_per_epoch': d['seconds_per_epoch'],
-            'seconds_per_val_step': d['seconds_per_val_step'],
-        }
-    json.dump(results, open('gbpr_timing.json', 'w'), indent=2)
-    print(json.dumps(results, indent=2))
-    "
+After all jobs complete, merge and average results into gbpr_timing.json:
+    python experiments/train_mutations/launch_benchmark_step_time.py --merge
 """
 import os
+import json
+import argparse
 import subprocess
 import submitit
+import numpy as np
 
 from pathlib import Path
 
 
-# One representative job_id per program (first job in saved_data)
-REPRESENTATIVE_JOBS = {
-    "hist": "0532b1914bc2417486ac590b6672afb5",
-    "most_freq": "010d1cd204b84af397f31e73d4505e7a",
-    "reverse": "0079c3471a1b4dd38da7364d04bf48dc",
-    "shuffle_dyck": "01d3a605118c41aca3b6bac7f06b86d0",
-    "shuffle_dyck2": "011feaa061f24316995aa1d14301d847",
-    "sort": "0152617485ba4c4f9a2c74f0f90a3c63",
-}
+N_JOBS_PER_PROGRAM = 10
+SAVED_DATA_DIR = Path(__file__).parent / "saved_data"
+BENCHMARK_RESULTS_DIR = Path(__file__).parent / "benchmark_results"
+LOSS_FN = "cross_entropy_loss"
+
+
+def get_job_ids_for_program(program_name: str, n: int) -> list[str]:
+    """Sample n job_ids evenly from saved_data for a given program."""
+    loss_dir = SAVED_DATA_DIR / program_name / LOSS_FN
+    all_jobs = sorted(loss_dir.iterdir())
+    if len(all_jobs) <= n:
+        selected = all_jobs
+    else:
+        indices = np.linspace(0, len(all_jobs) - 1, n, dtype=int)
+        selected = [all_jobs[i] for i in indices]
+    return [j.name.replace("job_", "") for j in selected]
 
 
 def get_executor() -> submitit.AutoExecutor:
@@ -81,40 +80,77 @@ def run_benchmark_in_container(
         raise
 
 
+def merge_results(output_path: str = "gbpr_timing.json"):
+    """Average per-job benchmark results into one timing file per program."""
+    per_program: dict[str, list[dict]] = {}
+    for f in sorted(BENCHMARK_RESULTS_DIR.glob("*.json")):
+        d = json.load(open(f))
+        prog = d["program_name"]
+        per_program.setdefault(prog, []).append(d)
+
+    results = {}
+    for prog, records in sorted(per_program.items()):
+        spe = np.mean([r["seconds_per_epoch"] for r in records])
+        spvs = np.mean([r["seconds_per_val_step"] for r in records])
+        results[prog] = {
+            "n_jobs": len(records),
+            "seconds_per_epoch": float(spe),
+            "seconds_per_val_step": float(spvs),
+        }
+        print(f"{prog}: {len(records)} jobs, {spe:.3f} s/epoch, {spvs:.3f} s/val_step")
+
+    with open(output_path, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"\nSaved to {output_path}")
+    print(json.dumps(results, indent=2))
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--merge",
+        action="store_true",
+        help="Merge completed benchmark results into gbpr_timing.json instead of launching jobs",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="gbpr_timing.json",
+        help="Output path for merged timing file (used with --merge)",
+    )
+    args = parser.parse_args()
+
+    if args.merge:
+        merge_results(args.output)
+        return
+
     os.makedirs("logs", exist_ok=True)
-    os.makedirs("benchmark_results", exist_ok=True)
+    BENCHMARK_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     executor = get_executor()
-    jobs = []
+    submitted = []
 
-    for program_name, job_id in REPRESENTATIVE_JOBS.items():
-        output_path = str(
-            Path(__file__).parent / f"benchmark_results/{program_name}.json"
-        )
-        if Path(output_path).exists():
-            print(f"Skipping {program_name} (already exists)")
-            continue
+    programs = [d.name for d in sorted(SAVED_DATA_DIR.iterdir()) if d.is_dir()]
+    for program_name in programs:
+        job_ids = get_job_ids_for_program(program_name, N_JOBS_PER_PROGRAM)
+        for job_id in job_ids:
+            output_path = str(BENCHMARK_RESULTS_DIR / f"{program_name}_{job_id}.json")
+            if Path(output_path).exists():
+                print(f"Skipping {program_name}/{job_id} (already exists)")
+                continue
 
-        job = executor.submit(
-            run_benchmark_in_container,
-            program_name=program_name,
-            job_id=job_id,
-            output_path=output_path,
-        )
-        jobs.append((program_name, job))
-        print(f"Submitted benchmark for {program_name} (job_id={job_id})")
+            job = executor.submit(
+                run_benchmark_in_container,
+                program_name=program_name,
+                job_id=job_id,
+                output_path=output_path,
+            )
+            submitted.append((program_name, job_id, job))
+            print(f"Submitted {program_name}/{job_id}")
 
-    print(f"\nSubmitted {len(jobs)} benchmark jobs.")
-    print("After completion, merge results with:")
-    print(
-        "  python -c \""
-        "import json; from pathlib import Path; results = {}; "
-        "[results.update({d['program_name']: {'seconds_per_epoch': d['seconds_per_epoch'], 'seconds_per_val_step': d['seconds_per_val_step']}}) "
-        "for f in Path('benchmark_results').glob('*.json') for d in [json.load(open(f))]]; "
-        "json.dump(results, open('gbpr_timing.json', 'w'), indent=2); print(json.dumps(results, indent=2))"
-        "\""
-    )
+    print(f"\nSubmitted {len(submitted)} benchmark jobs ({N_JOBS_PER_PROGRAM} per program).")
+    print("After completion, run:")
+    print("  python experiments/train_mutations/launch_benchmark_step_time.py --merge")
 
 
 if __name__ == "__main__":
