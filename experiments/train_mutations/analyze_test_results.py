@@ -490,10 +490,15 @@ def plot_accuracy_histogram(results, output_dir=None):
         if num_programs == 0:
             continue
 
-        num_cols = min(3, num_programs)
+        # Prefer the widest layout (up to 3 columns) that fills every cell, so e.g.
+        # 4 programs render as 2x2 rather than 2x3 with two blanks.
+        num_cols = next(
+            (c for c in range(min(3, num_programs), 1, -1) if num_programs % c == 0),
+            min(3, num_programs),
+        )
         num_rows = (num_programs + num_cols - 1) // num_cols
-        
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows), squeeze=False)
+
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(5 * num_cols, 5 * num_rows), squeeze=False)
         axes = axes.flatten()
         
         plotted_program_idx = 0
