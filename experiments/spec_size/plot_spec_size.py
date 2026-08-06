@@ -63,12 +63,21 @@ def load_job_maps(script_dir: Path):
     return job_to_order, job_to_prog
 
 
+EXCLUDED_PROGRAMS = {"shuffle_dyck", "shuffle_dyck2"}
+
+
 def load_reference_ids(train_mutations_dir: Path, job_to_prog: Dict, loss_fn: str) -> Set[str]:
-    """1,135 non-shuffle_dyck job IDs present in the N=40,000 train_mutations results."""
+    """847 job IDs present in the N=40,000 train_mutations results, excluding both Dyck programs.
+
+    shuffle_dyck cannot participate at N >= 5,000 (only 1,635 distinct training
+    samples). Both Dyck programs are additionally excluded from the main paper
+    because their outputs make exact-sequence accuracy a degenerate metric; see
+    the Dyck appendix.
+    """
     ref = set()
     for f in train_mutations_dir.glob(f"*/{loss_fn}/job_*/test_results.json"):
         job_id = json.loads(f.read_text()).get("job_id")
-        if job_id and job_to_prog.get(job_id) != "shuffle_dyck":
+        if job_id and job_to_prog.get(job_id) not in EXCLUDED_PROGRAMS:
             ref.add(job_id)
     return ref
 

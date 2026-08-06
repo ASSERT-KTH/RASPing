@@ -803,7 +803,15 @@ def aggregate_test_accuracies(results, output_dir=None):
     default="analysis_outputs",
     help="Directory to save analysis outputs",
 )
-def main(saved_data_dir, output_dir):
+@click.option(
+    "--exclude-programs",
+    default=None,
+    help=(
+        "Comma-separated program names to exclude, e.g. 'shuffle_dyck,shuffle_dyck2'. "
+        "Used to omit programs whose outputs make exact-sequence accuracy degenerate."
+    ),
+)
+def main(saved_data_dir, output_dir, exclude_programs):
     """Analyze and visualize test results from trained mutation models"""
     # Parse epsilons
     epsilon_values = np.linspace(0.0, 0.01, 5)
@@ -816,6 +824,12 @@ def main(saved_data_dir, output_dir):
     print(f"Loading results from {saved_data_dir}...")
     results = load_results(saved_data_dir)
     print(f"Loaded {len(results)} results")
+
+    if exclude_programs:
+        excluded = {p.strip() for p in exclude_programs.split(",") if p.strip()}
+        before = len(results)
+        results = [r for r in results if r.get("program_name") not in excluded]
+        print(f"Excluded programs {sorted(excluded)}: {before} -> {len(results)} results")
 
     # Aggregate all test accuracies
     aggregate_test_accuracies(results, output_path)
