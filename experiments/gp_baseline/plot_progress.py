@@ -277,51 +277,7 @@ def create_plot(
             gp_job_series, threshold
         )
 
-    target_epoch = 500
-    plt.figure(figsize=(8, 5))
-    # GP baseline lines
-    plt.plot(x_gp, gp_fixed_pct, label="GP", color="#1f77b4")
-    if x_gp and x_gp[-1] < target_epoch:
-        plt.plot(
-            [x_gp[-1], target_epoch],
-            [gp_fixed_pct[-1], gp_fixed_pct[-1]],
-            color="#1f77b4",
-            linestyle="--",
-            dashes=(1, 1),
-        )
-
-    if show_median_avg:
-        plt.plot(
-            x_gp,
-            gp_median_pct,
-            label="GP median accuracy (%)",
-            color="#1f77b4",
-            linestyle="--",
-        )
-        if x_gp and x_gp[-1] < target_epoch:
-            plt.plot(
-                [x_gp[-1], target_epoch],
-                [gp_median_pct[-1], gp_median_pct[-1]],
-                color="#1f77b4",
-                linestyle="--",
-                dashes=(1, 1),
-            )
-        plt.plot(
-            x_gp,
-            gp_mean_pct,
-            label="GP avg accuracy (%)",
-            color="#1f77b4",
-            linestyle=":",
-        )
-        if x_gp and x_gp[-1] < target_epoch:
-            plt.plot(
-                [x_gp[-1], target_epoch],
-                [gp_mean_pct[-1], gp_mean_pct[-1]],
-                color="#1f77b4",
-                linestyle="--",
-                dashes=(1, 1),
-            )
-    # Gradient-based lines (if available)
+    x_grad, grad_fixed_pct, grad_median_pct, grad_mean_pct = [], [], [], []
     if grad_job_series:
         if use_time_axis and grad_time_per_step is not None:
             x_grad, grad_fixed_pct, grad_median_pct, grad_mean_pct = aggregate_job_series_time(
@@ -331,52 +287,8 @@ def create_plot(
             x_grad, grad_fixed_pct, grad_median_pct, grad_mean_pct = aggregate_job_series(
                 grad_job_series, threshold
             )
-        plt.plot(
-            x_grad,
-            grad_fixed_pct,
-            label="GBPR",
-            color="#2ca02c",
-        )
-        if x_grad and x_grad[-1] < target_epoch:
-            plt.plot(
-                [x_grad[-1], target_epoch],
-                [grad_fixed_pct[-1], grad_fixed_pct[-1]],
-                color="#2ca02c",
-                linestyle="--",
-                dashes=(1, 1),
-            )
-        if show_median_avg:
-            plt.plot(
-                x_grad,
-                grad_median_pct,
-                label="GBPR median accuracy (%)",
-                color="#2ca02c",
-                linestyle="--",
-            )
-            if x_grad and x_grad[-1] < target_epoch:
-                plt.plot(
-                    [x_grad[-1], target_epoch],
-                    [grad_median_pct[-1], grad_median_pct[-1]],
-                    color="#2ca02c",
-                    linestyle="--",
-                    dashes=(1, 1),
-                )
-            plt.plot(
-                x_grad,
-                grad_mean_pct,
-                label="GBPR avg accuracy (%)",
-                color="#2ca02c",
-                linestyle=":",
-            )
-            if x_grad and x_grad[-1] < target_epoch:
-                plt.plot(
-                    [x_grad[-1], target_epoch],
-                    [grad_mean_pct[-1], grad_mean_pct[-1]],
-                    color="#2ca02c",
-                    linestyle="--",
-                    dashes=(1, 1),
-                )
-    # Exhaustive search lines (if available)
+
+    x_exh, exh_fixed_pct, exh_median_pct, exh_mean_pct = [], [], [], []
     if exhaustive_job_series:
         if use_time_axis and exh_time_per_step is not None:
             x_exh, exh_fixed_pct, exh_median_pct, exh_mean_pct = aggregate_job_series_time(
@@ -386,51 +298,53 @@ def create_plot(
             x_exh, exh_fixed_pct, exh_median_pct, exh_mean_pct = aggregate_job_series(
                 exhaustive_job_series, threshold
             )
-        plt.plot(
-            x_exh,
-            exh_fixed_pct,
-            label="BFS",
-            color="#ff7f0e",
-        )
-        if x_exh and x_exh[-1] < target_epoch:
+
+    # Global x-axis maximum — extend shorter lines to match with a dotted tail
+    x_max = max(
+        (x[-1] for x in [x_gp, x_grad, x_exh] if x),
+        default=0,
+    )
+
+    def _extend(x, y, color, linestyle="--"):
+        if x and x[-1] < x_max:
             plt.plot(
-                [x_exh[-1], target_epoch],
-                [exh_fixed_pct[-1], exh_fixed_pct[-1]],
-                color="#ff7f0e",
-                linestyle="--",
+                [x[-1], x_max],
+                [y[-1], y[-1]],
+                color=color,
+                linestyle=linestyle,
                 dashes=(1, 1),
             )
+
+    plt.figure(figsize=(8, 5))
+    # GP baseline lines
+    plt.plot(x_gp, gp_fixed_pct, label="GP", color="#1f77b4")
+    _extend(x_gp, gp_fixed_pct, "#1f77b4")
+
+    if show_median_avg:
+        plt.plot(x_gp, gp_median_pct, label="GP median accuracy (%)", color="#1f77b4", linestyle="--")
+        _extend(x_gp, gp_median_pct, "#1f77b4")
+        plt.plot(x_gp, gp_mean_pct, label="GP avg accuracy (%)", color="#1f77b4", linestyle=":")
+        _extend(x_gp, gp_mean_pct, "#1f77b4")
+
+    # Gradient-based lines (if available)
+    if grad_job_series:
+        plt.plot(x_grad, grad_fixed_pct, label="GBPR", color="#2ca02c")
+        _extend(x_grad, grad_fixed_pct, "#2ca02c")
         if show_median_avg:
-            plt.plot(
-                x_exh,
-                exh_median_pct,
-                label="BFS median accuracy (%)",
-                color="#ff7f0e",
-                linestyle="--",
-            )
-            if x_exh and x_exh[-1] < target_epoch:
-                plt.plot(
-                    [x_exh[-1], target_epoch],
-                    [exh_median_pct[-1], exh_median_pct[-1]],
-                    color="#ff7f0e",
-                    linestyle="--",
-                    dashes=(1, 1),
-                )
-            plt.plot(
-                x_exh,
-                exh_mean_pct,
-                label="BFS avg accuracy (%)",
-                color="#ff7f0e",
-                linestyle=":",
-            )
-            if x_exh and x_exh[-1] < target_epoch:
-                plt.plot(
-                    [x_exh[-1], target_epoch],
-                    [exh_mean_pct[-1], exh_mean_pct[-1]],
-                    color="#ff7f0e",
-                    linestyle="--",
-                    dashes=(1, 1),
-                )
+            plt.plot(x_grad, grad_median_pct, label="GBPR median accuracy (%)", color="#2ca02c", linestyle="--")
+            _extend(x_grad, grad_median_pct, "#2ca02c")
+            plt.plot(x_grad, grad_mean_pct, label="GBPR avg accuracy (%)", color="#2ca02c", linestyle=":")
+            _extend(x_grad, grad_mean_pct, "#2ca02c")
+
+    # Exhaustive search lines (if available)
+    if exhaustive_job_series:
+        plt.plot(x_exh, exh_fixed_pct, label="BFS", color="#ff7f0e")
+        _extend(x_exh, exh_fixed_pct, "#ff7f0e")
+        if show_median_avg:
+            plt.plot(x_exh, exh_median_pct, label="BFS median accuracy (%)", color="#ff7f0e", linestyle="--")
+            _extend(x_exh, exh_median_pct, "#ff7f0e")
+            plt.plot(x_exh, exh_mean_pct, label="BFS avg accuracy (%)", color="#ff7f0e", linestyle=":")
+            _extend(x_exh, exh_mean_pct, "#ff7f0e")
     plt.xlabel("Time (s)" if use_time_axis else "Epochs")
     plt.ylabel("% fixed programs")
     plt.ylim(0, 100)
@@ -490,6 +404,16 @@ def main():
         help="Show median and average accuracy lines in plots (default: False)",
     )
     parser.add_argument(
+        "--exclude-programs",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated program names to exclude from all plots, e.g. "
+            "'shuffle_dyck,shuffle_dyck2'. Used to omit programs whose outputs make "
+            "exact-sequence accuracy a degenerate metric."
+        ),
+    )
+    parser.add_argument(
         "--gbpr-timing-file",
         type=str,
         default=None,
@@ -544,6 +468,15 @@ def main():
         common_jobs = set.intersection(*all_job_sets)
     else:
         common_jobs = set()
+
+    # Drop excluded programs (job_key is (program_name, job_id))
+    if args.exclude_programs:
+        excluded = {p.strip() for p in args.exclude_programs.split(",") if p.strip()}
+        before = len(common_jobs)
+        common_jobs = {jk for jk in common_jobs if jk[0] not in excluded}
+        print(
+            f"Excluded programs {sorted(excluded)}: {before} -> {len(common_jobs)} jobs"
+        )
 
     # Filter all series to only include common jobs
     gp_job_series = {job: gp_job_series[job] for job in common_jobs}
@@ -721,6 +654,7 @@ def main():
                 args.threshold,
                 title=f"Program: {prog}",
                 show_median_avg=args.show_median_avg,
+                **time_kwargs(),
             )
             safe_prog_name = prog.replace("/", "_")
             plt.savefig(
@@ -759,6 +693,7 @@ def main():
                 args.threshold,
                 title=f"Mutation Order: {order}",
                 show_median_avg=args.show_median_avg,
+                **time_kwargs(),
             )
             plt.savefig(
                 output_dir / f"mutation_order_{order}.pdf",
@@ -812,6 +747,7 @@ def main():
                     args.threshold,
                     title=f"Mutation Order: {order} (All Buggy Mutants, excluding {most_freq_program})",
                     show_median_avg=args.show_median_avg,
+                    **time_kwargs(),
                 )
                 plt.savefig(
                     output_dir
@@ -863,6 +799,7 @@ def main():
                     args.threshold,
                     title=f"Mutation Order >= {min_order}",
                     show_median_avg=args.show_median_avg,
+                    **time_kwargs(),
                 )
                 plt.savefig(
                     output_dir / f"mutation_order_ge_{min_order}.pdf",
@@ -917,6 +854,7 @@ def main():
                         args.threshold,
                         title=f"Mutation Order >= {min_order} (All Buggy Mutants, excluding {most_freq_program})",
                         show_median_avg=args.show_median_avg,
+                        **time_kwargs(),
                     )
                     plt.savefig(
                         output_dir
@@ -960,6 +898,7 @@ def main():
                 args.threshold,
                 title=f"Program: {prog}, Mutation Order: {order}",
                 show_median_avg=args.show_median_avg,
+                **time_kwargs(),
             )
             safe_prog_name = prog.replace("/", "_")
             plt.savefig(
