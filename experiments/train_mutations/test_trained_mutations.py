@@ -10,7 +10,7 @@ module_path = os.path.abspath(os.path.join("../.."))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
-from src.functions import load_dataset, encodeAndPadData
+from src.functions import load_dataset, encodeAndPadData, generateModel
 from experiments.mutation.load_mutations import load_buggy_models
 from src.loss import (
     cross_entropy_loss,
@@ -32,6 +32,7 @@ def test_trained_model(
     max_len: int = 10,
     output_dir: str = None,
     loss_fn_name: str = "cross_entropy_loss",
+    random_init: bool = False,
 ):
     # Load the trained model
     if not output_dir:
@@ -43,10 +44,16 @@ def test_trained_model(
     if not model_path.exists():
         raise FileNotFoundError(f"No trained model found at {model_path}")
 
-    # Load the base buggy model first
-    model = load_buggy_models(
-        max_length=max_len, program_name=program_name, job_id=job_id
-    )[job_id]
+    if random_init:
+        # No buggy checkpoint to load structure from - compile the
+        # ground-truth program instead. Weights get overwritten below with
+        # the trained params either way, so no need to randomize them here.
+        model = generateModel(program_name, max_len)
+    else:
+        # Load the base buggy model first
+        model = load_buggy_models(
+            max_length=max_len, program_name=program_name, job_id=job_id
+        )[job_id]
 
     # Load the trained model parameters
     trained_params = np.load(str(model_path), allow_pickle=True).item()
@@ -102,12 +109,19 @@ def test_trained_model(
     default="cross_entropy_loss",
     help="Loss function used for training",
 )
+@click.option(
+    "--random-init/--no-random-init",
+    default=False,
+    help="Match the random-init training run: compile the ground-truth program instead of "
+         "loading a buggy mutation's structure.",
+)
 def run_test(
     program_name,
     job_id,
     max_len,
     output_dir,
     loss_fn_name,
+    random_init,
 ):
     print(f"Testing trained model {program_name} (job {job_id}) with {loss_fn_name}...")
     results = test_trained_model(
@@ -116,6 +130,7 @@ def run_test(
         max_len=max_len,
         output_dir=output_dir,
         loss_fn_name=loss_fn_name,
+        random_init=random_init,
     )
     print(f"Test results: {results}")
 
