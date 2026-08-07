@@ -12,7 +12,7 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 
 from src.trainer import Trainer
-from src.functions import load_dataset, encodeAndPadData
+from src.functions import load_dataset, encodeAndPadData, generateModel
 from src.loss import (
     cross_entropy_loss,
     cross_entropy_loss_smoothed_accuracy,
@@ -45,15 +45,26 @@ def train_mutated_model(
     n_val_samples: int = None,
     seed: int = 42,
     n_steps: int = None,
+    random_init: bool = False,
 ):
     if loss_fn_name not in LOSS_FUNCTIONS:
         raise ValueError(f"Loss function {loss_fn_name} not found")
     loss_fn = LOSS_FUNCTIONS[loss_fn_name]
 
-    # Load the buggy model
-    model = load_buggy_models(
-        max_length=max_len, program_name=program_name, job_id=job_id
-    )[job_id]
+    if random_init:
+        # Initialization-control baseline: compile the ground-truth program
+        # (no bug) and randomize its weights, instead of loading a buggy
+        # mutation's checkpoint. Everything else (data, optimizer, early
+        # stopping, evaluation) matches the mutant-repair path exactly, so
+        # this is a like-for-like comparison of the starting point only.
+        model = generateModel(program_name, max_len)
+        model.setJaxPRNGKey(seed)
+        model.setRandomWeights()
+    else:
+        # Load the buggy model
+        model = load_buggy_models(
+            max_length=max_len, program_name=program_name, job_id=job_id
+        )[job_id]
 
     # Load dataset
     program_name_key = program_name
@@ -172,6 +183,13 @@ def train_mutated_model(
               help="Random seed for training-set subsampling")
 @click.option("--n_steps", type=int, default=None,
               help="Total gradient steps (overrides n_epochs; ensures equal compute across N values)")
+@click.option(
+    "--random-init/--no-random-init",
+    default=False,
+    help="Initialization control: compile the ground-truth program and randomize its weights "
+         "(seeded by --seed) instead of loading a buggy mutation. --job_id is not required in "
+         "this mode and defaults to seed{seed} if omitted.",
+)
 def run_test(
     program_name,
     job_id,
@@ -189,8 +207,13 @@ def run_test(
     n_val_samples,
     seed,
     n_steps,
+    random_init,
 ):
-    print(f"Training mutated model {program_name} (job {job_id}) with {loss_fn_name}...")
+    if random_init and not job_id:
+        job_id = f"seed{seed}"
+
+    print(f"Training {'random-init' if random_init else 'mutated'} model {program_name} "
+          f"(job {job_id}) with {loss_fn_name}...")
     if not output_dir:
         output_dir = f"saved_data/{program_name}/{loss_fn_name}/job_{job_id}/"
     train_mutated_model(
@@ -210,6 +233,7 @@ def run_test(
         n_val_samples=n_val_samples,
         seed=seed,
         n_steps=n_steps,
+        random_init=random_init,
     )
 
 
