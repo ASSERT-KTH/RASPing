@@ -154,8 +154,9 @@ def main():
                 job = executor.submit(run_train_and_test, program_name, seed, output_dir, args.init_scheme)
                 jobs.append((program_name, seed, job))
 
-    print(f"Submitted {len(jobs)} jobs ({len(programs)} programs x {len(seeds)} seeds).")
-    print("Results land in saved_data_random_init/{program}/seed_{seed}/cross_entropy_loss/job_seed{seed}/")
+    print(f"Submitted {len(jobs)} jobs ({len(programs)} programs x {len(seeds)} seeds), "
+          f"init-scheme={args.init_scheme}.")
+    print(f"Results land in {args.output_root}/{{program}}/seed_{{seed}}/{LOSS_FN_NAME}/job_seed{{seed}}/")
 
 
 if __name__ == "__main__":

@@ -13,11 +13,18 @@ test_trained_mutations.py pipeline (so file formats match exactly):
   - buggy-init: saved_data/{program}/cross_entropy_loss/job_{job_id}/
     (existing mutant-repair results; a stratified-by-mutation-order subset
     is selected here, not all of them, to keep the plot readable)
-  - random-init: saved_data_random_init/{program}/seed_{seed}/cross_entropy_loss/job_seed{seed}/
+  - random-init: {random-init-root}/{program}/seed_{seed}/cross_entropy_loss/job_seed{seed}/
     (produced by launch_random_init_baseline.py)
+
+The random-init results depend on the weight initialization scheme used
+(launch_random_init_baseline.py --init-scheme). Point --random-init-root
+at the matching sweep and use --out-suffix to keep outputs from different
+schemes side by side.
 
 Usage:
     python plot_initialization_controls.py --subset-size 15
+    python plot_initialization_controls.py \\
+        --random-init-root saved_data_random_init_xavier --out-suffix _xavier
 """
 import json
 from pathlib import Path
@@ -29,7 +36,6 @@ import seaborn as sns
 
 HERE = Path(__file__).parent
 BUGGY_SAVED_DATA = HERE / "saved_data"
-RANDOM_INIT_SAVED_DATA = HERE / "saved_data_random_init"
 MUTATIONS_PATH = HERE.parent / "mutation" / "results" / "aggregated_mutations.json"
 PLOTS_DIR = HERE.parent.parent / "plots"
 
@@ -96,10 +102,10 @@ def load_buggy_init_curves(program: str, job_ids: list[str]) -> list[dict]:
     return curves
 
 
-def load_random_init_curves(program: str, seeds: list[int]) -> list[dict]:
+def load_random_init_curves(program: str, seeds: list[int], random_init_root: Path) -> list[dict]:
     curves = []
     for seed in seeds:
-        d = RANDOM_INIT_SAVED_DATA / program / f"seed_{seed}" / LOSS_FN / f"job_seed{seed}"
+        d = random_init_root / program / f"seed_{seed}" / LOSS_FN / f"job_seed{seed}"
         if not (d / "train_losses.npy").exists():
             continue
         c = load_curves(d)
@@ -183,12 +189,13 @@ def summarize(program: str, buggy_curves: list[dict], random_curves: list[dict])
     }
 
 
-def make_latex_table(rows: list[dict], out_path: Path):
+def make_latex_table(rows: list[dict], out_path: Path, init_scheme: str = "xavier"):
     lines = [
         r"\begin{table}[t]",
         r"\centering",
         r"\caption{Test accuracy when repairing from a buggy checkpoint vs. from a randomly "
-        r"initialized ground-truth model, using the identical repair procedure "
+        rf"initialized ground-truth model ({init_scheme} initialization), using the identical "
+        r"repair procedure "
         r"(n=10 seeds for random-init; buggy-init is a stratified subset by mutation order).}",
         r"\label{tab:init-controls}",
         r"\begin{tabular}{lrrrr}",
@@ -212,27 +219,42 @@ def main():
     parser.add_argument("--subset-size", type=int, default=15,
                          help="Number of buggy-init mutations to sample per program.")
     parser.add_argument("--seed", type=int, default=0, help="Seed for subset selection.")
+    parser.add_argument("--random-init-root", type=str, default="saved_data_random_init",
+                         help="Directory under experiments/train_mutations/ holding the "
+                              "random-init sweep to compare against (must match the "
+                              "--output-root used by launch_random_init_baseline.py).")
+    parser.add_argument("--out-suffix", type=str, default="",
+                         help="Suffix for output figure/table/CSV names, e.g. '_xavier', so "
+                              "results for different init schemes don't overwrite each other.")
+    parser.add_argument("--init-scheme", type=str, default="xavier",
+                         help="Init scheme the random-init sweep was produced with; used only "
+                              "to label the table caption.")
     args = parser.parse_args()
+
+    random_init_root = HERE / args.random_init_root
+    sfx = args.out_suffix
 
     summary_rows = []
     for program in PROGRAMS:
         job_ids = select_buggy_init_subset(program, args.subset_size, seed=args.seed)
         buggy_curves = load_buggy_init_curves(program, job_ids)
-        random_curves = load_random_init_curves(program, list(range(N_SEEDS)))
+        random_curves = load_random_init_curves(program, list(range(N_SEEDS)), random_init_root)
 
         print(f"{program}: {len(buggy_curves)} buggy-init curves, {len(random_curves)} random-init curves")
         if not random_curves:
-            print(f"  (no random-init results yet for {program} - run launch_random_init_baseline.py first)")
+            print(f"  (no random-init results yet for {program} in {random_init_root} - "
+                  f"run launch_random_init_baseline.py first)")
             continue
 
-        plot_program(program, buggy_curves, random_curves, PLOTS_DIR / f"init_controls_{program}.pdf")
+        plot_program(program, buggy_curves, random_curves, PLOTS_DIR / f"init_controls_{program}{sfx}.pdf")
         summary_rows.append(summarize(program, buggy_curves, random_curves))
 
     if summary_rows:
         df = pd.DataFrame(summary_rows)
         print(df.to_string(index=False))
-        df.to_csv(HERE / "init_controls_summary.csv", index=False)
-        make_latex_table(summary_rows, HERE / "init_controls_table.tex")
+        df.to_csv(HERE / f"init_controls_summary{sfx}.csv", index=False)
+        make_latex_table(summary_rows, HERE / f"init_controls_table{sfx}.tex",
+                         init_scheme=args.init_scheme)
 
 
 if __name__ == "__main__":
