@@ -1,0 +1,15 @@
+\begin{table}[t]
+\centering
+\caption{Paired initialization control: each mutant's own compiled architecture, repaired from the buggy checkpoint vs. randomly initialized (xavier, mean of 5 seeds), identical data/optimizer/early-stopping otherwise.}
+\label{tab:paired-init-control}
+\begin{tabular}{lrrrrrr}
+\toprule
+Program & $n$ & Buggy mean & Random mean & Random wins & Ties & Buggy wins \\
+\midrule
+hist & 20 & 56.3\% & 100.0\% & 11 & 9 & 0 \\
+most_freq & 20 & 36.0\% & 81.2\% & 19 & 0 & 1 \\
+reverse & 20 & 81.6\% & 100.0\% & 12 & 8 & 0 \\
+sort & 20 & 91.2\% & 100.0\% & 8 & 12 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
