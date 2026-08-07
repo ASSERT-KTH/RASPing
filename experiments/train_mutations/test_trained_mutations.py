@@ -33,6 +33,7 @@ def test_trained_model(
     output_dir: str = None,
     loss_fn_name: str = "cross_entropy_loss",
     random_init: bool = False,
+    random_init_source: str = "buggy",
 ):
     # Load the trained model
     if not output_dir:
@@ -44,7 +45,7 @@ def test_trained_model(
     if not model_path.exists():
         raise FileNotFoundError(f"No trained model found at {model_path}")
 
-    if random_init:
+    if random_init and random_init_source == "ground-truth":
         # No buggy checkpoint to load structure from - compile the
         # ground-truth program instead. Weights get overwritten below with
         # the trained params either way, so no need to randomize them here.
@@ -115,6 +116,12 @@ def test_trained_model(
     help="Match the random-init training run: compile the ground-truth program instead of "
          "loading a buggy mutation's structure.",
 )
+@click.option(
+    "--random-init-source",
+    type=click.Choice(["buggy", "ground-truth"]),
+    default="buggy",
+    help="Which architecture the random-init run used, so the same one is rebuilt here.",
+)
 def run_test(
     program_name,
     job_id,
@@ -122,6 +129,7 @@ def run_test(
     output_dir,
     loss_fn_name,
     random_init,
+    random_init_source,
 ):
     print(f"Testing trained model {program_name} (job {job_id}) with {loss_fn_name}...")
     results = test_trained_model(
@@ -131,6 +139,7 @@ def run_test(
         output_dir=output_dir,
         loss_fn_name=loss_fn_name,
         random_init=random_init,
+        random_init_source=random_init_source,
     )
     print(f"Test results: {results}")
 

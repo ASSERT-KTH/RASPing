@@ -47,18 +47,34 @@ def train_mutated_model(
     n_steps: int = None,
     random_init: bool = False,
     init_scheme: str = "xavier",
+    random_init_source: str = "buggy",
 ):
     if loss_fn_name not in LOSS_FUNCTIONS:
         raise ValueError(f"Loss function {loss_fn_name} not found")
     loss_fn = LOSS_FUNCTIONS[loss_fn_name]
 
     if random_init:
-        # Initialization-control baseline: compile the ground-truth program
-        # (no bug) and randomize its weights, instead of loading a buggy
-        # mutation's checkpoint. Everything else (data, optimizer, early
-        # stopping, evaluation) matches the mutant-repair path exactly, so
-        # this is a like-for-like comparison of the starting point only.
-        model = generateModel(program_name, max_len)
+        # Initialization-control baseline: randomize the weights instead of
+        # starting from the buggy mutation's compiled checkpoint. Everything
+        # else (data, optimizer, early stopping, evaluation) matches the
+        # mutant-repair path exactly.
+        #
+        # random_init_source controls WHICH architecture is randomized:
+        #   "ground-truth" compiles the correct program. This confounds the
+        #     comparison, because most mutants do not share the ground-truth
+        #     architecture, so the baseline is handed the right structure for
+        #     free -- it measures architecture + initialization together.
+        #   "buggy" (default) loads the mutant and randomizes that same
+        #     architecture, isolating the value of the compiled starting point
+        #     from the architecture it lives in. This is the paired control.
+        if random_init_source == "buggy":
+            if not job_id:
+                raise ValueError("--random-init-source buggy requires --job_id")
+            model = load_buggy_models(
+                max_length=max_len, program_name=program_name, job_id=job_id
+            )[job_id]
+        else:
+            model = generateModel(program_name, max_len)
         model.setJaxPRNGKey(seed)
         model.setRandomWeights(
             scheme=None if init_scheme == "unit-normal" else init_scheme
@@ -194,6 +210,15 @@ def train_mutated_model(
          "this mode and defaults to seed{seed} if omitted.",
 )
 @click.option(
+    "--random-init-source",
+    type=click.Choice(["buggy", "ground-truth"]),
+    default="buggy",
+    help="With --random-init, which architecture to randomize. 'buggy' (default) randomizes the "
+         "mutant's own compiled architecture, isolating initialization from architecture. "
+         "'ground-truth' compiles the correct program instead, which also hands the baseline the "
+         "correct structure and so confounds the two.",
+)
+@click.option(
     "--init-scheme",
     type=click.Choice(["lecun", "xavier", "kaiming", "unit-normal"]),
     default="xavier",
@@ -221,6 +246,7 @@ def run_test(
     n_steps,
     random_init,
     init_scheme,
+    random_init_source,
 ):
     if random_init and not job_id:
         job_id = f"seed{seed}"
@@ -248,6 +274,7 @@ def run_test(
         n_steps=n_steps,
         random_init=random_init,
         init_scheme=init_scheme,
+        random_init_source=random_init_source,
     )
 
 
