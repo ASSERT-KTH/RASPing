@@ -46,6 +46,7 @@ def train_mutated_model(
     seed: int = 42,
     n_steps: int = None,
     random_init: bool = False,
+    init_scheme: str = "xavier",
 ):
     if loss_fn_name not in LOSS_FUNCTIONS:
         raise ValueError(f"Loss function {loss_fn_name} not found")
@@ -59,7 +60,9 @@ def train_mutated_model(
         # this is a like-for-like comparison of the starting point only.
         model = generateModel(program_name, max_len)
         model.setJaxPRNGKey(seed)
-        model.setRandomWeights()
+        model.setRandomWeights(
+            scheme=None if init_scheme == "unit-normal" else init_scheme
+        )
     else:
         # Load the buggy model
         model = load_buggy_models(
@@ -190,6 +193,15 @@ def train_mutated_model(
          "(seeded by --seed) instead of loading a buggy mutation. --job_id is not required in "
          "this mode and defaults to seed{seed} if omitted.",
 )
+@click.option(
+    "--init-scheme",
+    type=click.Choice(["lecun", "xavier", "kaiming", "unit-normal"]),
+    default="xavier",
+    help="Weight initialization used with --random-init. Fan-in scaled schemes: 'xavier' "
+         "(default; Glorot & Bengio 2010, as in the original Transformer), 'lecun' (Haiku's "
+         "hk.Linear default), 'kaiming' (He et al. 2015). 'unit-normal' reproduces the historical "
+         "N(0,1) behaviour, which is NOT fan-in scaled and starts these models numerically broken.",
+)
 def run_test(
     program_name,
     job_id,
@@ -208,6 +220,7 @@ def run_test(
     seed,
     n_steps,
     random_init,
+    init_scheme,
 ):
     if random_init and not job_id:
         job_id = f"seed{seed}"
@@ -234,6 +247,7 @@ def run_test(
         seed=seed,
         n_steps=n_steps,
         random_init=random_init,
+        init_scheme=init_scheme,
     )
 
 

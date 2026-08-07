@@ -51,7 +51,7 @@ def get_executor(timeout_min: int, array_parallelism: int) -> submitit.AutoExecu
     return executor
 
 
-def run_train_and_test(program_name: str, seed: int, output_dir: str):
+def run_train_and_test(program_name: str, seed: int, output_dir: str, init_scheme: str = "xavier"):
     """Run train_mutations.py --random-init then test_trained_mutations.py --random-init."""
     repo_root = Path(__file__).parent.parent.parent
     container_path = repo_root / "container.sif"
@@ -74,6 +74,7 @@ def run_train_and_test(program_name: str, seed: int, output_dir: str):
         "--seed", str(seed),
         "--no-store-trajectory",
         "--random-init",
+        "--init-scheme", init_scheme,
         "--output_dir", str(full_output_dir),
     ]
 
@@ -125,6 +126,13 @@ def main():
                               "reservation contention slowdowns while staying under the "
                               "cluster's 72h MaxTime. A timeout here loses the whole job's "
                               "work (no mid-training checkpointing), so err generous.")
+    parser.add_argument("--init-scheme", type=str, default="xavier",
+                         choices=["lecun", "xavier", "kaiming", "unit-normal"],
+                         help="Weight init for the random-init control. Default 'xavier' "
+                              "(fan-in scaled). 'unit-normal' is the historical N(0,1), which "
+                              "is not fan-in scaled and starts these models numerically broken.")
+    parser.add_argument("--output-root", type=str, default="saved_data_random_init",
+                         help="Directory under experiments/train_mutations/ to write results to.")
     parser.add_argument("--array-parallelism", type=int, default=40,
                          help="Max concurrent tasks on the shared 1g.10gb reservation.")
     args = parser.parse_args()
@@ -139,11 +147,11 @@ def main():
     with executor.batch():
         for program_name in programs:
             for seed in seeds:
-                output_dir = f"saved_data_random_init/{program_name}/seed_{seed}/{LOSS_FN_NAME}/job_seed{seed}"
+                output_dir = f"{args.output_root}/{program_name}/seed_{seed}/{LOSS_FN_NAME}/job_seed{seed}"
                 if (Path(__file__).parent / output_dir / "test_results.json").exists():
                     print(f"Skipping {program_name} seed={seed}: already completed")
                     continue
-                job = executor.submit(run_train_and_test, program_name, seed, output_dir)
+                job = executor.submit(run_train_and_test, program_name, seed, output_dir, args.init_scheme)
                 jobs.append((program_name, seed, job))
 
     print(f"Submitted {len(jobs)} jobs ({len(programs)} programs x {len(seeds)} seeds).")
