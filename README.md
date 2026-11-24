@@ -91,10 +91,19 @@ tests/              unit tests, paper-number oracle, golden equivalence with the
 docs/FINDINGS.md    log of bugs / inconsistencies and their fixes
 ```
 
-## Raw data
+## Raw data and old history
 
-Raw run directories (weights, per-run curves, trajectories, raw cosmic-ray outputs) are not in
-git. The v1 raw data is archived as a tarball (see `docs/FINDINGS.md` header for its
-provenance). `scripts/freeze_v1_results.py` derived `results/v1_tmlr/` from it.
+Raw run directories (weights, per-run curves, trajectories, raw cosmic-ray outputs) are not
+in git. `scripts/freeze_v1_results.py` derived `results/v1_tmlr/` from them.
+
+The repository history was rewritten in Nov 2026 to drop those raw outputs (9 GB → 52 MB).
+The original, unrewritten history is still on GitHub under `refs/archive/*`. It includes
+every original branch and the original `tmlr-submission-1` tag, with all weights and run
+directories. A normal clone does not download it; fetch it explicitly (about 9 GB):
+
+```bash
+git fetch origin 'refs/archive/*:refs/archive/*'
+git checkout refs/archive/tags/tmlr-submission-1     # the submitted state, with raw runs
+```
 
 Contact: André Silva.
