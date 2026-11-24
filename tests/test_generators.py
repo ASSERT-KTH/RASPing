@@ -1,4 +1,4 @@
-from ..src.generators import (
+from rasping.generators import (
     generate_reverse_exhaustive,
     generate_hist_exhaustive,
     generate_sort_exhaustive,
@@ -7,7 +7,7 @@ from ..src.generators import (
     generate_shuffle_dyck2_exhaustive,
 )
 
-from typing import Counter
+from collections import Counter
 
 
 def test_generate_reverse_exhaustive():
@@ -97,7 +97,7 @@ def test_generate_most_freq_exhaustive():
 
         # Check frequency-based sorting
         counts = Counter(input_seq[1:])
-        sorted_tokens = sorted(input_seq[1:], key=lambda x: (-counts[x], x))
+        sorted_tokens = sorted(input_seq[1:], key=lambda x: -counts[x])  # stable
         assert output_seq[1:] == sorted_tokens
 
         assert len(input_seq) == len(output_seq)

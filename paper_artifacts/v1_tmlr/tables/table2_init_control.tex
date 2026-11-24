@@ -1,0 +1,14 @@
+\begin{tabular}{lrrrrrrr}
+\toprule
+ & & \multicolumn{2}{c}{Mean test accuracy} & \multicolumn{2}{c}{Repaired ($\geq$99\%)} & \multicolumn{2}{c}{Epochs to early stop} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+Program & $n$ & buggy & random & buggy & random & buggy & random \\
+\midrule
+\texttt{hist} & 20 & 56.3\% & 100.0\% & 45.0\% & 100.0\% & 385 & 231 \\
+\texttt{most\_freq} & 20 & 36.0\% & 81.2\% & 0.0\% & 0.0\% & 655 & 760 \\
+\texttt{reverse} & 20 & 81.6\% & 100.0\% & 40.0\% & 100.0\% & 459 & 71 \\
+\texttt{sort} & 20 & 91.2\% & 100.0\% & 60.0\% & 100.0\% & 429 & 102 \\
+\midrule
+\textbf{All} & 80 & 66.3\% & 95.3\% & 36.2\% & 75.0\% & 482 & 291 \\
+\bottomrule
+\end{tabular}
