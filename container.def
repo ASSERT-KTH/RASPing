@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: python:3.13.1-bullseye
+From: python:3.13.1-bookworm
 
 # Build:  apptainer build container.sif container.def   (from the repository root)
 # The repository itself is bind-mounted at run time (see rasping/cluster.py), so the
@@ -15,8 +15,11 @@ From: python:3.13.1-bullseye
     export PATH=/opt/venv/bin:$PATH
 
 %post
-    apt update -y
-    apt install -y texlive dvipng texlive-latex-extra texlive-fonts-recommended cm-super patch
+    # Debian bookworm: bullseye's security repository no longer serves the pinned packages.
+    # No TeX Live: nothing renders LaTeX (figures are made locally from results/).
+    apt-get update -y
+    apt-get install -y --no-install-recommends patch
+    rm -rf /var/lib/apt/lists/*
     pip3 install uv==0.13.9
     cd /opt/rasping
     UV_PROJECT_ENVIRONMENT=/opt/venv uv sync --locked --extra cuda --no-install-project
