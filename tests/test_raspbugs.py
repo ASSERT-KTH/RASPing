@@ -45,3 +45,23 @@ def test_compile_mutant(job_id):
 def test_compile_all_mutants(program):
     for m in raspbugs.mutants("all", program=program):
         assert isinstance(m.compile(), Model)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("program", PROGRAMS)
+def test_benchmark_rule_v1(program):
+    """v1 RaspBugs = buggy mutants whose output vocabulary can represent the targets (F6).
+
+    Every benchmark mutant is representable; every excluded buggy mutant is not, except
+    one shuffle_dyck2 mutant whose v1 training job failed for another reason.
+    """
+    from rasping import data
+
+    exceptions = 0
+    for m in raspbugs.mutants("buggy", program=program):
+        ok = not data.unrepresentable_outputs(m.program, m.compile())
+        if m.in_benchmark:
+            assert ok, m.job_id
+        elif ok:
+            exceptions += 1
+    assert exceptions == (1 if program == "shuffle_dyck2" else 0)

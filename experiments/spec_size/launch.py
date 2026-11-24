@@ -7,7 +7,8 @@ validation examples) with a fixed budget of 500k gradient steps:
     python -m rasping.results collect spec_size --version v2
 
 v1 (TMLR): N in {100, 1000, 5000, 10000, 25000}, seed 42, all buggy mutants; the
-N=40,000 column of Table 8 reused the main runs (F8).
+N=40,000 column of Table 8 reused the main runs, which had no 500k-step cap (F8). Now
+N=40,000 is run within the ablation under the same budget.
 """
 
 import click
@@ -15,7 +16,7 @@ import click
 from rasping import cluster, raspbugs
 from rasping.config import RUNS_DIR
 
-N_VALUES = (100, 1000, 5000, 10000, 25000)
+N_VALUES = (100, 1000, 5000, 10000, 25000, 40000)
 N_STEPS = 500_000
 #: shuffle_dyck has only 1,635 training examples in total.
 MAX_N = {"shuffle_dyck": 1635}

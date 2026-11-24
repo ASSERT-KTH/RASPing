@@ -22,6 +22,31 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 
 ---
 
+## Summary: what this means for the resubmission
+
+**Reruns needed (results in `results/v1_tmlr/` no longer match the code):**
+
+| Results | Why | Findings |
+|---|---|---|
+| All GP / BFS runs (Figs 4–5, Table 7, Table 8 baseline columns) | budget-only BFS, train-only fitness, no test tie-breaks, failures counted, `MAX_LEN`, timestamps | F3, F5, F11, F18, F29, F30, F31 |
+| Dyck-2 GBPR and baseline runs (App. C) | new Dyck-2 specification (lengths 2–10) | F1 |
+| Spec-size ablation (Table 8, Fig 8) | N=40,000 inside the 500k-step budget; 1,000-program baselines | F8 |
+| Main GBPR runs (Table 1/5, Figs 3–5, 7) | not invalidated numerically; rerun to get selected-test curves, measured times and full-test "before" accuracies for Figs 3–5/7 | F4, F7, F16, F18 |
+| Dyck metrics (Tables 6–7) | recall definition | F28 |
+
+**Paper text to change regardless of reruns:** early-stopping patience is 50 (F2); state
+the benchmark rule — buggy mutants whose compiled output vocabulary can represent the
+correct outputs — and that it favours GBPR over GP/BFS (F6); oracle accuracy was on 50
+samples (F7); list all six mutant statuses (F19); Fig 4's GBPR axis is evaluations every
+10 epochs, not gradient steps (F16); §5.3 quotes test-based GBPR rates next to a
+validation-based curve (F4); Table 8's bold entry at order 4, N=10k is wrong (F27).
+
+**Not affected:** every number in the submitted paper was reproduced exactly from the raw
+runs (`tests/test_paper_numbers.py`); the refactored code reproduces the v1 code's compiled
+weights and training numerics (`tests/test_golden.py`).
+
+---
+
 ## Data and benchmark
 
 ### F1 — Dyck-2 specification never contains inputs longer than 8 — `fixed`
@@ -37,7 +62,7 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
   Balanced strings remain rare (0.5%), as before. The golden `shuffle_dyck2` training entry
   was re-recorded. Mutant membership is unaffected (labels depend only on the program).
 
-### F6 — The 1,466-mutant benchmark is defined by a join with GBPR results — `open`
+### F6 — The 1,466-mutant benchmark is defined by a join with GBPR results — `fixed` (rule made explicit)
 - **Evidence:** `experiments/mutation/raspbugs.ipynb` inner-joins
   `aggregated_mutations.json` (1,773 `BUGGY_MODEL` rows) with
   `train_mutations/analysis_outputs/all_test_accuracies.csv` (GBPR results) to produce
@@ -54,8 +79,16 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
   GP/BFS could repair the excluded mutants, so excluding them from the comparison favours GBPR.
 - **Invalidates:** benchmark size and composition (§4, every table); the GBPR-vs-symbolic
   comparison (§5.3) should either include the 306 (GBPR counted as failing) or state the filter.
+- **Decision (Nov 24, 2026):** keep the v1 set of 1,466 mutants, with the rule stated explicitly:
+  *buggy mutants whose compiled output vocabulary can represent the specification's outputs*.
+  Sound because the baselines are evaluated on the same set. The paper must state the rule
+  and that it excludes mutants GP/BFS might repair.
+- **Fix:** `data.unrepresentable_outputs()` implements the rule; `tests/test_raspbugs.py::
+  test_benchmark_rule_v1` (slow) checks that it reproduces v1 membership (one Dyck-2
+  exception); `build_manifest.py` applies it for new benchmark versions; `rasping.repair`
+  records unrepresentable mutants as `status: unrepresentable` instead of crashing.
 
-### F7 — "Buggy" label decided on only 50 test samples — `open`
+### F7 — "Buggy" label decided on only 50 test samples — `fixed` (pipeline)
 - **Evidence:** `experiments/mutation/tests/test.py:29` loads `data/<prog>_test.jsonl[:50]`.
   The pre-repair accuracy stored in `execution_result.accuracy` (and plotted as "Before GBPR"
   in Figs 3 and 7) is also computed on these 50 samples, whereas post-repair accuracy is on
@@ -64,6 +97,11 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 - **Invalidates:** benchmark membership (mutants correct on the 50 but wrong elsewhere are
   mislabelled `CORRECT_MODEL`); the "before" histograms and the "min/median/mean" statistics
   in §4.
+- **Fix:** the oracle uses the whole test split for future benchmark builds; repair runs
+  record the compiled mutant's accuracy on the full test split (`initial_test_accuracy`),
+  which Figs 3/7 use for v2. v1 membership is kept (decision Nov 24, 2026): a mutant wrong
+  on one of the 50 samples is buggy on the full specification too, so no v1 mutant is
+  mislabelled; only bugs invisible on those 50 samples may be missing.
 
 ### F19 — Undocumented mutant statuses — `fixed`
 - **Evidence:** `aggregated_mutations.json` has, besides the four statuses described in §4,
@@ -80,12 +118,14 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 - **Paper:** §5.1 "validation loss improvement < 1e-4 for 10 epochs".
 - **Decision (Nov 24, 2026):** keep 50 (`config.TrainConfig`); correct the paper text to 50.
 
-### F8 — Spec-size ablation: N=40,000 point and baselines don't match the stated setup — `open`
+### F8 — Spec-size ablation: N=40,000 point and baselines don't match the stated setup — `fixed`
 - **Evidence:** `experiments/spec_size/launch_spec_size.py:8` runs N ∈ {100,…,25,000} with
   `N_STEPS=500k`; the N=40,000 column reuses the main runs, which have `n_epochs=10000`
   (≈1.56M step cap). The GP/BFS columns use the 500-program budget runs while the main
   experiments use 1,000.
 - **Paper:** App. D says the gradient-step budget is fixed at 500k for all N.
+- **Fix:** `experiments/spec_size/launch.py` includes N=40,000 under the 500k budget; the
+  analysis uses the main 1,000-program baseline runs for v2 (v1 keeps 500 to reproduce).
 
 ## Symbolic baselines (GP / BFS)
 
@@ -242,11 +282,13 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 - **Evidence:** order 4, N=10k (18.4) is bold ("GBPR surpasses both GP and BFS") but BFS is
   20.6. `experiments/spec_size/analyze.py` bolds by the caption's rule.
 
-### F28 — Dyck token recall ignores failed predictions — `open`
+### F28 — Dyck token recall ignores failed predictions — `fixed`
 - **Evidence:** `rasping/metrics.py::dyck_metrics` (v1 definition) counts a false negative only
   when the prediction is 0; positions where a GP/BFS program crashed (label −1) count as
   neither TP nor FN, inflating token recall / balanced accuracy for those programs (Table 6
   columns for baselines; Table 7 uses sequence-level metrics and is unaffected).
+- **Fix:** failed predictions on positive tokens count as false negatives. The v1 tables in
+  `results/v1_tmlr/dyck/` were computed with the old definition (frozen).
 
 ### F29 — Symbolic search breaks fitness ties with test accuracy — `fixed`
 - **Evidence:** `rasping/baselines/gp.py:145,230`, `bfs.py:116`: among candidates with equal

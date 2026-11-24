@@ -10,9 +10,11 @@ and writes
 
     python build_manifest.py --version v2 [--results-dir results]
 
-Benchmark membership (`in_raspbugs_<version>`): every buggy mutant, unless
-`--membership-from` gives a CSV with a `job_id` column restricting it (v1 was defined as
-the buggy mutants with a GBPR result, F6).
+Benchmark membership (`in_raspbugs_<version>`): buggy mutants whose compiled output
+vocabulary can represent the specification's outputs (`representable`; see F6), unless
+`--membership-from` gives a CSV with a `job_id` column defining it instead (as for v1,
+whose membership was the buggy mutants with a GBPR result — the same rule, applied
+implicitly, minus one Dyck-2 mutant).
 """
 
 from __future__ import annotations
@@ -65,6 +67,16 @@ def label(result: dict) -> dict:
     raise ValueError(f"Unknown oracle output: {out[:500]}")
 
 
+def is_representable(program: str, source: str) -> bool:
+    from rasping import data, programs
+    from rasping.config import MAX_LEN
+    from rasping.model import Model
+
+    p = programs.get(program)
+    model = Model(programs.build_sop(source, p.name, MAX_LEN), p.vocab, MAX_LEN, p.name)
+    return not data.unrepresentable_outputs(p.name, model)
+
+
 def iter_mutants(results_dir: Path):
     for f in sorted(results_dir.glob("**/tracr_*.jsonl")):
         program = f.parent.name
@@ -91,18 +103,24 @@ def iter_mutants(results_dir: Path):
 def main(version, results_dir, membership_from):
     rows = list(iter_mutants(Path(results_dir)))
     members = set(pd.read_csv(membership_from)["job_id"]) if membership_from else None
+    for r in rows:
+        if r["status"] == "BUGGY_MODEL":
+            r["representable"] = is_representable(r["program"], r["source"])
     flag = f"in_raspbugs_{version}"
     for r in rows:
-        r[flag] = r["status"] == "BUGGY_MODEL" and (members is None or r["job_id"] in members)
+        r[flag] = r["status"] == "BUGGY_MODEL" and (
+            r["job_id"] in members if members is not None else r["representable"])
 
     with gzip.open(HERE / f"raspbugs_{version}.jsonl.gz", "wt") as f:
         for r in rows:
             if r["status"] == "BUGGY_MODEL":
                 f.write(json.dumps({k: r.get(k) for k in (
-                    "job_id", "program", "mutation_order", "operators", flag, "oracle_accuracy_50",
+                    "job_id", "program", "mutation_order", "operators", flag, "representable",
+                    "oracle_accuracy_50",
                     "diff", "source", "mutations")}) + "\n")
     table = pd.DataFrame([{k: r.get(k) for k in ("job_id", "program", "mutation_order", "status",
-                                                  "oracle_accuracy_50", flag)} for r in rows])
+                                                  "oracle_accuracy_50", "representable", flag)}
+                          for r in rows])
     table["operators"] = [";".join(r["operators"]) for r in rows]
     table.to_csv(HERE / f"mutants_{version}.csv", index=False)
     print(table["status"].value_counts().to_string())

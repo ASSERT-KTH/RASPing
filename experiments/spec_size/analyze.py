@@ -26,7 +26,7 @@ def load(version, budget):
     spec = load_runs(version, "spec_size")
     spec = spec[spec["job_id"].isin(ref)]
     gbpr = {int(n): d for n, d in spec.groupby("n_train")}
-    if 40000 not in gbpr:
+    if 40000 not in gbpr:  # v1: the main runs stood in for N=40,000 (F8)
         gbpr[40000] = main
     base = {}
     for m in ("gp", "bfs"):
@@ -81,8 +81,10 @@ def figure8(t, version):
 
 @click.command()
 @click.option("--version", default="v1_tmlr", show_default=True)
-@click.option("--budget", default=500, show_default=True, help="Baseline budget (v1 ablation: 500)")
+@click.option("--budget", type=int, default=None,
+              help="Baseline budget [default: 500 for v1_tmlr (as submitted), else 1000 (F8)]")
 def main(version, budget):
+    budget = budget or (500 if version == "v1_tmlr" else 1000)
     gbpr, base = load(version, budget)
     t = analysis.spec_size_table(gbpr, base)
     print(t.round(1).to_string())

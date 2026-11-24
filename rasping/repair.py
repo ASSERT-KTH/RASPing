@@ -50,6 +50,7 @@ class RunRecord:
     n_steps_budget: int | None
     config: dict
     # results
+    status: str = "ok"  # "ok" | "unrepresentable" (target outside the output vocabulary)
     test_accuracy: float = float("nan")
     test_samples: int = 0
     initial_test_accuracy: float = float("nan")
@@ -106,6 +107,17 @@ def repair(
         raise ValueError(f"init must be one of {INITS}")
     mutant = raspbugs.get(job_id, version)
     model = mutant.compile(MAX_LEN)
+
+    missing = data.unrepresentable_outputs(mutant.program, model)
+    if missing:  # v1 crashed here (F6); record it as an unrepairable run instead
+        rec = RunRecord(job_id=job_id, program=mutant.program, mutation_order=mutant.mutation_order,
+                        init=init, seed=seed, n_train=0, n_val=0, n_steps_budget=n_steps,
+                        config=config.to_dict(), status="unrepresentable", test_accuracy=0.0,
+                        benchmark_version=version, git_commit=_git_commit())
+        if out_dir is not None:
+            Path(out_dir).mkdir(parents=True, exist_ok=True)
+            (Path(out_dir) / "run.json").write_text(json.dumps(asdict(rec), indent=1, default=float))
+        return rec
 
     X, Y = data.encode(data.load(mutant.program, "train"), model)
     Xv, Yv = data.encode(data.load(mutant.program, "val"), model)

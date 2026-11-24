@@ -40,9 +40,9 @@ def dyck_metrics(y_true: list, y_pred: list) -> dict:
     """
     t, p = np.concatenate(y_true), np.concatenate(y_pred)
     tp, tn = int(np.sum((t == 1) & (p == 1))), int(np.sum((t == 0) & (p == 0)))
-    # v1 definition: a failed prediction (label outside {0,1}) on a positive token is
-    # neither a TP nor a FN, which inflates token recall for crashing programs (F28).
-    fp, fn = int(np.sum((t == 0) & (p == 1))), int(np.sum((t == 1) & (p == 0)))
+    # A failed prediction (label outside {0,1}) on a positive token is a false negative.
+    # (v1 counted only p == 0, inflating recall for crashing programs; F28.)
+    fp, fn = int(np.sum((t == 0) & (p == 1))), int(np.sum((t == 1) & (p != 1)))
     tpr = tp / (tp + fn) if tp + fn else float("nan")
     tnr = tn / (tn + fp) if tn + fp else float("nan")
     prec_pos = tp / (tp + fp) if tp + fp else 0.0

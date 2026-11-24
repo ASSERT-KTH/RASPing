@@ -160,6 +160,20 @@ def save(program: str, split: str, data: list[Example], data_dir: Path = DATA_DI
 # --------------------------------------------------------------------------- encoding
 
 
+def unrepresentable_outputs(program: str, model: "Model", splits=("train", "val", "test"),
+                            data_dir: Path = DATA_DIR) -> set:
+    """Target output tokens of the specification that `model`'s output vocabulary lacks.
+
+    Non-empty means the compiled architecture cannot express the correct program at all:
+    gradient-based repair (which keeps the architecture) cannot succeed, and the
+    specification cannot even be encoded for training. Such mutants are excluded from
+    RaspBugs (docs/FINDINGS.md F6).
+    """
+    vocab = set(model.assembled.output_encoder.encoding_map)
+    targets = {t for s in splits for _, y in load(program, s, data_dir) for t in y[1:]}
+    return targets - vocab
+
+
 def encode(data: list[Example], model: "Model"):
     """Encode and pad a specification with `model`'s input/output encoders.
 

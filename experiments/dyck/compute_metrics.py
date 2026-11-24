@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 from rasping import data, programs, raspbugs
-from rasping.config import DYCK_PROGRAMS, RUNS_DIR
+from rasping.config import DYCK_PROGRAMS, MAX_LEN, RUNS_DIR
 from rasping.metrics import dyck_metrics
 from rasping.results import results_dir
 
@@ -44,8 +44,7 @@ def gbpr_metrics(job_id: str, run_dir: Path) -> dict:
 def baseline_metrics(record: dict) -> dict:
     prog = programs.canonical(record["program_name"])
     test = data.load(prog, "test")
-    max_len = max(len(x) for x, _ in test)  # includes BOS, as in v1 (F11)
-    sop = programs.build_sop(record["best_source"], prog, max_len)
+    sop = programs.build_sop(record["best_source"], prog, MAX_LEN)  # v1 used 11 (F11)
     true, pred = [], []
     for x, y in test:
         y = np.array(y[1:])

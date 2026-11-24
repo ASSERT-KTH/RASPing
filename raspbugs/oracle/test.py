@@ -4,7 +4,7 @@ cosmic-ray runs `pytest -s oracle/test_<program>.py` (from raspbugs/) on every m
 with the mutation applied to `source/<program>.py` in place. The printed markers are
 parsed when the results are aggregated:
     "UNCOMPILABLE MODEL"   Tracr cannot compile the mutant
-    "Accuracy: <x>"        accuracy of the compiled mutant on the first 50 test samples (F7)
+    "Accuracy: <x>"        accuracy of the compiled mutant on the test split
     "MODEL IS NOT BUGGY"   the mutant is correct on those samples (the test then passes)
 A failing assertion (accuracy < 1) means the mutant is buggy.
 """
@@ -15,14 +15,15 @@ from rasping import data, programs
 from rasping.config import MAX_LEN
 from rasping.model import Model
 
-N_ORACLE_SAMPLES = 50
+#: v1 used only the first 50 test samples, missing bugs that only show elsewhere (F7).
+N_ORACLE_SAMPLES = None  # the whole test split
 
 
 class Test:
     def __setup__(self, sop, name):
         self.sop = sop
         self.name = programs.canonical(name)
-        self.testing_data = data.load(self.name, "test")[:N_ORACLE_SAMPLES]
+        self.testing_data = data.load(self.name, "test")[:N_ORACLE_SAMPLES]  # None = all
 
     @pytest.mark.skip(reason="This is not a test")
     def test(self):
