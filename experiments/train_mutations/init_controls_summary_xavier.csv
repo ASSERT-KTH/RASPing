@@ -1,0 +1,5 @@
+program,buggy_init_n,buggy_init_test_acc_mean,buggy_init_test_acc_median,buggy_init_epochs_ran_mean,buggy_init_epochs_ran_median,random_init_n,random_init_test_acc_mean,random_init_test_acc_median,random_init_epochs_ran_mean,random_init_epochs_ran_median
+hist,12,0.5569000000000001,0.5147,418.1666666666667,298.5,10,0.8506600000000001,1.0,417.7,211.0
+most_freq,15,0.3311066666666667,0.34840000000000004,726.5333333333333,787.0,10,0.9,0.8922,466.9,413.5
+reverse,15,0.7254,0.9988,550.6666666666666,411.0,10,0.9999399999999999,1.0,70.9,67.0
+sort,15,0.9887733333333333,0.9948,474.06666666666666,477.0,10,0.99992,1.0,99.3,97.5

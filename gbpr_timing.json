@@ -1,0 +1,32 @@
+{
+  "hist": {
+    "n_jobs": 10,
+    "seconds_per_epoch": 2.2679119174542137,
+    "seconds_per_val_step": 22.679119174542137
+  },
+  "most_freq": {
+    "n_jobs": 10,
+    "seconds_per_epoch": 5.535028522552574,
+    "seconds_per_val_step": 55.350285225525724
+  },
+  "reverse": {
+    "n_jobs": 10,
+    "seconds_per_epoch": 4.133606453270302,
+    "seconds_per_val_step": 41.33606453270302
+  },
+  "shuffle_dyck": {
+    "n_jobs": 10,
+    "seconds_per_epoch": 0.41207875600387345,
+    "seconds_per_val_step": 4.120787560038734
+  },
+  "shuffle_dyck2": {
+    "n_jobs": 10,
+    "seconds_per_epoch": 11.484430499232143,
+    "seconds_per_val_step": 114.8443049923214
+  },
+  "sort": {
+    "n_jobs": 10,
+    "seconds_per_epoch": 3.653879771568463,
+    "seconds_per_val_step": 36.53879771568464
+  }
+}

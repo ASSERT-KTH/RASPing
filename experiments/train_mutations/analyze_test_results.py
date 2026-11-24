@@ -490,10 +490,15 @@ def plot_accuracy_histogram(results, output_dir=None):
         if num_programs == 0:
             continue
 
-        num_cols = min(3, num_programs)
+        # Prefer the widest layout (up to 3 columns) that fills every cell, so e.g.
+        # 4 programs render as 2x2 rather than 2x3 with two blanks.
+        num_cols = next(
+            (c for c in range(min(3, num_programs), 1, -1) if num_programs % c == 0),
+            min(3, num_programs),
+        )
         num_rows = (num_programs + num_cols - 1) // num_cols
-        
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows), squeeze=False)
+
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(5 * num_cols, 5 * num_rows), squeeze=False)
         axes = axes.flatten()
         
         plotted_program_idx = 0
@@ -803,7 +808,15 @@ def aggregate_test_accuracies(results, output_dir=None):
     default="analysis_outputs",
     help="Directory to save analysis outputs",
 )
-def main(saved_data_dir, output_dir):
+@click.option(
+    "--exclude-programs",
+    default=None,
+    help=(
+        "Comma-separated program names to exclude, e.g. 'shuffle_dyck,shuffle_dyck2'. "
+        "Used to omit programs whose outputs make exact-sequence accuracy degenerate."
+    ),
+)
+def main(saved_data_dir, output_dir, exclude_programs):
     """Analyze and visualize test results from trained mutation models"""
     # Parse epsilons
     epsilon_values = np.linspace(0.0, 0.01, 5)
@@ -816,6 +829,12 @@ def main(saved_data_dir, output_dir):
     print(f"Loading results from {saved_data_dir}...")
     results = load_results(saved_data_dir)
     print(f"Loaded {len(results)} results")
+
+    if exclude_programs:
+        excluded = {p.strip() for p in exclude_programs.split(",") if p.strip()}
+        before = len(results)
+        results = [r for r in results if r.get("program_name") not in excluded]
+        print(f"Excluded programs {sorted(excluded)}: {before} -> {len(results)} results")
 
     # Aggregate all test accuracies
     aggregate_test_accuracies(results, output_path)

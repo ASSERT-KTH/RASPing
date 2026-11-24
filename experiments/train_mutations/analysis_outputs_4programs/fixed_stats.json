@@ -1,0 +1,442 @@
+{
+  "0.0": {
+    "programs": {
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      },
+      "sort": {
+        "fixed": 64,
+        "total": 249,
+        "percentage": 25.702811244979916
+      },
+      "reverse": {
+        "fixed": 62,
+        "total": 268,
+        "percentage": 23.134328358208954
+      }
+    },
+    "loss_functions": {
+      "cross_entropy_loss": {
+        "fixed": 145,
+        "total": 847,
+        "percentage": 17.119244391971662
+      }
+    },
+    "program_loss_functions": {
+      "most_freq": {
+        "cross_entropy_loss": {
+          "fixed": 0,
+          "total": 284,
+          "percentage": 0.0
+        }
+      },
+      "hist": {
+        "cross_entropy_loss": {
+          "fixed": 19,
+          "total": 46,
+          "percentage": 41.30434782608695
+        }
+      },
+      "sort": {
+        "cross_entropy_loss": {
+          "fixed": 64,
+          "total": 249,
+          "percentage": 25.702811244979916
+        }
+      },
+      "reverse": {
+        "cross_entropy_loss": {
+          "fixed": 62,
+          "total": 268,
+          "percentage": 23.134328358208954
+        }
+      }
+    },
+    "mutation_orders": {
+      "5": {
+        "fixed": 8,
+        "total": 77,
+        "percentage": 10.38961038961039
+      },
+      "4": {
+        "fixed": 31,
+        "total": 136,
+        "percentage": 22.794117647058822
+      },
+      "1": {
+        "fixed": 23,
+        "total": 144,
+        "percentage": 15.972222222222221
+      },
+      "2": {
+        "fixed": 54,
+        "total": 303,
+        "percentage": 17.82178217821782
+      },
+      "3": {
+        "fixed": 29,
+        "total": 187,
+        "percentage": 15.508021390374333
+      }
+    }
+  },
+  "0.0025": {
+    "programs": {
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      },
+      "sort": {
+        "fixed": 131,
+        "total": 249,
+        "percentage": 52.610441767068274
+      },
+      "reverse": {
+        "fixed": 125,
+        "total": 268,
+        "percentage": 46.64179104477612
+      }
+    },
+    "loss_functions": {
+      "cross_entropy_loss": {
+        "fixed": 275,
+        "total": 847,
+        "percentage": 32.467532467532465
+      }
+    },
+    "program_loss_functions": {
+      "most_freq": {
+        "cross_entropy_loss": {
+          "fixed": 0,
+          "total": 284,
+          "percentage": 0.0
+        }
+      },
+      "hist": {
+        "cross_entropy_loss": {
+          "fixed": 19,
+          "total": 46,
+          "percentage": 41.30434782608695
+        }
+      },
+      "sort": {
+        "cross_entropy_loss": {
+          "fixed": 131,
+          "total": 249,
+          "percentage": 52.610441767068274
+        }
+      },
+      "reverse": {
+        "cross_entropy_loss": {
+          "fixed": 125,
+          "total": 268,
+          "percentage": 46.64179104477612
+        }
+      }
+    },
+    "mutation_orders": {
+      "5": {
+        "fixed": 18,
+        "total": 77,
+        "percentage": 23.376623376623375
+      },
+      "4": {
+        "fixed": 50,
+        "total": 136,
+        "percentage": 36.76470588235294
+      },
+      "1": {
+        "fixed": 37,
+        "total": 144,
+        "percentage": 25.694444444444443
+      },
+      "2": {
+        "fixed": 115,
+        "total": 303,
+        "percentage": 37.95379537953795
+      },
+      "3": {
+        "fixed": 55,
+        "total": 187,
+        "percentage": 29.411764705882355
+      }
+    }
+  },
+  "0.005": {
+    "programs": {
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      },
+      "sort": {
+        "fixed": 148,
+        "total": 249,
+        "percentage": 59.43775100401606
+      },
+      "reverse": {
+        "fixed": 127,
+        "total": 268,
+        "percentage": 47.38805970149254
+      }
+    },
+    "loss_functions": {
+      "cross_entropy_loss": {
+        "fixed": 294,
+        "total": 847,
+        "percentage": 34.710743801652896
+      }
+    },
+    "program_loss_functions": {
+      "most_freq": {
+        "cross_entropy_loss": {
+          "fixed": 0,
+          "total": 284,
+          "percentage": 0.0
+        }
+      },
+      "hist": {
+        "cross_entropy_loss": {
+          "fixed": 19,
+          "total": 46,
+          "percentage": 41.30434782608695
+        }
+      },
+      "sort": {
+        "cross_entropy_loss": {
+          "fixed": 148,
+          "total": 249,
+          "percentage": 59.43775100401606
+        }
+      },
+      "reverse": {
+        "cross_entropy_loss": {
+          "fixed": 127,
+          "total": 268,
+          "percentage": 47.38805970149254
+        }
+      }
+    },
+    "mutation_orders": {
+      "5": {
+        "fixed": 19,
+        "total": 77,
+        "percentage": 24.675324675324674
+      },
+      "4": {
+        "fixed": 54,
+        "total": 136,
+        "percentage": 39.705882352941174
+      },
+      "1": {
+        "fixed": 39,
+        "total": 144,
+        "percentage": 27.083333333333332
+      },
+      "2": {
+        "fixed": 122,
+        "total": 303,
+        "percentage": 40.26402640264026
+      },
+      "3": {
+        "fixed": 60,
+        "total": 187,
+        "percentage": 32.0855614973262
+      }
+    }
+  },
+  "0.0075": {
+    "programs": {
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      },
+      "sort": {
+        "fixed": 159,
+        "total": 249,
+        "percentage": 63.85542168674698
+      },
+      "reverse": {
+        "fixed": 127,
+        "total": 268,
+        "percentage": 47.38805970149254
+      }
+    },
+    "loss_functions": {
+      "cross_entropy_loss": {
+        "fixed": 305,
+        "total": 847,
+        "percentage": 36.00944510035419
+      }
+    },
+    "program_loss_functions": {
+      "most_freq": {
+        "cross_entropy_loss": {
+          "fixed": 0,
+          "total": 284,
+          "percentage": 0.0
+        }
+      },
+      "hist": {
+        "cross_entropy_loss": {
+          "fixed": 19,
+          "total": 46,
+          "percentage": 41.30434782608695
+        }
+      },
+      "sort": {
+        "cross_entropy_loss": {
+          "fixed": 159,
+          "total": 249,
+          "percentage": 63.85542168674698
+        }
+      },
+      "reverse": {
+        "cross_entropy_loss": {
+          "fixed": 127,
+          "total": 268,
+          "percentage": 47.38805970149254
+        }
+      }
+    },
+    "mutation_orders": {
+      "5": {
+        "fixed": 20,
+        "total": 77,
+        "percentage": 25.97402597402597
+      },
+      "4": {
+        "fixed": 56,
+        "total": 136,
+        "percentage": 41.17647058823529
+      },
+      "1": {
+        "fixed": 41,
+        "total": 144,
+        "percentage": 28.47222222222222
+      },
+      "2": {
+        "fixed": 126,
+        "total": 303,
+        "percentage": 41.584158415841586
+      },
+      "3": {
+        "fixed": 62,
+        "total": 187,
+        "percentage": 33.155080213903744
+      }
+    }
+  },
+  "0.01": {
+    "programs": {
+      "most_freq": {
+        "fixed": 0,
+        "total": 284,
+        "percentage": 0.0
+      },
+      "hist": {
+        "fixed": 19,
+        "total": 46,
+        "percentage": 41.30434782608695
+      },
+      "sort": {
+        "fixed": 162,
+        "total": 249,
+        "percentage": 65.06024096385542
+      },
+      "reverse": {
+        "fixed": 128,
+        "total": 268,
+        "percentage": 47.76119402985074
+      }
+    },
+    "loss_functions": {
+      "cross_entropy_loss": {
+        "fixed": 309,
+        "total": 847,
+        "percentage": 36.481700118063756
+      }
+    },
+    "program_loss_functions": {
+      "most_freq": {
+        "cross_entropy_loss": {
+          "fixed": 0,
+          "total": 284,
+          "percentage": 0.0
+        }
+      },
+      "hist": {
+        "cross_entropy_loss": {
+          "fixed": 19,
+          "total": 46,
+          "percentage": 41.30434782608695
+        }
+      },
+      "sort": {
+        "cross_entropy_loss": {
+          "fixed": 162,
+          "total": 249,
+          "percentage": 65.06024096385542
+        }
+      },
+      "reverse": {
+        "cross_entropy_loss": {
+          "fixed": 128,
+          "total": 268,
+          "percentage": 47.76119402985074
+        }
+      }
+    },
+    "mutation_orders": {
+      "5": {
+        "fixed": 20,
+        "total": 77,
+        "percentage": 25.97402597402597
+      },
+      "4": {
+        "fixed": 57,
+        "total": 136,
+        "percentage": 41.911764705882355
+      },
+      "1": {
+        "fixed": 41,
+        "total": 144,
+        "percentage": 28.47222222222222
+      },
+      "2": {
+        "fixed": 127,
+        "total": 303,
+        "percentage": 41.914191419141915
+      },
+      "3": {
+        "fixed": 64,
+        "total": 187,
+        "percentage": 34.22459893048128
+      }
+    }
+  }
+}

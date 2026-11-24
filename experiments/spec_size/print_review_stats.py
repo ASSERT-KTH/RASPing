@@ -42,12 +42,15 @@ def load_job_maps():
     return job_to_order, job_to_prog
 
 
+EXCLUDED_PROGRAMS = {"shuffle_dyck", "shuffle_dyck2"}
+
+
 def load_reference_job_ids(job_to_prog):
-    """Return the 1,135 non-shuffle_dyck job_ids present in train_mutations results."""
+    """Return the 847 job_ids present in train_mutations results, excluding both Dyck programs."""
     ref_ids = set()
     for f in TRAIN_MUTATIONS_DIR.glob(f"*/{LOSS_FN}/job_*/test_results.json"):
         job_id = json.loads(f.read_text()).get("job_id")
-        if job_id is not None and job_to_prog.get(job_id) != "shuffle_dyck":
+        if job_id is not None and job_to_prog.get(job_id) not in EXCLUDED_PROGRAMS:
             ref_ids.add(job_id)
     return ref_ids
 
