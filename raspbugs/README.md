@@ -1,88 +1,58 @@
-## How to generate mutants of Tracr programs
+# RaspBugs: generating the benchmark
 
-1. Install required packages
+RaspBugs is a set of buggy RASP programs ("mutants") obtained by mutating six reference
+programs. The benchmark itself is the manifest `raspbugs_<version>.jsonl.gz`: one record
+per buggy mutant, holding its mutated source, diff, operators and mutation order. Load it
+with `rasping.raspbugs`:
 
-```
-pip install -r ../../requirements.txt
-cd operators && pip install -e . && cd ..
-```
-
-2. Setup configuration file
-
-```toml
-[cosmic-ray]
-module-path = "source/reverse.py"
-timeout = 10.0
-excluded-modules = []
-test-command = "pytest -sxv tests/test_reverse.py"
-
-[cosmic-ray.distributor]
-name = "local"
+```python
+from rasping import raspbugs
+m = raspbugs.get("2a722d5d5449441fad93f98c73c633a2")   # or raspbugs.mutants("main")
+model = m.compile()                                    # Tracr -> Transformer
 ```
 
-This file (`tracr.toml`) defines important information such as:
-- Where the source code is (`module-path`)
-- How to execute the tests verify whether the change introduces a behavioral change (`test-command`)
+```
+python -m rasping.raspbugs <job_id>     # print a mutant and its diff
+```
 
-3. Create a mutation session
+## Layout
+
+| Path | What |
+|---|---|
+| `source/<program>.py` | reference RASP programs (from Weiss et al. 2021 / Tracr's `lib`) |
+| `operators/` | the 9 RASP-specific cosmic-ray mutation operators (package `rasp_operators`); the other 6 operators are cosmic-ray's built-in ones |
+| `oracle/` | the test cosmic-ray runs on each mutant to label it (compiles it, measures accuracy on 50 test samples) |
+| `run_mutations.py` | step 1: write cosmic-ray configs and run them per program and mutation order |
+| `build_manifest.py` | step 2: re-apply diffs, label mutants from the oracle output, write the manifest |
+| `raspbugs_v1.jsonl.gz` | the v1 (TMLR submission) manifest: 1,773 buggy mutants, 1,466 flagged `in_raspbugs_v1` |
+
+## Regenerating
+
+Run both steps from this directory. Step 1 needs a fork of cosmic-ray with higher-order
+mutations. It's installed by `uv sync`, pinned in `pyproject.toml`.
 
 ```bash
-cosmic-ray init tracr.toml tracr.sqlite
+python run_mutations.py --orders 1 2 3 4 5     # writes results/<program>/ (gitignored)
+python build_manifest.py --version v2          # writes raspbugs_v2.jsonl.gz, mutants_v2.csv
 ```
 
-This command prepares all the mutations that will later be applied to code.
+The oracle labels each mutant as one of:
 
-4. Execute a mutation session
+- `BUGGY_MODEL`: compiles, wrong on at least one oracle sample. These are the benchmark candidates.
+- `CORRECT_MODEL`: an equivalent mutant.
+- `UNCOMPILABLE_MODEL`: Tracr fails.
+- `FAILED_MUTATION`: the mutated program errors.
+- `TIMEOUT`
+- `UNKNOWN_FAILURE`: no oracle output.
+
+Up to 200 mutants are generated per program and order.
+
+**v1 membership.** The v1 benchmark (1,466) is the set of buggy mutants whose compiled
+output vocabulary can represent the correct outputs. That filter arose implicitly: in v1,
+training crashed on the other 307 mutants. See `docs/FINDINGS.md` F6 and F7 for this and
+for the 50-sample oracle. To rebuild v1 exactly from the archived raw outputs:
 
 ```bash
-cosmic-ray exec tracr.toml tracr.sqlite
-```
-
-5. Dump mutation results into a JSON file
-
-```bash
-cosmic-ray dump tracr.sqlite > tracr.jsonl
-```
-
-Important fields:
-- `[1][test_outcome]` (`killed` if there a behavioral difference is detected by the tests, `survived` otherwise)
-- `[1][diff]` (the diff to be applied to the source file)
-
-Example mutant:
-```json
-[
-    {
-        "job_id":"bf5610ea45754f84b2d29b3e6fef2851",
-        "mutations":[
-            {
-                "module_path":"source/reverse.py",
-                "operator_name":"core/ReplaceBinaryOperator_Sub_Add",
-                "occurrence":0,
-                "start_pos":[
-                    37,
-                    20
-                ],
-                "end_pos":[
-                    37,
-                    21
-                ],
-                "operator_args":{
-                    
-                }
-            }
-        ]
-    },
-    {
-        "worker_outcome":"normal",
-        "output":"\u001b[31mF\u001b[0m\u001b[31m\n\nFailed: tests.test_reverse.TestReverse.test_reverse\nTraceback (most recent call last):\n  File \"/home/andre/Repos/RASPing/.venv/lib/python3.12/site-packages/hammett/impl.py\", line 549, in run_test\n    resolved_function(**resolved_kwargs)\n  File \"/home/andre/Repos/RASPing/experiments/mutation/tests/test_reverse.py\", line 24, in test_reverse\n    assert result[:-1] == data[1][1:]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n\n\n\u001b[0m\n--- Local variables ---\ndata:\n    (\n        [\n            'BOS',\n            np.str_('e'),\n            np.str_('b'),\n            np.str_('d'),\n            np.str_('d'),\n            np.str_('c'),\n            np.str_('a'),\n            np.str_('a'),\n            np.str_('e'),\n            np.str_('d'),\n            np.str_('d'),\n        ],\n        [\n            'BOS',\n            np.str_('d'),\n            np.str_('d'),\n            np.str_('e'),\n            np.str_('a'),\n            np.str_('a'),\n            np.str_('c'),\n            np.str_('d'),\n            np.str_('d'),\n            np.str_('b'),\n            np.str_('e'),\n        ],\n    )\nresult:\n    [\n        np.str_('d'),\n        None,\n        None,\n        None,\n        None,\n        None,\n        None,\n        None,\n        None,\n        None,\n        None,\n    ]\nself:\n    <tests.test_reverse.TestReverse object at 0x72edfb32d490>\n\n--- Assert components ---\nleft:\n    [\n        np.str_('d'),\n        None,\n        None,\n        None,\n        None,\n        None,\n        None,\n        None,\n        None,\n        None,\n    ]\nright:\n    [\n        np.str_('d'),\n        np.str_('d'),\n        np.str_('e'),\n        np.str_('a'),\n        np.str_('a'),\n        np.str_('c'),\n        np.str_('d'),\n        np.str_('d'),\n        np.str_('b'),\n        np.str_('e'),\n    ]\n\n\u001b[31m0 succeeded, 1 failed, 0 skipped\u001b[0m\n",
-        "test_outcome":"killed",
-        "diff":"--- mutation diff ---\n--- asource/reverse.py\n+++ bsource/reverse.py\n@@ -34,7 +34,7 @@\n   Returns:\n     reverse : SOp that reverses the input sequence.\n   \"\"\"\n-  opp_idx = (length - rasp.indices).named(\"opp_idx\")\n+  opp_idx = (length + rasp.indices).named(\"opp_idx\")\n   opp_idx = (opp_idx - 1).named(\"opp_idx-1\")\n   reverse_selector = rasp.Select(rasp.indices, opp_idx,\n                                  rasp.Comparison.EQ).named(\"reverse_selector\")"
-    }
-]
-```
-
-6. (Optional) Generate an html report to see the results as a webpage
-
-```bash
-cr-html tracr.sqlite > report.html
+python build_manifest.py --version v1 --results-dir <archive>/experiments/mutation/results \
+    --membership-from <csv with the 1,466 job_ids>
 ```

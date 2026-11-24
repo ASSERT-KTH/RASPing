@@ -16,6 +16,10 @@ paper are frozen in `results/v1_tmlr/` and checked by `tests/test_paper_numbers.
 
 Paper references are to the TMLR submission (`paper.pdf`, rejected Nov 2026).
 
+Raw v1 data (run directories with weights, raw cosmic-ray outputs, trajectories) was
+archived on Nov 24, 2026 as `worktree.tar.zst` (24.7 GB raw, 3.4 GB compressed) together
+with a full mirror of the pre-rewrite git history; see the README for where it lives.
+
 ---
 
 ## Data and benchmark
@@ -34,7 +38,16 @@ Paper references are to the TMLR submission (`paper.pdf`, rejected Nov 2026).
   `raspbugs.json`. 307 buggy mutants are dropped; ~100 are explained by duplicate sources,
   the rest are undocumented and skew toward reverse/sort/hist at orders 3–5. Every
   experiment script loads `aggregated_mutations.json` instead and re-filters (or doesn't).
-- **Invalidates:** benchmark size and composition (§4, every table).
+- **Root cause (verified Nov 24, 2026):** v1 trained *all* 1,773 buggy mutants; 306 of the 307
+  without a result have a compiled **output vocabulary that cannot represent the correct
+  outputs** (hist 48, most_freq 62, reverse 84, sort 77, shuffle_dyck 14, shuffle_dyck2 21),
+  so encoding the specification raised and the training job crashed. Every one of the 1,466
+  benchmark mutants is representable. The remaining mutant (shuffle_dyck2, representable)
+  failed for an unknown reason. So v1 RaspBugs = "buggy mutants whose compiled architecture
+  can represent the target" — a sensible but undocumented filter that only applies to GBPR:
+  GP/BFS could repair the excluded mutants, so excluding them from the comparison favours GBPR.
+- **Invalidates:** benchmark size and composition (§4, every table); the GBPR-vs-symbolic
+  comparison (§5.3) should either include the 306 (GBPR counted as failing) or state the filter.
 
 ### F7 — "Buggy" label decided on only 50 test samples — `open`
 - **Evidence:** `experiments/mutation/tests/test.py:29` loads `data/<prog>_test.jsonl[:50]`.
@@ -118,42 +131,108 @@ Paper references are to the TMLR submission (`paper.pdf`, rejected Nov 2026).
 - **Evidence:** `gp_core.py:49` (max over train+val+test) vs
   `analyze_gp_bfs_dyck_balanced.py:~120` (test only).
 
-### F12 — Fig 1 / Fig 6 are not reproducible from the repository — `open`
+### F12 — Fig 1 / Fig 6 are not reproducible from the repository — `fixed`
 - **Evidence:** `trajectory.pkl` is gitignored (`experiments/train_mutations/.gitignore`);
   the job IDs behind the two figures are not recorded. Three local pickles exist (reverse
   `231a32a5…`, `66056586…`; sort `92e80c60…`) and are preserved in the backup.
+- **Fix (228d70d):** identified by parameter/checkpoint counts: Fig 1 = reverse
+  `231a32a5efd24a10840857bd72e478a1`, Fig 6 = sort `92e80c60de964d53b02dc7e968a0559e`;
+  recorded in `experiments/trajectories/{launch,plot}.py`; `launch.py` re-runs exactly these.
 
-### F20 — Several paper table cells were computed by hand — `open`
+### F20 — Several paper table cells were computed by hand — `fixed`
 - **Evidence:** Table 2 "Repaired (≥99%)" (random) and "Epochs to early stop" (buggy) are
   produced by no script; Table 6 "Majority" column is computed by neither dyck script;
   Tables 6, 7, 8, 9 are printed to stdout and transcribed.
+- **Fix (228d70d):** every table is written as `.tex` by `experiments/*/analyze.py`
+  (`scripts/reproduce_paper.py`); the Majority column is computed from the test splits.
 
 ## Code health
 
-### F13 — `test_gp_core.py` fails — `open`
+### F13 — `test_gp_core.py` fails — `fixed`
 - **Evidence:** `experiments/gp_baseline/test_gp_core.py:35` hardcodes 14 mutation sites;
   there are 16.
+- **Fix (228d70d):** `tests/test_baselines.py` asserts the per-operator counts (total 16).
 
-### F14 — Stale docstrings and help texts — `open`
+### F14 — Stale docstrings and help texts — `fixed`
 - **Evidence:** `--random-init` help in `train_mutations.py:208-210` still says "compile the
   ground-truth program"; `plot_spec_size.py:13-16` and `print_review_stats.py:7-13` say
   1,135/1,466 jobs while the code uses 847.
+- **Fix (228d70d):** the scripts were rewritten (`rasping/repair.py`, `experiments/spec_size/`).
 
-### F15 — `Model.train()` crashes — `open`
+### F15 — `Model.train()` crashes — `fixed`
 - **Evidence:** `src/model.py:432` passes `returnAllMetrics=` to `Trainer`, which has no such
   parameter (`src/trainer.py:25-48`). Affects only legacy code paths (to be deleted).
+- **Fix (cd73c9a):** removed with the legacy code paths.
 
-### F21 — Editable install points at a stale path; imports rely on `sys.path` hacks — `open`
+### F21 — Editable install points at a stale path; imports rely on `sys.path` hacks — `fixed`
 - **Evidence:** the `.venv` editable finder maps packages to `/home/andre/Repos/RASPing/…`;
   22 files append to `sys.path`; `src/functions.py:13` and
   `experiments/mutation/load_mutations.py` import each other (the latter keeps a copy of
   `getAcceptedNamesAndInput` to dodge the cycle).
+- **Fix (cd73c9a, 228d70d):** `rasping` package installed by `uv sync`; no `sys.path` hacks;
+  scripts run from any directory.
 
-### F22 — Unpinned core dependencies — `open`
+### F22 — Unpinned core dependencies — `fixed`
 - **Evidence:** `requirements.txt` pins `tracr` and `dm-haiku` to `@main`; `pyproject.toml`
   declares no dependencies; `uv.lock` contains only the project. The working `.venv` has
   tracr `9ce2b8c8`, haiku `47500fbd`.
+- **Fix (cd73c9a):** all deps in `pyproject.toml`, git deps pinned to commits, transitive deps
+  constrained to the v1 environment, real `uv.lock`.
 
 ### F23 — `jax_debug_nans=True` set globally on import — `open`
 - **Evidence:** `src/model.py:14-16` changes global JAX config at import time (slows every
   computation and changes NaN behaviour for every importer).
+
+## Found during the refactor (Nov 24, 2026)
+
+### F24 — Specifications are not reproducible (unseeded RNG) — `open`
+- **Evidence:** the random generators in `rasping/generators.py` draw from NumPy's global RNG
+  and `scripts/generate_data.py` never seeds it, so `data/` cannot be regenerated.
+
+### F25 — `most_freq` exhaustive generator breaks ties differently — `open`
+- **Evidence:** `generate_most_freq_exhaustive` sorts by `(-count, token)`; the random
+  generator (used for `data/`) and Tracr's `make_sort_freq` keep first-occurrence order.
+  Only the exhaustive generator (tests) is affected.
+
+### F26 — Training-time trajectory storage on every main run — `open`
+- **Evidence:** v1 `launch_train_mutations.py` ran every mutant with `store_trajectory=True`
+  (full parameter copy every 50 steps, kept in memory until the end). Long runs of large
+  models (most_freq: up to 1.1M parameters) can exhaust memory. (It is *not* the cause of
+  the missing results in F6.) `experiments/main_repair/launch.py` no longer stores
+  trajectories.
+
+### F27 — Table 8 bold entry contradicts its caption — `paper`
+- **Evidence:** order 4, N=10k (18.4) is bold ("GBPR surpasses both GP and BFS") but BFS is
+  20.6. `experiments/spec_size/analyze.py` bolds by the caption's rule.
+
+### F28 — Dyck token recall ignores failed predictions — `open`
+- **Evidence:** `rasping/metrics.py::dyck_metrics` (v1 definition) counts a false negative only
+  when the prediction is 0; positions where a GP/BFS program crashed (label −1) count as
+  neither TP nor FN, inflating token recall / balanced accuracy for those programs (Table 6
+  columns for baselines; Table 7 uses sequence-level metrics and is unaffected).
+
+### F29 — Symbolic search breaks fitness ties with test accuracy — `open`
+- **Evidence:** `rasping/baselines/gp.py:145,230`, `bfs.py:116`: among candidates with equal
+  fitness the one with higher *test* accuracy is kept as best, so `best_source`/`test_acc`
+  depend on the test set (separate from F17, which concerns the progress curves).
+
+### F30 — Compile/evaluation failures are silently scored 0 — `open`
+- **Evidence:** `rasping/baselines/common.py:135-143` returns 0.0 on any error or timeout;
+  `num_compile_failures` is therefore always 0 and broken candidates are recorded as `ok`.
+
+### F31 — Minor inconsistencies in the symbolic baselines — `open`
+- GP status is `success_early` only if the perfect program is in the initial population;
+  generation 2 never appears (double increment, `gp.py:171,196`); survivors are not
+  tie-broken as the comment says (`gp.py:243`); GP mutations are not checked for no-ops
+  while BFS drops them; BFS `duration_s` excludes data loading, GP's includes it;
+  candidates are built with `max_len=11` (BOS counted) while compiled models use 10 (F11).
+- The v1 spec-size baseline tables (budget 500) contain 1,691 GP / 1,760 BFS records — an
+  older, larger mutant set; the analysis restricts them to the benchmark.
+
+### F32 — GP/BFS fork worker processes after JAX is initialised — `open`
+- **Evidence:** `evaluate_with_timeout` uses `multiprocessing` with the default fork start
+  method; Python warns this can deadlock with JAX's threads.
+
+### F33 — Oracle accuracy round-tripped through pandas — `wontfix`
+- 80 `oracle_accuracy_50` values in `raspbugs_v1.jsonl.gz` carry float noise (0.9400000000000001)
+  from the v1 pandas JSON round trip; `build_manifest.py` writes the parsed value. Harmless.
