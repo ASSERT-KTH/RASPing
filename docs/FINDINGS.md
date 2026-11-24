@@ -328,3 +328,22 @@ weights and training numerics (`tests/test_golden.py`).
 ### F33 — Oracle accuracy round-tripped through pandas — `wontfix`
 - 80 `oracle_accuracy_50` values in `raspbugs_v1.jsonl.gz` carry float noise (0.9400000000000001)
   from the v1 pandas JSON round trip; `build_manifest.py` writes the parsed value. Harmless.
+
+### F34 — Golden training numerics are only bit-exact on the recording machine — `fixed` (test)
+- **Evidence:** CI (GitHub runner, 4 vCPUs) failed `test_golden_training` for most_freq, sort
+  and shuffle_dyck. Pinning this machine to 4 or 1 cores (`taskset`) fails it too. Compiled
+  weights, encodings and accuracies match everywhere. Training losses agree to ~1e-12 in the
+  first epoch, then diverge: by epoch 4, most_freq is off by 2.1%. Cause: XLA's CPU backend splits
+  reductions by thread count and ISA, so the summation order changes. The compiled models'
+  sharp logits and Adam amplify those last-bit differences within a few steps.
+- **Consequence:** the "new code = v1 code to 1e-9" claim holds on the recording machine
+  (16 threads), where it was established. The same holds for any v1-vs-v2 training comparison:
+  differences in late-epoch numbers between machines are expected and are not bugs. It is no
+  concern for the paper's results, which are pass rates at the 0.99 threshold over many mutants.
+- **Fix (test only):** by default `tests/test_golden.py` checks weights and accuracies exactly,
+  the first training epoch to 1e-7, and later losses to 10%. A 10% learning-rate change still
+  fails all six programs. `pytest --golden-exact` restores the full 1e-7 comparison, including
+  the trained weights, for use on the recording machine. Golden values unchanged.
+- **Related:** the CI log warns about `os.fork()` with JAX during `test_golden_search`. That only
+  happens because other tests in the same pytest process have imported JAX. The baselines on
+  their own do not load JAX (F32).

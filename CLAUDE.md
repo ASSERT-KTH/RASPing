@@ -17,7 +17,7 @@ repository map and how each paper artifact is produced.
 - **Mutants** come from `rasping.raspbugs` (the manifest), never from raw cosmic-ray output.
 - **Never commit raw run outputs.** This covers `model.npy`, `trajectory.pkl` and anything under `runs/`. Only tidy tables go in `results/<version>/`, and only generated artifacts go in `paper_artifacts/<version>/`.
 - **`results/v1_tmlr/` is frozen.** It holds the submitted paper's data. `tests/test_paper_numbers.py` pins it, so never edit it. New results go in a new version directory, e.g. `results/v2/`.
-- **Behaviour changes must be visible.** `tests/test_golden.py` and `tests/test_golden_search.py` pin the v1 numerics. If a change is meant to alter behaviour, re-record the golden file in the same commit and add or update an entry in `docs/FINDINGS.md`. That entry gives the evidence, the fix commit, and which results and artifacts it invalidates.
+- **Behaviour changes must be visible.** `tests/test_golden.py` and `tests/test_golden_search.py` pin the v1 numerics. Late training epochs are only bit-exact on the machine that recorded them, so by default they are compared loosely; `pytest --golden-exact` compares them fully (F34). If a change is meant to alter behaviour, re-record the golden file in the same commit and add or update an entry in `docs/FINDINGS.md`. That entry gives the evidence, the fix commit, and which results and artifacts it invalidates.
 - **Experiment scripts** are `experiments/<name>/{launch,analyze}.py`.
   - Launchers build `python -m ...` command lines and submit them with `rasping.cluster`; they must support `--dry-run`.
   - Analyses take `--version` and write through `rasping.tables`.
