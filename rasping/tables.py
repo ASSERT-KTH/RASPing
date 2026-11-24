@@ -48,7 +48,8 @@ def save_figure(fig, version: str, name: str) -> Path:
     import matplotlib.pyplot as plt
 
     p = artifact_path(version, "figures", name)
-    fig.savefig(p, bbox_inches="tight")
+    # No CreationDate, so regenerated PDFs are byte-identical to the committed ones.
+    fig.savefig(p, bbox_inches="tight", metadata={"CreationDate": None})
     plt.close(fig)
     print(f"wrote {p.relative_to(ARTIFACTS_DIR.parent)}")
     return p

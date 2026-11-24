@@ -45,3 +45,7 @@ def test_reproduce_paper_v1(tmp_path):
     out = subprocess.run([sys.executable, str(REPO_ROOT / "scripts/reproduce_paper.py"), "--version", "v1_tmlr"],
                          capture_output=True, text=True, cwd=tmp_path)
     assert out.returncode == 0, out.stdout[-3000:] + out.stderr[-3000:]
+    # The committed artifacts must be exactly what the scripts produce (PDFs carry no date).
+    diff = subprocess.run(["git", "status", "--porcelain", "paper_artifacts/v1_tmlr"],
+                          capture_output=True, text=True, cwd=REPO_ROOT)
+    assert diff.returncode == 0 and diff.stdout == "", "regenerated artifacts differ:\n" + diff.stdout
