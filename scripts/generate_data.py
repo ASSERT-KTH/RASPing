@@ -4,8 +4,10 @@
 
 Random generation for the sequence-to-sequence programs (duplicates removed),
 exhaustive enumeration (truncated to --num-samples) for the Dyck programs, then a
-seeded 80/10/10 split. NOTE: as in v1, the random generators use NumPy's unseeded
-global RNG (F24) and exhaustive enumeration is truncated before shuffling (F1).
+seeded 80/10/10 split. Generation is seeded (--seed); the committed v1 files of the
+sequence-to-sequence programs were generated unseeded (F24) and are kept as they are.
+
+    python scripts/generate_data.py --program shuffle_dyck2     # regenerate one program
 """
 
 from pathlib import Path
@@ -20,10 +22,13 @@ from rasping.config import DATA_DIR, MAX_LEN, PROGRAMS
 @click.option("--num-samples", "-n", default=50000, show_default=True)
 @click.option("--max-len", "-l", default=MAX_LEN, show_default=True)
 @click.option("--output-dir", "-o", default=str(DATA_DIR), show_default=True)
-def main(num_samples, max_len, output_dir):
-    for program in PROGRAMS:
+@click.option("--seed", default=0, show_default=True)
+@click.option("--program", "only", multiple=True, help="Only these programs (default: all)")
+def main(num_samples, max_len, output_dir, seed, only):
+    for program in only or PROGRAMS:
         exhaustive = program.startswith("shuffle_dyck")
-        ds = data.generate(program, max_len, num_samples, remove_duplicates=True, exhaustive=exhaustive)
+        ds = data.generate(program, max_len, num_samples, remove_duplicates=True,
+                           exhaustive=exhaustive, seed=seed)
         for split, part in zip(("train", "val", "test"), data.split_train_val_test(ds)):
             data.save(program, split, part, data_dir=Path(output_dir))
         click.echo(f"{program}: {len(ds)} examples -> {output_dir}")

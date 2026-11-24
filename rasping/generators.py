@@ -287,7 +287,8 @@ def generate_most_freq_exhaustive(acceptedTokens, maxSeqLength):
         for seq in itertools.product(acceptedTokens, repeat=length):
             inputSeq = list(seq)
             tokenCounts = Counter(inputSeq)
-            outputSeq = sorted(inputSeq, key=lambda x: (-tokenCounts[x], x))
+            # ties keep first-occurrence order, like Tracr's make_sort_freq (F25)
+            outputSeq = sorted(inputSeq, key=lambda x: -tokenCounts[x])
 
             inputSeq.insert(0, "BOS")
             outputSeq.insert(0, "BOS")

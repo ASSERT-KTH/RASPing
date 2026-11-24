@@ -97,7 +97,7 @@ def test_generate_most_freq_exhaustive():
 
         # Check frequency-based sorting
         counts = Counter(input_seq[1:])
-        sorted_tokens = sorted(input_seq[1:], key=lambda x: (-counts[x], x))
+        sorted_tokens = sorted(input_seq[1:], key=lambda x: -counts[x])  # stable
         assert output_seq[1:] == sorted_tokens
 
         assert len(input_seq) == len(output_seq)

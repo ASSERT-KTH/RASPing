@@ -24,12 +24,18 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 
 ## Data and benchmark
 
-### F1 — Dyck-2 specification never contains inputs longer than 8 — `open`
+### F1 — Dyck-2 specification never contains inputs longer than 8 — `fixed`
 - **Evidence:** `src/functions.py:71` — `generateData(exhaustive=True)` enumerates inputs in
   order of length and returns `data[:size]` *before* shuffling. For `shuffle_dyck2` with
   n=50,000 and max_len=10, every input in `data/shuffle_dyck2_*.jsonl` has length 2–8.
 - **Paper:** §4 says input lengths are sampled between 2 and 10.
 - **Invalidates:** all `shuffle_dyck2` results (App. C Tables 6–7; spec-size Dyck runs).
+- **Fix (see commit "Fix specification generation"):** exhaustive enumerations larger than
+  the requested size are sampled with a seeded, length-stratified draw
+  (`rasping/data.py::_sample_by_length`); `data/shuffle_dyck2_*.jsonl` regenerated (seed 0):
+  lengths 2–10 now present (train: 12/52/219/806/3349 at lengths 2–6, ~8.9k each at 7–10).
+  Balanced strings remain rare (0.5%), as before. The golden `shuffle_dyck2` training entry
+  was re-recorded. Mutant membership is unaffected (labels depend only on the program).
 
 ### F6 — The 1,466-mutant benchmark is defined by a join with GBPR results — `open`
 - **Evidence:** `experiments/mutation/raspbugs.ipynb` inner-joins
@@ -185,14 +191,18 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 
 ## Found during the refactor (Nov 24, 2026)
 
-### F24 — Specifications are not reproducible (unseeded RNG) — `open`
+### F24 — Specifications are not reproducible (unseeded RNG) — `fixed`
 - **Evidence:** the random generators in `rasping/generators.py` draw from NumPy's global RNG
   and `scripts/generate_data.py` never seeds it, so `data/` cannot be regenerated.
+- **Fix:** `data.generate(..., seed=)` and `generate_data.py --seed` (default 0). The committed
+  v1 files of hist/most_freq/reverse/sort are kept as is (all v1 results use them); they
+  cannot be byte-reproduced, only regenerated with the same distribution.
 
-### F25 — `most_freq` exhaustive generator breaks ties differently — `open`
+### F25 — `most_freq` exhaustive generator breaks ties differently — `fixed`
 - **Evidence:** `generate_most_freq_exhaustive` sorts by `(-count, token)`; the random
   generator (used for `data/`) and Tracr's `make_sort_freq` keep first-occurrence order.
   Only the exhaustive generator (tests) is affected.
+- **Fix:** stable sort by count, as Tracr; test updated.
 
 ### F26 — Training-time trajectory storage on every main run — `open`
 - **Evidence:** v1 `launch_train_mutations.py` ran every mutant with `store_trajectory=True`

@@ -62,6 +62,28 @@ def write_jsonl(path: str | Path, records: Iterable[dict]) -> None:
 # --------------------------------------------------------------------------- generation
 
 
+def _sample_by_length(data: list[Example], size: int, rng: np.random.Generator) -> list[Example]:
+    """`size` distinct examples with input lengths as uniform as possible.
+
+    Lengths with fewer examples than their share are taken whole and the remainder is
+    spread over the other lengths (so short lengths are exhausted, long ones sampled).
+    """
+    by_len: dict[int, list] = {}
+    for ex in data:
+        by_len.setdefault(len(ex[0]), []).append(ex)
+    lengths = sorted(by_len, key=lambda n: len(by_len[n]))
+    out, remaining = [], size
+    for i, n in enumerate(lengths):
+        quota = remaining // (len(lengths) - i)
+        pool = by_len[n]
+        take = min(quota, len(pool))
+        idx = rng.choice(len(pool), take, replace=False)
+        out += [pool[j] for j in sorted(idx)]
+        remaining -= take
+    order = rng.permutation(len(out))
+    return [out[j] for j in order]
+
+
 def generate(
     program: str,
     max_len: int,
@@ -69,16 +91,23 @@ def generate(
     remove_duplicates: bool = False,
     timeout: float = 10,
     exhaustive: bool = False,
+    seed: int | None = None,
 ) -> list[Example]:
     """Generate up to `size` examples of `program` with inputs of length 2..max_len.
 
-    Random generation uses NumPy's global RNG. Exhaustive generation enumerates inputs
-    in order of length and truncates to `size` *without shuffling* (F1).
+    Random generation draws from NumPy's global RNG, seeded with `seed` if given.
+    Exhaustive generation enumerates all inputs; if there are more than `size`, a
+    length-stratified sample is drawn (seeded) so that every length 2..max_len is
+    represented. (v1 took the first `size` in length order, i.e. lengths 2-8 only: F1.)
     """
     vocab = list(programs.get(program).vocab)
+    if seed is not None:
+        np.random.seed(seed)
     if exhaustive:
         data = get_generator(program, exhaustive=True)(vocab, max_len)
-        return data[:size] if size < len(data) else data
+        if size >= len(data):
+            return data
+        return _sample_by_length(data, int(size), np.random.default_rng(seed))
 
     generator = get_generator(program)
     data: list[Example] = []
