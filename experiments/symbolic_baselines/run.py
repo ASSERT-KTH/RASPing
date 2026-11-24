@@ -8,8 +8,8 @@ GP) plus method, budget, program and the search hyperparameters.
     python experiments/symbolic_baselines/run.py --method gp --job-id <id> --budget 1000
     python experiments/symbolic_baselines/run.py --method bfs --job-id <id> --budget 1000
 
-Defaults are the v1 (TMLR) settings: GP population 16, tournament 3, seed 42; BFS depth
-= the mutant's mutation order (docs/FINDINGS.md F3); 30 s evaluation timeout.
+Defaults: GP population 16, tournament 3, seed 42 (as v1); BFS without a depth limit
+(v1 used the mutant's mutation order, docs/FINDINGS.md F3); 30 s evaluation timeout.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from rasping.config import DATA_DIR, RUNS_DIR
               help="GP: tournament size")
 @click.option("--seed", type=int, default=gp.DEFAULTS["seed"], show_default=True, help="GP: RNG seed")
 @click.option("--max-depth", type=int, default=None,
-              help="BFS: search depth [default: the mutant's mutation order]")
+              help="BFS: depth limit [default: none; v1 used the mutation order, F3]")
 @click.option("--eval-timeout", type=float, default=30.0, show_default=True,
               help="Seconds allowed for evaluating one candidate on one dataset")
 @click.option("--log-every", type=int, default=None, help="Progress log interval [GP 25, BFS 50]")

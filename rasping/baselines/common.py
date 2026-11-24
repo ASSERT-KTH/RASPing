@@ -47,13 +47,19 @@ def load_splits(program: str, data_dir: Path = DATA_DIR) -> tuple[list, list, li
 
 
 def compute_max_length(program: str, data_dir: Path = DATA_DIR) -> int:
-    """Longest input over train+val+test, *including* the BOS token (F11).
-
-    This is the `max_len` the candidate programs are built with (e.g. 11 for the v1
-    specifications, whose inputs have at most 10 tokens plus BOS).
-    """
+    """Longest input over train+val+test *including* BOS: the `max_len` v1 built
+    candidates with (11 instead of the compiled models' 10; F11). No longer used by the
+    searches, which use `config.MAX_LEN`."""
     train, val, test = load_splits(program, data_dir)
     return max(max(len(inp) for inp, _ in train + val + test), 1)
+
+
+class CandidateError(Exception):
+    """A candidate could not be evaluated: `kind` is "error" (build/eval failed) or "timeout"."""
+
+    def __init__(self, kind: str, detail: str = ""):
+        super().__init__(f"{kind}: {detail}")
+        self.kind = kind
 
 
 # --------------------------------------------------------------------------- evaluation
@@ -112,10 +118,11 @@ def _evaluate_worker(result_queue, source_code: str, program: str, max_length: i
 
 def evaluate_with_timeout(source_code: str, program: str, max_length: int,
                           data: List[Example], timeout: float = 30.0) -> float:
-    """Evaluate a candidate in a separate process; timeouts and errors score 0.0.
+    """Accuracy of a candidate, evaluated in a separate process.
 
-    Note: this never raises, so the callers' compile-failure branches are unreachable
-    and `num_compile_failures` is always 0 (preserved v1 behaviour).
+    Raises `CandidateError("error")` if the program cannot be built or evaluated and
+    `CandidateError("timeout")` on timeout (v1 silently scored both as 0.0; F30).
+    Runtime errors on individual inputs count as wrong predictions.
     """
     result_queue = multiprocessing.Queue()
     process = multiprocessing.Process(
@@ -132,15 +139,14 @@ def evaluate_with_timeout(source_code: str, program: str, max_length: int,
         if process.is_alive():
             process.kill()
             process.join()
-        return 0.0
+        raise CandidateError("timeout", f"after {timeout}s")
 
     if not result_queue.empty():
         status, result = result_queue.get()
         if status == "success":
             return result
-        logger.debug(f"Evaluation failed: {result}")
-        return 0.0
-    return 0.0
+        raise CandidateError("error", repr(result))
+    raise CandidateError("error", f"worker exited with code {process.exitcode}")
 
 
 # Kept as the single entry point the searches call (v1 had two identical wrappers,
@@ -296,9 +302,13 @@ def all_single_step_neighbors(source_code: str) -> List[str]:
 
 
 def history_entry(step: int, phase_key: str, phase: int, status: str, train_acc, test_acc,
-                  best_train: float, best_test: float) -> dict:
-    """One `program_history` record (`phase_key` is "generation" for GP, "depth" for BFS)."""
-    return {
+                  best_train: float, best_test: float, time_s: float | None = None) -> dict:
+    """One `program_history` record (`phase_key` is "generation" for GP, "depth" for BFS).
+
+    `best_train_acc` / `best_test_acc` are the fitness and test accuracy of the currently
+    selected (best-fitness) program; `time_s` is seconds since the search started.
+    """
+    entry = {
         "step": step,
         phase_key: phase,
         "status": status,
@@ -307,3 +317,6 @@ def history_entry(step: int, phase_key: str, phase: int, status: str, train_acc,
         "best_train_acc": best_train,
         "best_test_acc": best_test,
     }
+    if time_s is not None:
+        entry["time_s"] = round(time_s, 3)
+    return entry

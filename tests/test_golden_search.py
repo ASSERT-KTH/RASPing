@@ -52,6 +52,9 @@ def test_golden_search(program, method, tiny_data_dir):
     g = GOLDEN[program]
     expected = dict(g[method])
     got = run(method, raspbugs.get(g["job_id"]), tiny_data_dir)
+    assert all("time_s" in e for e in got["program_history"])
+    got["program_history"] = [{k: v for k, v in e.items() if k != "time_s"}
+                              for e in got["program_history"]]  # wall-clock: not reproducible
 
     assert hashlib.sha256(got["best_source"].encode()).hexdigest() == expected.pop("best_source_sha")
     for key, value in expected.items():

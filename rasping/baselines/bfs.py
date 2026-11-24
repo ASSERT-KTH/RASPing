@@ -3,11 +3,10 @@
 Evaluates the buggy mutant, then every single-step mutation of it (depth 1), then every
 single-step mutation of the successfully evaluated depth-1 programs (depth 2), ... until
 `max_depth`, `budget` evaluated programs (duplicates included) or a perfect-fitness
-program. The v1 runs set `max_depth` to the mutant's true mutation order (F3); that is
-what `run_bfs_for_mutant` does by default.
-
-Ported from `experiments/gp_baseline/run_gp_exhaustive.py` with identical behaviour; it
-is pinned by `tests/test_golden_search.py`.
+program. By default there is no depth limit (v1 used the mutant's true mutation order,
+an oracle; F3). Other changes from v1 as for GP: training-split fitness (F5), no test
+tie-break (F29), failures counted (F30), `MAX_LEN` (F11), timestamps (F18).
+Pinned by `tests/test_golden_search.py`.
 """
 
 from __future__ import annotations
@@ -19,18 +18,18 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from rasping import programs
 from rasping.baselines.common import (
+    CandidateError,
     all_single_step_neighbors,
-    compute_max_length,
     evaluate_source,
     hash_source,
     history_entry,
     load_splits,
 )
-from rasping.config import DATA_DIR
+from rasping.config import DATA_DIR, MAX_LEN
 
 logger = logging.getLogger(__name__)
 
-#: Budget of the v1 (TMLR) runs (max_depth = the mutant's mutation order).
+#: Budget of the v1 (TMLR) runs.
 DEFAULTS = dict(budget=1000)
 
 
@@ -38,111 +37,87 @@ def run_bfs(
     base_source: str,
     program: str,
     data_dir: Path = DATA_DIR,
-    max_depth: int = 2,
+    max_depth: int | None = None,
     budget: int = DEFAULTS["budget"],
     log_every: int = 50,
     eval_timeout: float = 30.0,
 ) -> Dict[str, Any]:
-    """Run BFS from `base_source` (a mutant of `program`). Returns the v1 result dict
-    with `duration_s` (measured from the base evaluation, i.e. excluding data loading)
-    but without the job metadata that `run_bfs_for_mutant` adds."""
-    program = programs.canonical(program)
+    """Run BFS from `base_source` (a mutant of `program`) until `budget` programs.
 
-    train_data, val_data, test_data = load_splits(program, data_dir)
-    fitness_data = train_data + val_data  # F5: fitness uses train+val
-    max_length = compute_max_length(program, data_dir)
+    `max_depth=None` (default) puts no limit on the depth (v1 used the mutant's true
+    mutation order; F3). Fitness is training-split accuracy; test accuracy is reported
+    only. Ties keep the first program found.
+    """
+    program = programs.canonical(program)
+    train_data, _val, test_data = load_splits(program, data_dir)
+    start = time.time()
 
     cache: Dict[str, Tuple[float, float]] = {}
-    num_programs = 0
-    num_duplicates = 0
-    num_compile_failures = 0
-
-    best_train = -1.0
-    best_test = -1.0
-    best_source = base_source
-
+    num_programs = num_duplicates = num_compile_failures = num_timeouts = 0
+    best_train, best_test, best_source = -1.0, -1.0, base_source
     program_history: List[Dict[str, Any]] = []
 
-    def evaluate_candidate(src: str) -> Tuple[str, Optional[Tuple[float, float]], str]:
-        """Evaluate a candidate; returns (status, (train, test) or None, hash)."""
-        nonlocal num_programs, num_compile_failures, num_duplicates
-        h = hash_source(src)
+    def evaluate(src: str) -> Tuple[str, Optional[Tuple[float, float]]]:
+        nonlocal num_programs, num_duplicates, num_compile_failures, num_timeouts
         num_programs += 1  # every attempt counts toward the budget
+        h = hash_source(src)
         if h in cache:
             num_duplicates += 1
-            return "duplicate", cache[h], h
+            return "duplicate", cache[h]
         try:
-            train_acc = evaluate_source(src, program, max_length, fitness_data, timeout=eval_timeout)
-            test_acc = evaluate_source(src, program, max_length, test_data, timeout=eval_timeout)
-        except Exception as e:  # unreachable: evaluate_source never raises
-            num_compile_failures += 1
-            logger.debug(f"Compile/eval failed for candidate {h}: {e}")
-            return "compile_fail", None, h
-        cache[h] = (train_acc, test_acc)
-        return "ok", (train_acc, test_acc), h
+            fit = evaluate_source(src, program, MAX_LEN, train_data, timeout=eval_timeout)
+            test = evaluate_source(src, program, MAX_LEN, test_data, timeout=eval_timeout)
+        except CandidateError as e:
+            if e.kind == "timeout":
+                num_timeouts += 1
+            else:
+                num_compile_failures += 1
+            return "compile_fail", None
+        cache[h] = (fit, test)
+        return "ok", cache[h]
 
-    start_time = time.time()
-    status, base_eval, _ = evaluate_candidate(base_source)
-    if status != "compile_fail" and base_eval is not None:
-        best_train, best_test = base_eval
-        logger.info(f"Seeded base candidate: train={best_train:.4f} test={best_test:.4f}")
-    program_history.append(history_entry(
-        num_programs, "depth", 0, status,
-        None if base_eval is None else base_eval[0],
-        None if base_eval is None else base_eval[1],
-        best_train, best_test))
+    def log(status, res, depth):
+        program_history.append(history_entry(
+            num_programs, "depth", depth, status,
+            None if res is None else res[0], None if res is None else res[1],
+            best_train, best_test, time.time() - start))
 
-    depth = 0
-    frontier: List[str] = [base_source]
+    status, res = evaluate(base_source)
+    if res is not None:
+        best_train, best_test = res
+    log(status, res, 0)
 
-    if best_train < 1.0:
-        while depth < max_depth and frontier and num_programs < budget:
-            # Expand every program of the frontier before evaluating anything.
-            next_frontier: List[str] = []
-            for src in frontier:
-                next_frontier.extend(all_single_step_neighbors(src))
-
-            depth += 1
-            new_frontier: List[str] = []
-            for src in next_frontier:
-                if num_programs >= budget:
-                    break
-                status_i, eval_res, _ = evaluate_candidate(src)
-                train_acc = eval_res[0] if eval_res is not None else None
-                test_acc = eval_res[1] if eval_res is not None else None
-                if status_i == "ok" and eval_res is not None:
-                    new_frontier.append(src)
-                    # NB: ties on fitness are broken by *test* accuracy
-                    if train_acc > best_train or (train_acc == best_train and test_acc > best_test):
-                        best_train = train_acc
-                        best_test = test_acc
-                        best_source = src
-                        logger.info(f"New best: train={best_train:.4f} test={best_test:.4f}")
-                program_history.append(history_entry(num_programs, "depth", depth, status_i,
-                                                     train_acc, test_acc, best_train, best_test))
-                if log_every and num_programs % max(1, log_every) == 0:
-                    logger.info(f"Progress: depth={depth} programs={num_programs}/{budget} "
-                                f"dup={num_duplicates} fails={num_compile_failures} "
-                                f"best_train={best_train:.4f} best_test={best_test:.4f}")
-                if best_train >= 1.0:
-                    break
-
-            frontier = new_frontier
-
-            if best_train >= 1.0 or num_programs >= budget:
+    depth, frontier = 0, [base_source]
+    while best_train < 1.0 and frontier and num_programs < budget \
+            and (max_depth is None or depth < max_depth):
+        depth += 1
+        candidates = [n for src in frontier for n in all_single_step_neighbors(src)]
+        frontier = []
+        for src in candidates:
+            if num_programs >= budget or best_train >= 1.0:
                 break
+            status, res = evaluate(src)
+            if status == "ok":
+                frontier.append(src)
+                if res[0] > best_train:
+                    best_train, best_test, best_source = res[0], res[1], src
+            log(status, res, depth)
+            if log_every and num_programs % max(1, log_every) == 0:
+                logger.info(f"depth={depth} programs={num_programs}/{budget} dup={num_duplicates} "
+                            f"fails={num_compile_failures} timeouts={num_timeouts} "
+                            f"best_fitness={best_train:.4f}")
 
-    end_time = time.time()
     return {
         "status": "success_early" if best_train >= 1.0 else "complete",
         "num_programs": num_programs,
         "num_duplicates": num_duplicates,
         "num_compile_failures": num_compile_failures,
+        "num_timeouts": num_timeouts,
         "train_acc": best_train,
         "test_acc": best_test,
         "best_source": best_source,
         "program_history": program_history,
-        "duration_s": end_time - start_time,
+        "duration_s": time.time() - start,
     }
 
 
@@ -156,10 +131,9 @@ def run_bfs_for_mutant(
 ) -> Dict[str, Any]:
     """Run BFS on a `rasping.raspbugs.Mutant`; returns the per-mutant result record.
 
-    `max_depth=None` uses the mutant's mutation order, as the v1 runs did (F3).
+    `max_depth=None` means unlimited (budget only). To reproduce v1, pass
+    `max_depth=mutant.mutation_order` (F3).
     """
-    if max_depth is None:
-        max_depth = mutant.mutation_order
     result = run_bfs(
         base_source=mutant.source,
         program=mutant.program,

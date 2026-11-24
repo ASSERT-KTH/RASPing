@@ -87,28 +87,37 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 
 ## Symbolic baselines (GP / BFS)
 
-### F3 — BFS is told the true mutation order — `open`
+### F3 — BFS is told the true mutation order — `fixed`
 - **Evidence:** `experiments/gp_baseline/run_gp_exhaustive.py:330` sets
   `max_depth = mutation_order` of the mutant being repaired.
 - **Paper:** not disclosed; this is oracle information on top of the operator oracle §5.3
   already acknowledges.
+- **Fix (commit "Fix the symbolic baselines"):** BFS has no depth limit by default (budget only), decided
+  Nov 24, 2026. `--max-depth` remains available.
 
-### F5 — GP fitness uses train+val; paper says train — `open`
-- **Evidence:** `experiments/gp_baseline/gp_core.py:375`.
+### F5 — GP fitness uses train+val; paper says train — `fixed`
+- **Evidence:** `experiments/gp_baseline/gp_core.py:375` (BFS likewise).
+- **Fix (commit "Fix the symbolic baselines"):** GP and BFS fitness = training-split accuracy.
 
-### F9 — Conflicting GP defaults; GP and BFS share an output dir — `open`
+### F9 — Conflicting GP defaults; GP and BFS share an output dir — `fixed`
 - **Evidence:** CLI defaults pop=16, k=3, budget=500 (`run_gp_baseline.py`) vs
   `run_gp_for_bug` defaults pop=60, k=4 (`gp_core.py:675-677`). Both runners default
   `--output-dir` to `experiments/gp_baseline/results` (`run_gp_baseline.py:120`,
   `run_gp_exhaustive.py:392`).
+- **Fix (228d70d):** one set of defaults (`gp.DEFAULTS`, the paper's), output dirs
+  `runs/symbolic_baselines/<method>_budget<B>/`.
 
-### F17 — Baseline progress curves select on the test set — `open`
-- **Evidence:** `experiments/gp_baseline/plot_progress.py:11-78` builds GP/BFS curves from
-  `best_test_acc`, the maximum *test* accuracy over all candidates evaluated so far, rather
-  than the test accuracy of the candidate with the best training fitness (`test_acc` in the
-  result record).
-- **Invalidates:** Fig 4, Fig 5, the §5.3 convergence numbers, and baseline columns of
-  Table 8 / Table 7 if they use the same field.
+### F17 — Baseline progress curves use the running maximum of the selected program's test accuracy — `fixed`
+- **Evidence:** `best_test_acc` in the search histories is the test accuracy of the
+  currently *selected* (best-fitness) program — not of any candidate, as first written
+  here. But the curves (`plot_progress.py` `expand_gp_history_to_series`) and Table 8
+  (`max_best_test_acc`) take its running maximum over time, so a mutant counts as repaired
+  if the selection was ever ≥99% on test, even if later replaced.
+- **Impact on v1:** none at the 99% threshold — running maximum and final selection give
+  identical pass rates for every method, budget and mutation order (checked Nov 24, 2026).
+- **Fix:** with F29 fixed the selected program's test accuracy is non-decreasing in
+  fitness order only by chance, so v2 analysis should use the selected program's value at
+  each step (`test_acc` of the final record for endpoints). See F4 for the GBPR side.
 
 ## Analysis and figures
 
@@ -121,21 +130,24 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
   has one entry per 10 epochs (`VAL_STEP=10`). The caption says the x-axis counts gradient
   steps for GBPR.
 
-### F18 — Fig 5 GBPR wall-clock time is estimated, not measured — `open`
+### F18 — Fig 5 wall-clock time is estimated, not measured — `fixed` (logging)
 - **Evidence:** GBPR time = (validation index) × `seconds_per_val_step` from
   `gbpr_timing.json`, a per-program average over a 10-job step-time benchmark
   (`train_mutations/benchmark_step_time.py`). GP/BFS time assumes a constant
   `duration_s / num_programs` per step (`plot_progress.py:168-190`).
-- **Fix:** record wall-clock timestamps per validation step / per evaluated program.
+- **Fix:** GBPR runs record per-epoch timestamps (`run.json` → `curves.csv.gz:time_s`, 228d70d);
+  GP/BFS histories record `time_s` per evaluated program. The v2 analysis must use them.
 
 ### F10 — Repair threshold is defined inconsistently — `open`
 - **Evidence:** `plot_progress.py:379` defaults `--threshold 1.0`;
   `analyze_test_results.py:822` uses `1 - linspace(0, 0.01, 5)`; `print_review_stats.py:30`
   and both dyck analyses hardcode 0.99; the LLM-patch evaluation used `== 1.0`.
 
-### F11 — Maximum sequence length computed two ways — `open`
+### F11 — Maximum sequence length computed two ways — `fixed`
 - **Evidence:** `gp_core.py:49` (max over train+val+test) vs
-  `analyze_gp_bfs_dyck_balanced.py:~120` (test only).
+  `analyze_gp_bfs_dyck_balanced.py:~120` (test only); both include BOS, so candidates were
+  built with max_len 11 while compiled models use 10.
+- **Fix (commit "Fix the symbolic baselines"):** searches build candidates with `config.MAX_LEN`.
 
 ### F12 — Fig 1 / Fig 6 are not reproducible from the repository — `fixed`
 - **Evidence:** `trajectory.pkl` is gitignored (`experiments/train_mutations/.gitignore`);
@@ -223,21 +235,31 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
   neither TP nor FN, inflating token recall / balanced accuracy for those programs (Table 6
   columns for baselines; Table 7 uses sequence-level metrics and is unaffected).
 
-### F29 — Symbolic search breaks fitness ties with test accuracy — `open`
+### F29 — Symbolic search breaks fitness ties with test accuracy — `fixed`
 - **Evidence:** `rasping/baselines/gp.py:145,230`, `bfs.py:116`: among candidates with equal
   fitness the one with higher *test* accuracy is kept as best, so `best_source`/`test_acc`
   depend on the test set (separate from F17, which concerns the progress curves).
+- **Fix (commit "Fix the symbolic baselines"):** ties keep the incumbent (first found); test accuracy is
+  computed for reporting only.
 
-### F30 — Compile/evaluation failures are silently scored 0 — `open`
+### F30 — Compile/evaluation failures are silently scored 0 — `fixed`
 - **Evidence:** `rasping/baselines/common.py:135-143` returns 0.0 on any error or timeout;
   `num_compile_failures` is therefore always 0 and broken candidates are recorded as `ok`.
+- **Fix (commit "Fix the symbolic baselines"):** failures raise `CandidateError`; they are counted
+  (`num_compile_failures`, `num_timeouts`), logged as `compile_fail` and excluded from the
+  population/frontier. (On the golden mini-runs GP had 5 and 2 such failures.)
 
-### F31 — Minor inconsistencies in the symbolic baselines — `open`
+### F31 — Minor inconsistencies in the symbolic baselines — `fixed` (partly)
 - GP status is `success_early` only if the perfect program is in the initial population;
   generation 2 never appears (double increment, `gp.py:171,196`); survivors are not
   tie-broken as the comment says (`gp.py:243`); GP mutations are not checked for no-ops
   while BFS drops them; BFS `duration_s` excludes data loading, GP's includes it;
-  candidates are built with `max_len=11` (BOS counted) while compiled models use 10 (F11).
+  candidates are built with `max_len=11` (BOS counted) while compiled models use 10 (F11);
+  duplicates in the initial population were counted twice.
+- **Fix (commit "Fix the symbolic baselines"):** status `success_early` whenever a perfect-fitness program
+  is found; consecutive generation numbers; `duration_s` excludes data loading for both;
+  duplicates counted once. GP still does not filter no-op mutations (`wontfix`: part of the
+  algorithm as published).
 - The v1 spec-size baseline tables (budget 500) contain 1,691 GP / 1,760 BFS records — an
   older, larger mutant set; the analysis restricts them to the benchmark.
 

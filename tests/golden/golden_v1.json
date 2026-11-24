@@ -1013,8 +1013,9 @@
    "gp": {
     "status": "complete",
     "num_programs": 12,
-    "num_duplicates": 2,
-    "num_compile_failures": 0,
+    "num_duplicates": 3,
+    "num_compile_failures": 5,
+    "num_timeouts": 0,
     "train_acc": 0.0,
     "test_acc": 0.0,
     "program_history": [
@@ -1029,25 +1030,25 @@
      },
      {
       "step": 2,
-      "generation": 1,
-      "status": "ok",
-      "train_acc": 0.0,
-      "test_acc": 0.0,
+      "generation": 0,
+      "status": "compile_fail",
+      "train_acc": null,
+      "test_acc": null,
       "best_train_acc": 0.0,
       "best_test_acc": 0.0
      },
      {
       "step": 3,
-      "generation": 1,
-      "status": "ok",
-      "train_acc": 0.0,
-      "test_acc": 0.0,
+      "generation": 0,
+      "status": "compile_fail",
+      "train_acc": null,
+      "test_acc": null,
       "best_train_acc": 0.0,
       "best_test_acc": 0.0
      },
      {
       "step": 4,
-      "generation": 1,
+      "generation": 0,
       "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
@@ -1056,26 +1057,26 @@
      },
      {
       "step": 5,
-      "generation": 3,
-      "status": "ok",
-      "train_acc": 0.0,
-      "test_acc": 0.0,
+      "generation": 0,
+      "status": "compile_fail",
+      "train_acc": null,
+      "test_acc": null,
       "best_train_acc": 0.0,
       "best_test_acc": 0.0
      },
      {
       "step": 6,
-      "generation": 3,
-      "status": "ok",
-      "train_acc": 0.0,
-      "test_acc": 0.0,
+      "generation": 0,
+      "status": "compile_fail",
+      "train_acc": null,
+      "test_acc": null,
       "best_train_acc": 0.0,
       "best_test_acc": 0.0
      },
      {
       "step": 7,
-      "generation": 3,
-      "status": "duplicate",
+      "generation": 0,
+      "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
       "best_train_acc": 0.0,
@@ -1083,17 +1084,17 @@
      },
      {
       "step": 8,
-      "generation": 3,
-      "status": "ok",
-      "train_acc": 0.0,
-      "test_acc": 0.0,
+      "generation": 0,
+      "status": "compile_fail",
+      "train_acc": null,
+      "test_acc": null,
       "best_train_acc": 0.0,
       "best_test_acc": 0.0
      },
      {
       "step": 9,
-      "generation": 3,
-      "status": "ok",
+      "generation": 0,
+      "status": "duplicate",
       "train_acc": 0.0,
       "test_acc": 0.0,
       "best_train_acc": 0.0,
@@ -1101,8 +1102,8 @@
      },
      {
       "step": 10,
-      "generation": 4,
-      "status": "ok",
+      "generation": 0,
+      "status": "duplicate",
       "train_acc": 0.0,
       "test_acc": 0.0,
       "best_train_acc": 0.0,
@@ -1110,8 +1111,8 @@
      },
      {
       "step": 11,
-      "generation": 4,
-      "status": "ok",
+      "generation": 0,
+      "status": "duplicate",
       "train_acc": 0.0,
       "test_acc": 0.0,
       "best_train_acc": 0.0,
@@ -1119,8 +1120,8 @@
      },
      {
       "step": 12,
-      "generation": 4,
-      "status": "duplicate",
+      "generation": 0,
+      "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
       "best_train_acc": 0.0,
@@ -1130,6 +1131,12 @@
     "job_id": "0532b1914bc2417486ac590b6672afb5",
     "program_name": "hist",
     "seed": 7,
+    "method": "gp",
+    "budget": 12,
+    "program": "hist",
+    "population_size": 4,
+    "tournament_k": 2,
+    "eval_timeout": 60,
     "best_source_sha": "8842dcc339bf95d8534836c8d58197f21db194a0812cb7920d9c7d8b6b2703b7"
    },
    "bfs": {
@@ -1137,6 +1144,7 @@
     "num_programs": 12,
     "num_duplicates": 1,
     "num_compile_failures": 0,
+    "num_timeouts": 0,
     "train_acc": 0.0,
     "test_acc": 0.0,
     "program_history": [
@@ -1251,6 +1259,11 @@
     ],
     "job_id": "0532b1914bc2417486ac590b6672afb5",
     "program_name": "hist",
+    "method": "bfs",
+    "budget": 12,
+    "program": "hist",
+    "max_depth": 1,
+    "eval_timeout": 60,
     "best_source_sha": "8842dcc339bf95d8534836c8d58197f21db194a0812cb7920d9c7d8b6b2703b7"
    }
   },
@@ -1260,9 +1273,10 @@
     "status": "complete",
     "num_programs": 12,
     "num_duplicates": 0,
-    "num_compile_failures": 0,
-    "train_acc": 0.0,
-    "test_acc": 0.0,
+    "num_compile_failures": 2,
+    "num_timeouts": 0,
+    "train_acc": 0.55,
+    "test_acc": 0.625,
     "program_history": [
      {
       "step": 1,
@@ -1275,16 +1289,16 @@
      },
      {
       "step": 2,
-      "generation": 1,
-      "status": "ok",
-      "train_acc": 0.0,
-      "test_acc": 0.0,
+      "generation": 0,
+      "status": "compile_fail",
+      "train_acc": null,
+      "test_acc": null,
       "best_train_acc": 0.0,
       "best_test_acc": 0.0
      },
      {
       "step": 3,
-      "generation": 1,
+      "generation": 0,
       "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
@@ -1293,7 +1307,7 @@
      },
      {
       "step": 4,
-      "generation": 1,
+      "generation": 0,
       "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
@@ -1302,7 +1316,7 @@
      },
      {
       "step": 5,
-      "generation": 3,
+      "generation": 0,
       "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
@@ -1311,7 +1325,7 @@
      },
      {
       "step": 6,
-      "generation": 3,
+      "generation": 1,
       "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
@@ -1320,7 +1334,7 @@
      },
      {
       "step": 7,
-      "generation": 3,
+      "generation": 1,
       "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
@@ -1329,7 +1343,7 @@
      },
      {
       "step": 8,
-      "generation": 3,
+      "generation": 1,
       "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
@@ -1338,7 +1352,7 @@
      },
      {
       "step": 9,
-      "generation": 4,
+      "generation": 1,
       "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
@@ -1347,7 +1361,7 @@
      },
      {
       "step": 10,
-      "generation": 4,
+      "generation": 2,
       "status": "ok",
       "train_acc": 0.0,
       "test_acc": 0.0,
@@ -1356,33 +1370,40 @@
      },
      {
       "step": 11,
-      "generation": 4,
-      "status": "ok",
-      "train_acc": 0.0,
-      "test_acc": 0.0,
+      "generation": 2,
+      "status": "compile_fail",
+      "train_acc": null,
+      "test_acc": null,
       "best_train_acc": 0.0,
       "best_test_acc": 0.0
      },
      {
       "step": 12,
-      "generation": 4,
+      "generation": 2,
       "status": "ok",
-      "train_acc": 0.0,
-      "test_acc": 0.0,
-      "best_train_acc": 0.0,
-      "best_test_acc": 0.0
+      "train_acc": 0.55,
+      "test_acc": 0.625,
+      "best_train_acc": 0.55,
+      "best_test_acc": 0.625
      }
     ],
     "job_id": "0152617485ba4c4f9a2c74f0f90a3c63",
     "program_name": "sort",
     "seed": 7,
-    "best_source_sha": "e51aedb39c4eae957ac43a45bfc9e6c1392135c300a1c47ba5f93452896a7d8b"
+    "method": "gp",
+    "budget": 12,
+    "program": "sort",
+    "population_size": 4,
+    "tournament_k": 2,
+    "eval_timeout": 60,
+    "best_source_sha": "076f9867aca002a4f0caf4508a1509f313aad7e07a8430032f2dbe8f9b64e3fe"
    },
    "bfs": {
     "status": "complete",
     "num_programs": 12,
     "num_duplicates": 2,
     "num_compile_failures": 0,
+    "num_timeouts": 0,
     "train_acc": 0.0,
     "test_acc": 0.0,
     "program_history": [
@@ -1497,6 +1518,11 @@
     ],
     "job_id": "0152617485ba4c4f9a2c74f0f90a3c63",
     "program_name": "sort",
+    "method": "bfs",
+    "budget": 12,
+    "program": "sort",
+    "max_depth": 1,
+    "eval_timeout": 60,
     "best_source_sha": "e51aedb39c4eae957ac43a45bfc9e6c1392135c300a1c47ba5f93452896a7d8b"
    }
   }

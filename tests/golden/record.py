@@ -72,6 +72,8 @@ def record_search(program: str, job_id: str) -> dict:
         r = dict(r)
         r.pop("duration_s", None)
         r["best_source_sha"] = hashlib.sha256(r.pop("best_source").encode()).hexdigest()
+        r["program_history"] = [{k: v for k, v in e.items() if k != "time_s"}
+                                for e in r["program_history"]]
         return json.loads(json.dumps(r, default=float))
     return {"job_id": job_id, "gp": strip(gp), "bfs": strip(bfs)}
 

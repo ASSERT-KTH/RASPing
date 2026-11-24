@@ -30,6 +30,7 @@ def run_row(rec: dict, method: str, budget: int) -> dict:
         "num_programs": rec.get("num_programs"),
         "num_duplicates": rec.get("num_duplicates"),
         "num_compile_failures": rec.get("num_compile_failures"),
+        **({"num_timeouts": rec["num_timeouts"]} if "num_timeouts" in rec else {}),
         "train_acc": rec.get("train_acc"),
         "test_acc": rec.get("test_acc"),
         "max_best_test_acc": max(((e.get("best_test_acc") or 0.0) for e in h), default=0.0),
@@ -59,6 +60,8 @@ def history_rows(rec: dict, method: str, budget: int) -> list[dict]:
                     "test_acc": e.get("test_acc"),
                     "best_train_acc": e.get("best_train_acc"),
                     "best_test_acc": e.get("best_test_acc"),
+                    # v2 records only (wall-clock seconds since the search started)
+                    **({"time_s": e["time_s"]} if "time_s" in e else {}),
                 }
             )
             prev = key
