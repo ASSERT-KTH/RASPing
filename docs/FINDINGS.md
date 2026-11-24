@@ -65,18 +65,20 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
   mislabelled `CORRECT_MODEL`); the "before" histograms and the "min/median/mean" statistics
   in §4.
 
-### F19 — Undocumented mutant statuses — `open`
+### F19 — Undocumented mutant statuses — `fixed`
 - **Evidence:** `aggregated_mutations.json` has, besides the four statuses described in §4,
   `UNKNOWN_FAILURE` (362) and `TIMEOUT` (78).
-- **Fix:** document in the benchmark README / paper, or investigate and reclassify.
+- **Fix:** documented in `raspbugs/README.md` (UNKNOWN_FAILURE = no oracle output); the paper
+  should list all six.
 
 ## Training (GBPR)
 
-### F2 — Early-stopping patience: paper says 10, code used 50 — `open`
+### F2 — Early-stopping patience: paper says 10, code used 50 — `paper`
 - **Evidence:** `experiments/train_mutations/train_mutations.py:170` CLI default
   `early_stopping_patience=50`; no launcher overrides it (the function default of 10 at :37
   is never reached). `launch_random_init_baseline.py:11-12` confirms 50.
 - **Paper:** §5.1 "validation loss improvement < 1e-4 for 10 epochs".
+- **Decision (Nov 24, 2026):** keep 50 (`config.TrainConfig`); correct the paper text to 50.
 
 ### F8 — Spec-size ablation: N=40,000 point and baselines don't match the stated setup — `open`
 - **Evidence:** `experiments/spec_size/launch_spec_size.py:8` runs N ∈ {100,…,25,000} with
@@ -121,14 +123,24 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 
 ## Analysis and figures
 
-### F4 — Fig 4/5 compare GBPR validation accuracy against baseline test accuracy — `open`
+### F4 — Fig 4/5 compare GBPR validation accuracy against baseline test accuracy — `fixed` (logging)
 - **Evidence:** `experiments/gp_baseline/plot_progress.py:89-117` (with
-  `# TODO: We need to store the test results`) uses `val_accs.npy` for GBPR.
+  `# TODO: We need to store the test results`) uses `val_accs.npy` for GBPR. The §5.3 text then
+  quotes the *test*-based rates (41.9% / 26.0% at orders 4 / 5, = Table 5) while the plotted
+  GBPR plateaus are the validation-based 41.2% / 24.7%.
+- **Fix (commit "Log the selected parameters' test accuracy"):** the Trainer records, at every
+  validation step, the test accuracy of the parameters early stopping would return then
+  (best validation loss so far): `selected_test_accs` in curves.npz / `selected_test_acc` in
+  `val_curves.csv.gz`. `experiments/symbolic_baselines/analyze.py` uses it (and the baselines'
+  selected-program test accuracy without running max, F17) when present; v1 tables still
+  reproduce the submitted figures exactly.
 
-### F16 — Fig 4 x-axis for GBPR is validation evaluations (every 10 epochs), not gradient steps — `open`
+### F16 — Fig 4 x-axis for GBPR is validation evaluations (every 10 epochs), not gradient steps — `fixed`
 - **Evidence:** `plot_progress.py:120-147` indexes the per-job `val_accs.npy` series, which
   has one entry per 10 epochs (`VAL_STEP=10`). The caption says the x-axis counts gradient
   steps for GBPR.
+- **Fix:** the axis is labelled for what it is (GBPR: evaluations every 10 epochs; GP/BFS:
+  programs evaluated); the caption must say so. Fig 5 (time) is the comparable view.
 
 ### F18 — Fig 5 wall-clock time is estimated, not measured — `fixed` (logging)
 - **Evidence:** GBPR time = (validation index) × `seconds_per_val_step` from
@@ -138,10 +150,11 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 - **Fix:** GBPR runs record per-epoch timestamps (`run.json` → `curves.csv.gz:time_s`, 228d70d);
   GP/BFS histories record `time_s` per evaluated program. The v2 analysis must use them.
 
-### F10 — Repair threshold is defined inconsistently — `open`
+### F10 — Repair threshold is defined inconsistently — `fixed`
 - **Evidence:** `plot_progress.py:379` defaults `--threshold 1.0`;
   `analyze_test_results.py:822` uses `1 - linspace(0, 0.01, 5)`; `print_review_stats.py:30`
   and both dyck analyses hardcode 0.99; the LLM-patch evaluation used `== 1.0`.
+- **Fix (228d70d):** `config.THRESHOLD` is the only definition.
 
 ### F11 — Maximum sequence length computed two ways — `fixed`
 - **Evidence:** `gp_core.py:49` (max over train+val+test) vs
@@ -218,7 +231,7 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
   Only the exhaustive generator (tests) is affected.
 - **Fix:** stable sort by count, as Tracr; test updated.
 
-### F26 — Training-time trajectory storage on every main run — `open`
+### F26 — Training-time trajectory storage on every main run — `fixed`
 - **Evidence:** v1 `launch_train_mutations.py` ran every mutant with `store_trajectory=True`
   (full parameter copy every 50 steps, kept in memory until the end). Long runs of large
   models (most_freq: up to 1.1M parameters) can exhaust memory. (It is *not* the cause of

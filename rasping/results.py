@@ -50,8 +50,10 @@ def collect(run_root: str | Path, out_dir: str | Path, with_curves: bool = True)
                                    "train_acc": float(c["train_accs"][e]),
                                    "val_loss": float(c["val_losses"][e]) if e < len(c["val_losses"]) else np.nan,
                                    "time_s": times[e] if e < len(times) else np.nan})
+                sel = c["selected_test_accs"] if "selected_test_accs" in c else []
                 for i, v in enumerate(c["val_accs"]):
-                    val_curves.append({**key, "val_eval": i, "val_acc": float(v)})
+                    val_curves.append({**key, "val_eval": i, "val_acc": float(v),
+                                       "selected_test_acc": float(sel[i]) if i < len(sel) else np.nan})
         rows.append(row)
 
     out = Path(out_dir)

@@ -67,6 +67,9 @@ class TrainResult:
     train_accs: list = field(default_factory=list)  # per epoch, full train set
     val_losses: list = field(default_factory=list)  # per epoch
     val_accs: list = field(default_factory=list)  # every `val_every` epochs (epoch 0, 10, ...)
+    # test accuracy of the parameters early stopping would return at that point (best
+    # validation loss so far), at the same epochs as val_accs; only if X_test is given
+    selected_test_accs: list = field(default_factory=list)
     stopped_early: bool = False
     diverged: bool = False  # training loss became non-finite; params are the last finite ones
     best_step: Optional[int] = None
@@ -75,8 +78,10 @@ class TrainResult:
     epoch_end_times: list = field(default_factory=list)  # seconds since train() started
 
     def history(self) -> dict:
-        return {k: [float(v) for v in getattr(self, k)]
-                for k in ("train_losses", "train_accs", "val_losses", "val_accs")}
+        keys = ["train_losses", "train_accs", "val_losses", "val_accs"]
+        if self.selected_test_accs:
+            keys.append("selected_test_accs")
+        return {k: [float(v) for v in getattr(self, k)] for k in keys}
 
 
 class Trainer:
@@ -95,6 +100,7 @@ class Trainer:
         batch_size: int = 8,
         lr: float = 1e-4,
         X_val=None, Y_val=None,
+        X_test=None, Y_test=None,
         early_stopping_patience: int = 0,
         early_stopping_min_delta: float = 0.0,
         val_every: int = 0,
@@ -107,6 +113,7 @@ class Trainer:
         self.model = model
         self.X_train, self.Y_train = X_train, Y_train
         self.X_val, self.Y_val = X_val, Y_val
+        self.X_test, self.Y_test = X_test, Y_test  # monitoring only, never used for decisions
         self.n_epochs = n_epochs
         self.batch_size = batch_size
         self.val_every = val_every
@@ -182,6 +189,11 @@ class Trainer:
                     log["val_accuracy"] = val_acc
                 if self.early_stopper is not None:
                     stop = self.early_stopper(val_loss, self.state.params, int(self.state.step))
+                if self.val_every and epoch % self.val_every == 0 and self.X_test is not None:
+                    es = self.early_stopper
+                    selected = es.best_params if es is not None and es.best_params is not None \
+                        else self.state.params
+                    res.selected_test_accs.append(self.model.accuracy(self.X_test, self.Y_test, selected))
             res.epoch_end_times.append(time.time() - t0)
             if self.wandb_run is not None:
                 self.wandb_run.log({k: float(v) for k, v in log.items()}, step=int(self.state.step))

@@ -5,7 +5,8 @@
 
 Each run writes one directory:
     run.json      config, provenance and results (see `RunRecord`)
-    curves.npz    train_losses, train_accs, val_losses (per epoch), val_accs (every val_every)
+    curves.npz    train_losses, train_accs, val_losses (per epoch); val_accs and
+                  selected_test_accs (test accuracy of the best-val-loss params) every val_every
     model.npy     final (best) parameters                      [gitignored]
     trajectory.pkl parameter trajectory, if requested          [gitignored]
 
@@ -138,7 +139,7 @@ def repair(
     trainer = Trainer(
         model, X, Y, LOSSES["cross_entropy_loss"],
         n_epochs=n_epochs, batch_size=config.batch_size, lr=config.learning_rate,
-        X_val=Xv, Y_val=Yv,
+        X_val=Xv, Y_val=Yv, X_test=Xt, Y_test=Yt,
         early_stopping_patience=config.early_stopping_patience,
         early_stopping_min_delta=config.early_stopping_min_delta,
         val_every=config.val_every, grad_clip_norm=config.grad_clip_norm,

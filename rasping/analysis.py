@@ -54,8 +54,13 @@ def repair_matrix(df: pd.DataFrame, rows: str = "program", cols: str = "mutation
 # Port of experiments/gp_baseline/plot_progress.py (v1) — same aggregation semantics.
 
 
-def best_so_far_series(history: pd.DataFrame, value: str = "best_test_acc") -> dict[str, list[float]]:
-    """Dense per-step best-so-far series from (sparse) baseline histories, per job."""
+def best_so_far_series(history: pd.DataFrame, value: str = "best_test_acc",
+                       running_max: bool = True) -> dict[str, list[float]]:
+    """Dense per-step series from (sparse) baseline histories, per job.
+
+    `running_max=True` is the v1 curve semantics (F17); with False the value at each
+    step is that of the program selected at that step.
+    """
     out = {}
     for job_id, h in history.groupby("job_id", sort=False):
         h = h[(h["step"] > 0) & h[value].notna()].sort_values("step", kind="stable")
@@ -66,7 +71,7 @@ def best_so_far_series(history: pd.DataFrame, value: str = "best_test_acc") -> d
         best, ptr = 0.0, 0
         for s in range(1, steps[-1] + 1):
             while ptr < len(steps) and steps[ptr] == s:
-                best = max(best, vals[ptr])
+                best = max(best, vals[ptr]) if running_max else vals[ptr]
                 ptr += 1
             dense[s - 1] = best
         out[job_id] = dense.tolist()
@@ -105,6 +110,24 @@ def pass_rate_by_time(series: dict[str, list[float]], sec_per_step: dict[str, fl
             v.append(s[max(idx, 0)])
         out[k] = 100.0 * np.mean(np.asarray(v) >= threshold)
     return grid, out
+
+
+def pass_rate_on_time_grid(series: dict[str, tuple], threshold: float = THRESHOLD,
+                           n_grid: int = 500):
+    """Pass rate over wall-clock time from measured `(times, values)` per job.
+
+    A job's value at time t is its last recorded value at or before t (0 before the
+    first record) and is held after its last record.
+    """
+    if not series:
+        return np.array([]), np.array([])
+    grid = np.linspace(0, max(float(t[-1]) for t, _ in series.values()), n_grid)
+    mat = np.zeros((len(series), n_grid))
+    for i, (t, v) in enumerate(series.values()):
+        idx = np.searchsorted(np.asarray(t, float), grid, side="right") - 1
+        vals = np.asarray(v, float)
+        mat[i] = np.where(idx >= 0, vals[np.clip(idx, 0, None)], 0.0)
+    return grid, 100.0 * (mat >= threshold).mean(axis=0)
 
 
 # --------------------------------------------------------------------------- spec size
