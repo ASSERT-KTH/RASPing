@@ -26,7 +26,7 @@ def create_config(source_file: str, mutation_order: int = 1) -> str:
             "module-path": f"source/{os.path.basename(source_file)}",
             "timeout": 60.0,
             "excluded-modules": [],
-            "test-command": f"pytest -s tests/test_{base_name}.py",
+            "test-command": f"pytest -s oracle/test_{base_name}.py",
             "distributor": {"name": "local"},
             # Add higher-order mutation parameters
             "mutation-order": mutation_order,

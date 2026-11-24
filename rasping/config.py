@@ -30,6 +30,12 @@ DYCK_PROGRAMS = ("shuffle_dyck", "shuffle_dyck2")
 #: Maximum input length (excluding BOS) of the specifications and compiled models.
 MAX_LEN = 10
 
+# --------------------------------------------------------------------------- labels
+
+#: Name of the method in figure legends and table headers. The v1 paper called it
+#: "GBPR"; the resubmission is expected to rename it (AE decision, Nov 2026).
+METHOD_LABEL = "GBPR"
+
 # --------------------------------------------------------------------------- evaluation
 
 #: A program counts as repaired if its exact-sequence accuracy on held-out data

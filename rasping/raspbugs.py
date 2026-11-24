@@ -74,8 +74,13 @@ def mutants(
     subset: str = "all",
     program: str | None = None,
     version: str = DEFAULT_VERSION,
+    sort: bool = True,
 ) -> list[Mutant]:
-    """Mutants of a subset (optionally of one program), sorted by (program, job_id)."""
+    """Mutants of a subset (optionally of one program).
+
+    Sorted by (program, job_id), or in manifest order (the order the generation
+    pipeline produced them) with `sort=False`.
+    """
     if subset not in SUBSETS:
         raise ValueError(f"subset must be one of {SUBSETS}")
     ms = list(_load(version).values())
@@ -87,7 +92,7 @@ def mutants(
         ms = [m for m in ms if m.program in DYCK_PROGRAMS]
     if program is not None:
         ms = [m for m in ms if m.program == programs.canonical(program)]
-    return sorted(ms, key=lambda m: (m.program, m.job_id))
+    return sorted(ms, key=lambda m: (m.program, m.job_id)) if sort else ms
 
 
 def get(job_id: str, version: str = DEFAULT_VERSION) -> Mutant:
@@ -96,3 +101,13 @@ def get(job_id: str, version: str = DEFAULT_VERSION) -> Mutant:
 
 def compile_mutant(job_id: str, max_len: int = MAX_LEN, version: str = DEFAULT_VERSION) -> Model:
     return get(job_id, version).compile(max_len)
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) != 2:
+        sys.exit("Usage: python -m rasping.raspbugs <job_id>   (print a mutant)")
+    m = get(sys.argv[1])
+    print(f"job_id: {m.job_id}\nprogram: {m.program}\nmutation_order: {m.mutation_order}\n"
+          f"operators: {', '.join(m.operators)}\nin_benchmark: {m.in_benchmark}\n\n{m.diff}")

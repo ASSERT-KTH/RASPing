@@ -10,6 +10,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
+import time
+
 import tqdm
 
 from rasping.model import Model
@@ -69,6 +71,7 @@ class TrainResult:
     best_step: Optional[int] = None
     final_step: int = 0
     trajectory: list = field(default_factory=list)  # (step, params, val_loss) if requested
+    epoch_end_times: list = field(default_factory=list)  # seconds since train() started
 
     def history(self) -> dict:
         return {k: [float(v) for v in getattr(self, k)]
@@ -138,6 +141,7 @@ class Trainer:
     def train(self) -> TrainResult:
         pad = self.model.pad_token
         res = TrainResult()
+        t0 = time.time()
         if self.store_trajectory:
             res.trajectory.append((0, jax.device_get(self.state.params), self._val_loss(self.state.params)))
 
@@ -171,6 +175,7 @@ class Trainer:
                     log["val_accuracy"] = val_acc
                 if self.early_stopper is not None:
                     stop = self.early_stopper(val_loss, self.state.params, int(self.state.step))
+            res.epoch_end_times.append(time.time() - t0)
             if self.wandb_run is not None:
                 self.wandb_run.log({k: float(v) for k, v in log.items()}, step=int(self.state.step))
 

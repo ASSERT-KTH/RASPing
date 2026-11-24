@@ -22,6 +22,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from rasping.baselines import records
+
 LOSS_FN = "cross_entropy_loss"
 
 
@@ -176,54 +178,8 @@ def paired_init_dirs(root: Path):
 
 
 def freeze_baseline(results_dir: Path, method: str, budget: int) -> tuple[pd.DataFrame, pd.DataFrame]:
-    runs, hist = [], []
-    for fp in sorted(results_dir.glob("*.json")):
-        rec = json.loads(fp.read_text())
-        if "job_id" not in rec:
-            continue
-        h = rec.get("program_history", [])
-        runs.append(
-            {
-                "method": method,
-                "budget": budget,
-                "job_id": rec["job_id"],
-                "program_file": rec["program_name"],
-                "status": rec.get("status"),
-                "num_programs": rec.get("num_programs"),
-                "num_duplicates": rec.get("num_duplicates"),
-                "num_compile_failures": rec.get("num_compile_failures"),
-                "train_acc": rec.get("train_acc"),
-                "test_acc": rec.get("test_acc"),
-                "max_best_test_acc": max(
-                    ((e.get("best_test_acc") or 0.0) for e in h), default=0.0
-                ),
-                "duration_s": rec.get("duration_s"),
-                "seed": rec.get("seed"),
-                "history_len": len(h),
-                "max_step": max((int(e.get("step", 0)) for e in h), default=0),
-            }
-        )
-        # Keep only change points of the best-so-far values (+ first/last entry).
-        prev = None
-        for i, e in enumerate(h):
-            key = (e.get("best_train_acc"), e.get("best_test_acc"))
-            if key != prev or i == len(h) - 1:
-                hist.append(
-                    {
-                        "method": method,
-                        "budget": budget,
-                        "job_id": rec["job_id"],
-                        "step": e.get("step"),
-                        "generation": e.get("generation", e.get("depth")),
-                        "status": e.get("status"),
-                        "train_acc": e.get("train_acc"),
-                        "test_acc": e.get("test_acc"),
-                        "best_train_acc": e.get("best_train_acc"),
-                        "best_test_acc": e.get("best_test_acc"),
-                    }
-                )
-                prev = key
-    return pd.DataFrame(runs), pd.DataFrame(hist)
+    # The record -> rows conversion is shared with experiments/symbolic_baselines/collect.py.
+    return records.tables(records.load_records(results_dir), method, budget)
 
 
 # --------------------------------------------------------------------------- weight stats
