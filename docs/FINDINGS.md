@@ -31,7 +31,7 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 |---|---|---|
 | All GP / BFS runs (Figs 4–5, Table 8 baseline columns) | budget-only BFS, train-only fitness, no test tie-breaks, failures counted, `MAX_LEN`, timestamps | F3, F5, F11, F18, F29, F30, F31 |
 | Spec-size ablation (Table 8, Fig 8) | N=40,000 inside the 500k-step budget; 1,000-program baselines | F8 |
-| Main GBPR runs (Table 1/5, Figs 3–5, 7) | not invalidated numerically; rerun to get selected-test curves, measured times and full-test "before" accuracies for Figs 3–5/7 | F4, F7, F16, F18 |
+| Main GBPR runs (Table 1/5, Figs 3–5, 7) | not invalidated numerically; rerun to get selected-test curves, measured times and full-test "before" accuracies for Figs 3–5/7, and seeded batch order so seeds give uncertainty estimates | F4, F7, F16, F18, F36 |
 
 The Dyck programs (App. C, Tables 6–7) were removed from RaspBugs (F35), so their reruns
 (F1, F28) are no longer needed.
@@ -151,6 +151,25 @@ weights and training numerics (`tests/test_golden.py`).
   is never reached). `launch_random_init_baseline.py:11-12` confirms 50.
 - **Paper:** §5.1 "validation loss improvement < 1e-4 for 10 epochs".
 - **Decision (Nov 24, 2026):** keep 50 (`config.TrainConfig`); correct the paper text to 50.
+
+### F36 — Minibatches in a fixed order every epoch; compiled-init runs are deterministic — `fixed`
+- **Evidence:** the v1 trainer (`experiments/train_mutations/trainer.py`, ported to
+  `rasping/train.py`) slices `X_train[i:i+batch_size]` in order every epoch. The
+  specification files are shuffled once when generated and never again. So a compiled-init
+  run has no randomness at all: its "seed" changes nothing, and multiple seeds can't give
+  uncertainty estimates (reviewers npsX and QMPc asked for them). Random-init runs vary only
+  through their initialisation, so the two arms of the init comparison didn't share a source
+  of variance.
+- **Fix:** `Trainer(seed=...)` reshuffles the training set at the start of every epoch with
+  its own NumPy stream (`default_rng([seed, 1])`, independent of the subsampling and
+  re-initialisation streams). `rasping.repair` passes its `--seed`. There is no switch back
+  to the fixed order: v2 runs all use the shuffled trainer.
+- **Tests:** golden training entries re-recorded (compiled weights, encodings, accuracies and
+  search entries unchanged); `tests/test_train.py` checks that the same seed reproduces a
+  run and a different seed changes it.
+- **Invalidates:** no reported number. The v1 results stay frozen. v2 training runs (main,
+  spec size, init control and pilot) differ from v1 in batch order, so v1 and v2 numbers
+  agree only statistically, not run by run.
 
 ### F8 — Spec-size ablation: N=40,000 point and baselines don't match the stated setup — `fixed`
 - **Evidence:** `experiments/spec_size/launch_spec_size.py:8` runs N ∈ {100,…,25,000} with

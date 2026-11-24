@@ -98,8 +98,9 @@ def repair(
 ) -> RunRecord:
     """Repair one mutant and (if `out_dir`) write its run directory.
 
-    `n_train`/`n_val` subsample the specification (seeded by `seed`); `n_steps` fixes the
-    gradient-step budget by setting the epoch count (spec-size ablation).
+    `seed` sets the batch order (every init), the re-initialisation (non-compiled inits) and
+    the `n_train`/`n_val` subsample of the specification. `n_steps` fixes the gradient-step
+    budget by setting the epoch count (spec-size ablation).
     """
     if init not in INITS:
         raise ValueError(f"init must be one of {INITS}")
@@ -147,7 +148,7 @@ def repair(
         early_stopping_min_delta=config.early_stopping_min_delta,
         val_every=config.val_every, grad_clip_norm=config.grad_clip_norm,
         store_trajectory=store_trajectory, trajectory_store_interval=trajectory_store_interval,
-        wandb_run=wandb_run, progress=progress,
+        wandb_run=wandb_run, progress=progress, seed=seed,
     )
     t0 = time.time()
     result = trainer.train()
@@ -184,7 +185,7 @@ def repair(
 @click.option("--out", "out_dir", required=True, type=click.Path(), help="Run directory to write")
 @click.option("--init", type=click.Choice(INITS), default="compiled", show_default=True)
 @click.option("--seed", type=int, default=42, show_default=True,
-              help="Seed for re-initialisation and specification subsampling")
+              help="Seed for batch order, re-initialisation and specification subsampling")
 @click.option("--n-train", type=int, default=None, help="Subsample the training split")
 @click.option("--n-val", type=int, default=None, help="Subsample the validation split")
 @click.option("--n-steps", type=int, default=None, help="Fixed gradient-step budget")
