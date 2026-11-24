@@ -341,10 +341,16 @@ weights and training numerics (`tests/test_golden.py`).
   (16 threads), where it was established. The same holds for any v1-vs-v2 training comparison:
   differences in late-epoch numbers between machines are expected and are not bugs. It is no
   concern for the paper's results, which are pass rates at the 0.99 threshold over many mutants.
-- **Fix (test only):** by default `tests/test_golden.py` checks weights and accuracies exactly,
-  the first training epoch to 2e-5 relative, and later losses to 10%. A 1% learning-rate change
-  moves the first-epoch losses by at least 2.5e-4 for every program, so it still fails. `pytest --golden-exact` restores the full 1e-7 comparison, including
-  the trained weights, for use on the recording machine. Golden values unchanged.
+- **Fix (test only):** a first-epoch tolerance doesn't work either. On another runner, the
+  most_freq validation loss differed by 1.1e-3 after four steps, more than a 1% learning-rate
+  change causes (2.5e-4). By default `tests/test_golden.py` now checks:
+  - weights, encodings and accuracies exactly;
+  - the Xavier-init training runs to 1e-7. They are well-conditioned: ~1e-16 noise across
+    thread counts, against >=1.3e-4 for a 1% learning-rate change. This is the tight trainer check;
+  - the compiled-init runs' losses to 10%, as a sanity check only.
+
+  `pytest --golden-exact` restores the full 1e-7 comparison of every run, including the
+  trained weights, for use on the recording machine. Golden values unchanged.
 - **Related:** the CI log warns about `os.fork()` with JAX during `test_golden_search`. That only
   happens because other tests in the same pytest process have imported JAX. The baselines on
   their own do not load JAX (F32).
