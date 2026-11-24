@@ -160,3 +160,18 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+# ---------------------------------------------------------------- project
+# Raw run outputs never go into git: model weights, per-run directories,
+# trajectories and logs live on cluster storage / the Zenodo archive.
+# Only the tidy tables under results/ and generated paper_artifacts/ are tracked.
+**/model.npy
+**/trajectory.pkl
+**/saved_data*/
+**/runs/
+wandb/
+plots/
+submitit_logs/
+.claude/worktrees/
+# Local copies of the paper and reviews
+paper.pdf
+reviews.txt
