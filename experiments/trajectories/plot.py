@@ -100,13 +100,6 @@ def compute_loss_landscape(trajectory, program_name, loss_function_name, job_id,
     
     # 4. Load the model and set up loss function
     try:
-        # Use same mapping as in train_mutations.py
-        program_name_key = program_name
-        if program_name == "most_freq":
-            program_name_key = "most-freq"
-        elif program_name == "shuffle_dyck":
-            program_name_key = "shuffle_dyck1"
-            
         # Load the buggy model
         model = raspbugs.compile_mutant(job_id)
         
@@ -342,13 +335,6 @@ def plot_loss_landscape_trajectory(trajectories, output_dir):
             
             # 6. Load model and generate examples
             try:
-                # Use same mapping as in train_mutations.py
-                program_name_key = program_name
-                if program_name == "most_freq":
-                    program_name_key = "most-freq"
-                elif program_name == "shuffle_dyck":
-                    program_name_key = "shuffle_dyck1"
-                    
                 # Load the model
                 job_id_clean = job_id.replace("job_", "")
                 model = raspbugs.compile_mutant(job_id_clean)

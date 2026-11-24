@@ -6,7 +6,8 @@ Raw runs (gitignored) live under `runs/<experiment>/...`; each has a `run.json` 
     results/<version>/<experiment>/curves.csv.gz   one row per (run, epoch)
     results/<version>/<experiment>/val_curves.csv.gz one row per (run, validation eval)
 which is all the analysis scripts read. `results/v1_tmlr/` was produced from the
-legacy layout by `scripts/freeze_v1_results.py` with the same core columns.
+legacy layout by a one-off script with the same core columns (`scripts/freeze_v1_results.py`,
+removed after commit 992e2c0).
 """
 
 from __future__ import annotations
@@ -69,20 +70,28 @@ def collect(run_root: str | Path, out_dir: str | Path, with_curves: bool = True)
 
 def load_runs(version: str, experiment: str, name: str = "runs.csv",
               with_mutant_info: bool = True) -> pd.DataFrame:
-    """Load a tidy table, adding program / mutation_order from the benchmark manifest."""
+    """Load a tidy table, adding program / mutation_order for each job_id (see `mutant_table`)."""
     df = pd.read_csv(results_dir(version, experiment) / name)
     if with_mutant_info and "job_id" in df:
-        meta = mutant_table()
+        meta = mutant_table(version)
         drop = [c for c in ("program", "mutation_order") if c in df.columns]
         df = df.drop(columns=drop).merge(meta, on="job_id", how="left")
     return df
 
 
-def mutant_table(version: str = raspbugs.DEFAULT_VERSION) -> pd.DataFrame:
-    ms = raspbugs.mutants("buggy", version=version)
+def mutant_table(version: str | None = None) -> pd.DataFrame:
+    """job_id -> program, mutation_order.
+
+    A results version can freeze its own mutant table as `results/<version>/mutants.csv`.
+    v1_tmlr does: it records the submitted paper's 1,466-mutant benchmark, Dyck programs
+    included. Otherwise the table comes from the current benchmark manifest.
+    """
+    frozen = results_dir(version) / "mutants.csv" if version else None
+    if frozen is not None and frozen.exists():
+        return pd.read_csv(frozen, usecols=["job_id", "program", "mutation_order"])
+    ms = raspbugs.mutants()
     return pd.DataFrame({"job_id": [m.job_id for m in ms], "program": [m.program for m in ms],
-                         "mutation_order": [m.mutation_order for m in ms],
-                         "in_benchmark": [m.in_benchmark for m in ms]})
+                         "mutation_order": [m.mutation_order for m in ms]})
 
 
 #: Experiments whose runs are written by `rasping.repair` (collected with `collect`).

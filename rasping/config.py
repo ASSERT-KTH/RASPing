@@ -20,12 +20,9 @@ RUNS_DIR = REPO_ROOT / "runs"  # raw run outputs incl. weights (gitignored)
 
 # --------------------------------------------------------------------------- programs
 
-#: Canonical program names (as used in the benchmark and in results tables).
-PROGRAMS = ("hist", "most_freq", "reverse", "sort", "shuffle_dyck", "shuffle_dyck2")
-#: The four sequence-to-sequence programs of the main evaluation (847 mutants in v1).
-MAIN_PROGRAMS = ("hist", "most_freq", "reverse", "sort")
-#: Binary-classification programs with degenerate (imbalanced) specifications.
-DYCK_PROGRAMS = ("shuffle_dyck", "shuffle_dyck2")
+#: Canonical names of the RaspBugs base programs (as used in the benchmark and results).
+#: The v1 paper also had shuffle_dyck and shuffle_dyck2; they were removed (FINDINGS F35).
+PROGRAMS = ("hist", "most_freq", "reverse", "sort")
 
 #: Maximum input length (excluding BOS) of the specifications and compiled models.
 MAX_LEN = 10

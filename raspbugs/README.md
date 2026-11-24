@@ -1,13 +1,13 @@
 # RaspBugs: generating the benchmark
 
-RaspBugs is a set of buggy RASP programs ("mutants") obtained by mutating six reference
-programs. The benchmark itself is the manifest `raspbugs_<version>.jsonl.gz`: one record
-per buggy mutant, holding its mutated source, diff, operators and mutation order. Load it
-with `rasping.raspbugs`:
+RaspBugs is a set of 847 buggy RASP programs ("mutants") obtained by mutating four reference
+programs: hist (46), most_freq (284), reverse (268) and sort (249). The benchmark itself is
+the manifest `raspbugs.jsonl.gz`: one record per mutant, holding its mutated source, diff,
+operators and mutation order. Load it with `rasping.raspbugs`:
 
 ```python
 from rasping import raspbugs
-m = raspbugs.get("2a722d5d5449441fad93f98c73c633a2")   # or raspbugs.mutants("main")
+m = raspbugs.get("2a722d5d5449441fad93f98c73c633a2")   # or raspbugs.mutants(program="sort")
 model = m.compile()                                    # Tracr -> Transformer
 ```
 
@@ -24,7 +24,7 @@ python -m rasping.raspbugs <job_id>     # print a mutant and its diff
 | `oracle/` | the test cosmic-ray runs on each mutant to label it (compiles it, measures accuracy on 50 test samples) |
 | `run_mutations.py` | step 1: write cosmic-ray configs and run them per program and mutation order |
 | `build_manifest.py` | step 2: re-apply diffs, label mutants from the oracle output, write the manifest |
-| `raspbugs_v1.jsonl.gz` | the v1 (TMLR submission) manifest: 1,773 buggy mutants, 1,466 flagged `in_raspbugs_v1` |
+| `raspbugs.jsonl.gz` | the benchmark manifest: the 847 mutants |
 
 ## Regenerating
 
@@ -33,7 +33,7 @@ mutations. It's installed by `uv sync`, pinned in `pyproject.toml`.
 
 ```bash
 python run_mutations.py --orders 1 2 3 4 5     # writes results/<program>/ (gitignored)
-python build_manifest.py --version v2          # writes raspbugs_v2.jsonl.gz, mutants_v2.csv
+python build_manifest.py                       # writes raspbugs.jsonl.gz, mutants.csv
 ```
 
 The oracle labels each mutant as one of:
@@ -47,12 +47,9 @@ The oracle labels each mutant as one of:
 
 Up to 200 mutants are generated per program and order.
 
-**v1 membership.** The v1 benchmark (1,466) is the set of buggy mutants whose compiled
-output vocabulary can represent the correct outputs. That filter arose implicitly: in v1,
-training crashed on the other 307 mutants. See `docs/FINDINGS.md` F6 and F7 for this and
-for the 50-sample oracle. To rebuild v1 exactly from the archived raw outputs:
-
-```bash
-python build_manifest.py --version v1 --results-dir <archive>/experiments/mutation/results \
-    --membership-from <csv with the 1,466 job_ids>
-```
+**Membership.** A mutant is in RaspBugs if the oracle labels it `BUGGY_MODEL` and its
+compiled output vocabulary can represent the correct outputs (`representable`). On the raw
+v1 outputs, the four programs give 1,118 buggy mutants, of which 271 are not representable.
+The v1 paper (TMLR submission) also had two Dyck programs, for 1,466 mutants in total;
+they were removed because their imbalanced binary outputs make exact-match accuracy
+uninformative. See `docs/FINDINGS.md` F6, F7 and F35, including the 50-sample oracle used in v1.

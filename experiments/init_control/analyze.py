@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from rasping import analysis
-from rasping.config import MAIN_PROGRAMS, TrainConfig
+from rasping.config import PROGRAMS, TrainConfig
 from rasping.results import load_runs, results_dir
 from rasping.tables import latex_table, pct, save_figure, tt, write_table
 
@@ -41,7 +41,7 @@ def table2(summary, version):
 
 def figure9(pm, version):
     fig, axes = plt.subplots(1, 4, figsize=(16, 4.2), sharex=True, sharey=True)
-    for ax, program in zip(axes, MAIN_PROGRAMS):
+    for ax, program in zip(axes, PROGRAMS):
         sub = pm[pm["program"] == program]
         for outcome, color in PALETTE.items():
             s = sub[sub["outcome"] == outcome]
@@ -66,7 +66,7 @@ RUN = ["job_id", "seed"]
 
 def figure10(buggy_val, random_val, version):
     fig, axes = plt.subplots(1, 4, figsize=(16, 4.2), sharey=True)
-    for ax, program in zip(axes, MAIN_PROGRAMS):
+    for ax, program in zip(axes, PROGRAMS):
         # each panel spans the program's longest run (of either initialization)
         n = int(max(v[v["program"] == program]["val_eval"].max() for v in (buggy_val, random_val))) + 1
         for label, val, color in (("buggy init", buggy_val, "tab:blue"),
@@ -91,7 +91,7 @@ def table9(version):
     t = analysis.weight_stats_ranges(pd.read_csv(path)).set_index(["program", "state"])
     states = ["compiled", "repaired_from_compiled", "trained_from_xavier"]
     rows = []
-    for p in MAIN_PROGRAMS:
+    for p in PROGRAMS:
         r = [t.loc[(p, s)] for s in states]
         rows.append([tt(p),
                      *[f"{x.zero_min:.1f}--{x.zero_max:.1f}\\%" for x in r],

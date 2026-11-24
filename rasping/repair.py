@@ -50,7 +50,7 @@ class RunRecord:
     n_steps_budget: int | None
     config: dict
     # results
-    status: str = "ok"  # "ok" | "unrepresentable" (target outside the output vocabulary)
+    status: str = "ok"
     test_accuracy: float = float("nan")
     test_samples: int = 0
     initial_test_accuracy: float = float("nan")
@@ -63,7 +63,6 @@ class RunRecord:
     wall_time_s: float = float("nan")
     epoch_end_times_s: list = field(default_factory=list)
     # provenance
-    benchmark_version: str = raspbugs.DEFAULT_VERSION
     git_commit: str = ""
 
 
@@ -95,7 +94,6 @@ def repair(
     trajectory_store_interval: int = 50,
     save_weights: bool = True,
     wandb_project: str | None = None,
-    version: str = raspbugs.DEFAULT_VERSION,
     progress: bool = True,
 ) -> RunRecord:
     """Repair one mutant and (if `out_dir`) write its run directory.
@@ -105,19 +103,12 @@ def repair(
     """
     if init not in INITS:
         raise ValueError(f"init must be one of {INITS}")
-    mutant = raspbugs.get(job_id, version)
+    mutant = raspbugs.get(job_id)
     model = mutant.compile(MAX_LEN)
-
+    # Benchmark mutants can represent every target output by construction (F6, F35).
     missing = data.unrepresentable_outputs(mutant.program, model)
-    if missing:  # v1 crashed here (F6); record it as an unrepairable run instead
-        rec = RunRecord(job_id=job_id, program=mutant.program, mutation_order=mutant.mutation_order,
-                        init=init, seed=seed, n_train=0, n_val=0, n_steps_budget=n_steps,
-                        config=config.to_dict(), status="unrepresentable", test_accuracy=0.0,
-                        benchmark_version=version, git_commit=_git_commit())
-        if out_dir is not None:
-            Path(out_dir).mkdir(parents=True, exist_ok=True)
-            (Path(out_dir) / "run.json").write_text(json.dumps(asdict(rec), indent=1, default=float))
-        return rec
+    if missing:
+        raise ValueError(f"{job_id}: compiled output vocabulary lacks {sorted(missing)[:5]}")
 
     X, Y = data.encode(data.load(mutant.program, "train"), model)
     Xv, Yv = data.encode(data.load(mutant.program, "val"), model)
@@ -138,7 +129,7 @@ def repair(
         job_id=job_id, program=mutant.program, mutation_order=mutant.mutation_order,
         init=init, seed=seed, n_train=len(X), n_val=len(Xv), n_steps_budget=n_steps,
         config={**config.to_dict(), "n_epochs": n_epochs}, initial_test_accuracy=initial_test_acc,
-        benchmark_version=version, git_commit=_git_commit(),
+        git_commit=_git_commit(),
     )
 
     wandb_run = None

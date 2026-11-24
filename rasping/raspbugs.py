@@ -1,14 +1,11 @@
 """Load the RaspBugs benchmark.
 
-The benchmark manifest `raspbugs/raspbugs_<version>.jsonl.gz` has one record per buggy
-mutant: job_id, program, mutation_order, operators, source (the mutated program), diff,
-and flags. It is produced by the generation pipeline in `raspbugs/` (see its README).
-
-Subsets:
-    "all"   the benchmark proper (v1: the 1,466 mutants of the TMLR submission)
-    "main"  the sequence-to-sequence programs of the main evaluation (v1: 847)
-    "dyck"  the two Dyck programs
-    "buggy" every mutant labelled BUGGY_MODEL by the oracle (v1: 1,773; see F6)
+The manifest `raspbugs/raspbugs.jsonl.gz` has one record per benchmark mutant: job_id,
+program, mutation_order, operators, source (the mutated program), diff and the oracle's
+accuracy. RaspBugs is 847 buggy mutants of four programs (hist, most_freq, reverse,
+sort). A mutant is included if the oracle labels it buggy and its compiled output
+vocabulary can represent the correct outputs (docs/FINDINGS.md F6, F35). The manifest is
+produced by the generation pipeline in `raspbugs/` (see its README).
 """
 
 from __future__ import annotations
@@ -17,17 +14,15 @@ import gzip
 import json
 from dataclasses import dataclass, field
 from functools import lru_cache
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rasping import programs
-from rasping.config import DYCK_PROGRAMS, MAIN_PROGRAMS, MAX_LEN, RASPBUGS_DIR
+from rasping.config import MAX_LEN, RASPBUGS_DIR
 
 if TYPE_CHECKING:
     from rasping.model import Model
 
-DEFAULT_VERSION = "v1"
-SUBSETS = ("all", "main", "dyck", "buggy")
+MANIFEST = RASPBUGS_DIR / "raspbugs.jsonl.gz"
 
 
 @dataclass(frozen=True)
@@ -38,7 +33,6 @@ class Mutant:
     operators: tuple
     source: str
     diff: str
-    in_benchmark: bool
     oracle_accuracy_50: float | None = None
     mutations: list = field(default_factory=list, compare=False, hash=False)
 
@@ -51,14 +45,10 @@ class Mutant:
         return Model(sop, p.vocab, max_len, p.name)
 
 
-def manifest_path(version: str = DEFAULT_VERSION) -> Path:
-    return RASPBUGS_DIR / f"raspbugs_{version}.jsonl.gz"
-
-
-@lru_cache(maxsize=4)
-def _load(version: str) -> dict[str, Mutant]:
+@lru_cache(maxsize=1)
+def _load() -> dict[str, Mutant]:
     out = {}
-    with gzip.open(manifest_path(version), "rt") as f:
+    with gzip.open(MANIFEST, "rt") as f:
         for line in f:
             r = json.loads(line)
             out[r["job_id"]] = Mutant(
@@ -68,44 +58,30 @@ def _load(version: str) -> dict[str, Mutant]:
                 operators=tuple(r["operators"]),
                 source=r["source"],
                 diff=r["diff"],
-                in_benchmark=bool(r.get(f"in_raspbugs_{version}", True)),
                 oracle_accuracy_50=r.get("oracle_accuracy_50"),
                 mutations=r.get("mutations") or [],
             )
     return out
 
 
-def mutants(
-    subset: str = "all",
-    program: str | None = None,
-    version: str = DEFAULT_VERSION,
-    sort: bool = True,
-) -> list[Mutant]:
-    """Mutants of a subset (optionally of one program).
+def mutants(program: str | None = None, sort: bool = True) -> list[Mutant]:
+    """The benchmark's mutants (optionally of one program).
 
     Sorted by (program, job_id), or in manifest order (the order the generation
     pipeline produced them) with `sort=False`.
     """
-    if subset not in SUBSETS:
-        raise ValueError(f"subset must be one of {SUBSETS}")
-    ms = list(_load(version).values())
-    if subset != "buggy":
-        ms = [m for m in ms if m.in_benchmark]
-    if subset == "main":
-        ms = [m for m in ms if m.program in MAIN_PROGRAMS]
-    elif subset == "dyck":
-        ms = [m for m in ms if m.program in DYCK_PROGRAMS]
+    ms = list(_load().values())
     if program is not None:
         ms = [m for m in ms if m.program == programs.canonical(program)]
     return sorted(ms, key=lambda m: (m.program, m.job_id)) if sort else ms
 
 
-def get(job_id: str, version: str = DEFAULT_VERSION) -> Mutant:
-    return _load(version)[job_id]
+def get(job_id: str) -> Mutant:
+    return _load()[job_id]
 
 
-def compile_mutant(job_id: str, max_len: int = MAX_LEN, version: str = DEFAULT_VERSION) -> "Model":
-    return get(job_id, version).compile(max_len)
+def compile_mutant(job_id: str, max_len: int = MAX_LEN) -> "Model":
+    return get(job_id).compile(max_len)
 
 
 if __name__ == "__main__":
@@ -115,4 +91,4 @@ if __name__ == "__main__":
         sys.exit("Usage: python -m rasping.raspbugs <job_id>   (print a mutant)")
     m = get(sys.argv[1])
     print(f"job_id: {m.job_id}\nprogram: {m.program}\nmutation_order: {m.mutation_order}\n"
-          f"operators: {', '.join(m.operators)}\nin_benchmark: {m.in_benchmark}\n\n{m.diff}")
+          f"operators: {', '.join(m.operators)}\n\n{m.diff}")

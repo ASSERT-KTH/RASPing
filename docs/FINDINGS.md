@@ -13,6 +13,7 @@ paper are frozen in `results/v1_tmlr/` and checked by `tests/test_paper_numbers.
 - `fixed+rerun` — code fixed and affected results regenerated
 - `paper` — no code change needed, but the paper text must be updated
 - `wontfix` — documented, deliberately kept (with reason)
+- `obsolete` — no longer applies (the code or data it concerns was removed)
 
 Paper references are to the TMLR submission (`paper.pdf`, rejected Nov 2026).
 
@@ -28,15 +29,17 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 
 | Results | Why | Findings |
 |---|---|---|
-| All GP / BFS runs (Figs 4–5, Table 7, Table 8 baseline columns) | budget-only BFS, train-only fitness, no test tie-breaks, failures counted, `MAX_LEN`, timestamps | F3, F5, F11, F18, F29, F30, F31 |
-| Dyck-2 GBPR and baseline runs (App. C) | new Dyck-2 specification (lengths 2–10) | F1 |
+| All GP / BFS runs (Figs 4–5, Table 8 baseline columns) | budget-only BFS, train-only fitness, no test tie-breaks, failures counted, `MAX_LEN`, timestamps | F3, F5, F11, F18, F29, F30, F31 |
 | Spec-size ablation (Table 8, Fig 8) | N=40,000 inside the 500k-step budget; 1,000-program baselines | F8 |
 | Main GBPR runs (Table 1/5, Figs 3–5, 7) | not invalidated numerically; rerun to get selected-test curves, measured times and full-test "before" accuracies for Figs 3–5/7 | F4, F7, F16, F18 |
-| Dyck metrics (Tables 6–7) | recall definition | F28 |
 
-**Paper text to change regardless of reruns:** early-stopping patience is 50 (F2); state
-the benchmark rule — buggy mutants whose compiled output vocabulary can represent the
-correct outputs — and that it favours GBPR over GP/BFS (F6); oracle accuracy was on 50
+The Dyck programs (App. C, Tables 6–7) were removed from RaspBugs (F35), so their reruns
+(F1, F28) are no longer needed.
+
+**Paper text to change regardless of reruns:** early-stopping patience is 50 (F2); RaspBugs
+is now 847 mutants of four programs, and the paper must say why the Dyck programs were
+dropped (F35); state the benchmark rule — buggy mutants whose compiled output vocabulary
+can represent the correct outputs — and that it favours GBPR over GP/BFS (F6); oracle accuracy was on 50
 samples (F7); list all six mutant statuses (F19); Fig 4's GBPR axis is evaluations every
 10 epochs, not gradient steps (F16); §5.3 quotes test-based GBPR rates next to a
 validation-based curve (F4); Table 8's bold entry at order 4, N=10k is wrong (F27).
@@ -49,7 +52,7 @@ weights and training numerics (`tests/test_golden.py`).
 
 ## Data and benchmark
 
-### F1 — Dyck-2 specification never contains inputs longer than 8 — `fixed`
+### F1 — Dyck-2 specification never contains inputs longer than 8 — `obsolete` (F35)
 - **Evidence:** `src/functions.py:71` — `generateData(exhaustive=True)` enumerates inputs in
   order of length and returns `data[:size]` *before* shuffling. For `shuffle_dyck2` with
   n=50,000 and max_len=10, every input in `data/shuffle_dyck2_*.jsonl` has length 2–8.
@@ -61,6 +64,8 @@ weights and training numerics (`tests/test_golden.py`).
   lengths 2–10 now present (train: 12/52/219/806/3349 at lengths 2–6, ~8.9k each at 7–10).
   Balanced strings remain rare (0.5%), as before. The golden `shuffle_dyck2` training entry
   was re-recorded. Mutant membership is unaffected (labels depend only on the program).
+- **Obsolete:** the Dyck programs were removed from RaspBugs (F35). The length-stratified
+  sampler stays in `rasping/data.py`, since exhaustive generation uses it for every program.
 
 ### F6 — The 1,466-mutant benchmark is defined by a join with GBPR results — `fixed` (rule made explicit)
 - **Evidence:** `experiments/mutation/raspbugs.ipynb` inner-joins
@@ -79,14 +84,43 @@ weights and training numerics (`tests/test_golden.py`).
   GP/BFS could repair the excluded mutants, so excluding them from the comparison favours GBPR.
 - **Invalidates:** benchmark size and composition (§4, every table); the GBPR-vs-symbolic
   comparison (§5.3) should either include the 306 (GBPR counted as failing) or state the filter.
-- **Decision (Nov 24, 2026):** keep the v1 set of 1,466 mutants, with the rule stated explicitly:
+- **Decision (Nov 24, 2026):** keep the v1 set of mutants, with the rule stated explicitly:
   *buggy mutants whose compiled output vocabulary can represent the specification's outputs*.
   Sound because the baselines are evaluated on the same set. The paper must state the rule
-  and that it excludes mutants GP/BFS might repair.
-- **Fix:** `data.unrepresentable_outputs()` implements the rule; `tests/test_raspbugs.py::
-  test_benchmark_rule_v1` (slow) checks that it reproduces v1 membership (one Dyck-2
-  exception); `build_manifest.py` applies it for new benchmark versions; `rasping.repair`
-  records unrepresentable mutants as `status: unrepresentable` instead of crashing.
+  and that it excludes mutants GP/BFS might repair. Later the same day the Dyck programs
+  were removed (F35). For the four remaining programs the rule reproduces v1 membership
+  exactly (847 mutants, no exceptions), as the earlier slow test on all 1,773 buggy mutants showed.
+- **Fix:** `data.unrepresentable_outputs()` implements the rule. `raspbugs/build_manifest.py`
+  applies it. Run on the raw v1 cosmic-ray outputs of the four programs, it reproduces
+  `raspbugs.jsonl.gz` byte for byte (decompressed), verified Nov 24, 2026 (F35). `tests/test_raspbugs.py::test_benchmark_rule` (slow) checks that every
+  benchmark mutant is representable, and `rasping.repair` refuses a mutant that is not.
+
+### F35 — RaspBugs redefined: one benchmark, four programs, 847 mutants — `paper`
+- **Why:** the Dyck programs (shuffle_dyck, shuffle_dyck2) output almost only zeros, so
+  ≥99% exact-match accuracy is uninformative for them. The all-zero predictor passes it on
+  Dyck-2 (reviewer npsX). The v1 paper had already moved them to App. C and evaluated on
+  the other four programs (847 mutants), so "RaspBugs = 1,466" and "evaluation = 847" did
+  not match, which confused reviewers. Decision (Nov 24, 2026): drop them from the benchmark
+  entirely, keep a single benchmark version, and don't preserve backwards compatibility.
+- **Change:** `raspbugs/raspbugs.jsonl.gz` holds exactly the 847 benchmark mutants (hist 46,
+  most_freq 284, reverse 268, sort 249). `rasping.raspbugs.mutants()` has no subsets or
+  versions. Deleted:
+  - the Dyck programs: sources, oracle tests, generators, `data/` specifications and the
+    golden entries;
+  - the Dyck metrics, `experiments/dyck/`, `results/v1_tmlr/dyck/` and Tables 6–7 in
+    `paper_artifacts/v1_tmlr/`;
+  - the one-off `scripts/freeze_v1_results.py`, which would rewrite them. It remains in git
+    history (commit 992e2c0).
+
+  The analyses read v1 mutant metadata from the frozen `results/v1_tmlr/mutants.csv`, so
+  every other v1 table and figure still reproduces byte for byte. The v1 tables keep their
+  Dyck rows, which the analyses filter out.
+- **Obsoletes:** F1, F28, and the Dyck-2 exception in F6.
+- **Paper:** §4 should give 847 mutants of four programs and explain why the Dyck programs
+  were excluded. App. C can go or shrink to that explanation. The 1,466 figure appears in the
+  arXiv version and the reviews, so the paper should say the benchmark was redefined.
+- **Also check:** the spec-size ablation's v1 runs included shuffle_dyck2. The analysis already
+  restricted them to the four programs, so Table 8 is unaffected.
 
 ### F7 — "Buggy" label decided on only 50 test samples — `fixed` (pipeline)
 - **Evidence:** `experiments/mutation/tests/test.py:29` loads `data/<prog>_test.jsonl[:50]`.
@@ -282,7 +316,7 @@ weights and training numerics (`tests/test_golden.py`).
 - **Evidence:** order 4, N=10k (18.4) is bold ("GBPR surpasses both GP and BFS") but BFS is
   20.6. `experiments/spec_size/analyze.py` bolds by the caption's rule.
 
-### F28 — Dyck token recall ignores failed predictions — `fixed`
+### F28 — Dyck token recall ignores failed predictions — `obsolete` (F35)
 - **Evidence:** `rasping/metrics.py::dyck_metrics` (v1 definition) counts a false negative only
   when the prediction is 0; positions where a GP/BFS program crashed (label −1) count as
   neither TP nor FN, inflating token recall / balanced accuracy for those programs (Table 6
@@ -325,9 +359,10 @@ weights and training numerics (`tests/test_golden.py`).
   lazily in `data.encode` / `metrics.exact_match_accuracy`), so the symbolic baselines
   never load JAX and forking is safe. Golden search results unchanged.
 
-### F33 — Oracle accuracy round-tripped through pandas — `wontfix`
-- 80 `oracle_accuracy_50` values in `raspbugs_v1.jsonl.gz` carry float noise (0.9400000000000001)
-  from the v1 pandas JSON round trip; `build_manifest.py` writes the parsed value. Harmless.
+### F33 — Oracle accuracy round-tripped through pandas — `obsolete` (F35)
+- 80 `oracle_accuracy_50` values in the v1 manifest (`raspbugs_v1.jsonl.gz`) carried float
+  noise (0.9400000000000001) from the v1 pandas JSON round trip. All 80 were Dyck mutants, so
+  none is in the current benchmark.
 
 ### F34 — Golden training numerics are only bit-exact on the recording machine — `fixed` (test)
 - **Evidence:** CI (GitHub runner, 4 vCPUs) failed `test_golden_training` for most_freq, sort

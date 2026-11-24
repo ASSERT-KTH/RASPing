@@ -5,7 +5,7 @@
            results/<version>/symbolic_baselines/<method>_budget<B>_history.csv.gz
 
 Columns and row order match `results/v1_tmlr/symbolic_baselines/` (see
-`rasping.baselines.records`, shared with `scripts/freeze_v1_results.py`).
+`rasping.baselines.records`).
 
     python experiments/symbolic_baselines/collect.py --version v2 [--method gp] [--budget 1000]
 """

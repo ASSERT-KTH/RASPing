@@ -2,12 +2,11 @@
 
     python scripts/generate_data.py [--num-samples 50000] [--max-len 10] [--output-dir data/]
 
-Random generation for the sequence-to-sequence programs (duplicates removed),
-exhaustive enumeration (truncated to --num-samples) for the Dyck programs, then a
-seeded 80/10/10 split. Generation is seeded (--seed); the committed v1 files of the
-sequence-to-sequence programs were generated unseeded (F24) and are kept as they are.
+Random generation (duplicates removed), then a seeded 80/10/10 split. Generation is
+seeded (--seed); the committed files were generated unseeded in v1 (F24) and are kept
+as they are.
 
-    python scripts/generate_data.py --program shuffle_dyck2     # regenerate one program
+    python scripts/generate_data.py --program sort     # regenerate one program
 """
 
 from pathlib import Path
@@ -26,9 +25,7 @@ from rasping.config import DATA_DIR, MAX_LEN, PROGRAMS
 @click.option("--program", "only", multiple=True, help="Only these programs (default: all)")
 def main(num_samples, max_len, output_dir, seed, only):
     for program in only or PROGRAMS:
-        exhaustive = program.startswith("shuffle_dyck")
-        ds = data.generate(program, max_len, num_samples, remove_duplicates=True,
-                           exhaustive=exhaustive, seed=seed)
+        ds = data.generate(program, max_len, num_samples, remove_duplicates=True, seed=seed)
         for split, part in zip(("train", "val", "test"), data.split_train_val_test(ds)):
             data.save(program, split, part, data_dir=Path(output_dir))
         click.echo(f"{program}: {len(ds)} examples -> {output_dir}")

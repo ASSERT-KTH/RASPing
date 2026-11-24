@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from rasping import analysis
-from rasping.config import MAIN_PROGRAMS
+from rasping.config import PROGRAMS
 from rasping.results import load_runs, results_dir
 from tests.test_paper_numbers import TABLE1, TABLE2, TABLE5, TABLE8, TABLE9, round_half_up
 
@@ -19,7 +19,7 @@ pytestmark = pytest.mark.skipif(not results_dir(V).exists(), reason="no v1 resul
 @pytest.fixture(scope="module")
 def main847():
     df = load_runs(V, "main_repair")
-    return df[df["program"].isin(MAIN_PROGRAMS)]
+    return df[df["program"].isin(PROGRAMS)]
 
 
 def test_table1(main847):
@@ -99,13 +99,3 @@ def test_table9():
             got = (round(r.zero_min, 1), round(r.zero_max, 1), round(r.std_min, 2),
                    round(r.std_max, 2), round(r.max_abs, 2))
             assert got == exp, (prog, state)
-
-
-def test_tables6_7():
-    gb = pd.read_csv(results_dir(V, "dyck") / "gbpr_metrics.csv").assign(method="gbpr")
-    bl = pd.read_csv(results_dir(V, "dyck") / "baseline_metrics.csv")
-    s = analysis.dyck_summary(pd.concat([gb, bl])).set_index(["method", "program_name"])
-    assert round(s.loc[("gbpr", "shuffle_dyck"), "acc"], 2) == 98.28
-    assert round(s.loc[("gbpr", "shuffle_dyck2"), "acc_fixed"], 1) == 99.7
-    assert round(s.loc[("bfs", "shuffle_dyck"), "recall_fixed"], 1) == 60.1
-    assert round(s.loc[("gp", "shuffle_dyck2"), "recall_fixed"], 1) == 3.8
