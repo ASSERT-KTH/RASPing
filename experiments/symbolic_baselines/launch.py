@@ -11,7 +11,7 @@ records into tables with `experiments/symbolic_baselines/collect.py`.
 Budget calibration on the init pilot's sample (25 per program, stratified by order):
 
     python experiments/symbolic_baselines/launch.py --method bfs --budget 5000 \
-        --n-per-program 25 --timeout-hours 24
+        --n-per-program 25 --timeout-hours 24 --partition <cpu partition>
 
 On the 847 benchmark mutants, v1 at budget 1,000 took at most 3.5 h per run (median
 0.7 h GP, 0.9 h BFS) and 664 / 891 CPU-hours in total. A run's record is written only when
@@ -43,8 +43,10 @@ RUN_SCRIPT = "experiments/symbolic_baselines/run.py"
               help="Only a stratified sample of this many mutants per program (raspbugs.stratified_sample)")
 @click.option("--sample-seed", type=int, default=0, show_default=True)
 @click.option("--timeout-hours", type=float, default=12, show_default=True, help="SLURM time limit per job")
+@click.option("--partition", default=None, help="SLURM partition (e.g. the cluster's CPU partition)")
 @cluster.add_cli_options
-def main(method, budget, n_per_program, sample_seed, timeout_hours, dry_run, local, no_container, limit):
+def main(method, budget, n_per_program, sample_seed, timeout_hours, partition, dry_run, local,
+         no_container, limit):
     out = run_dir(method, budget)
     python = sys.executable if no_container else "python"
     if n_per_program is None:
@@ -60,6 +62,7 @@ def main(method, budget, n_per_program, sample_seed, timeout_hours, dry_run, loc
     cluster.submit_from_cli(
         commands, f"symbolic_{method}_budget{budget}", dry_run, local, no_container, limit,
         gpu=False, timeout_min=int(timeout_hours * 60),
+        **({"slurm_partition": partition} if partition else {}),
         slurm_additional_parameters={},  # CPU-only: drop the default GPU (MIG) reservation
     )
 
