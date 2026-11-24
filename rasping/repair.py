@@ -30,12 +30,64 @@ import numpy as np
 from rasping import data, raspbugs
 from rasping.config import MAX_LEN, REPO_ROOT, TrainConfig
 from rasping.losses import LOSSES
-from rasping.model import INIT_SCHEMES
+from rasping.model import INIT_SCHEMES, MLP_EXACTNESS, SOFTMAX_COLDNESS, Model
 from rasping.train import Trainer
 
-#: "compiled" starts from the mutant's Tracr weights (the method); the others
-#: re-initialise the same architecture (initialization controls, paper §5.5).
-INITS = ("compiled",) + tuple(s for s in INIT_SCHEMES)
+#: Starting points, all in the mutant's own compiled architecture:
+#:   compiled        the mutant's Tracr weights (the method)
+#:   lecun | xavier | kaiming | unit-normal   random re-initialisation (`Model.set_random_weights`)
+#:   shuffled        compiled values permuted within each tensor: scale and sparsity kept,
+#:                   structure destroyed
+#:   rescaled        compiled structure at Xavier scale, biases zeroed
+#:   soft:<c>        compiled with attention coldness c and MLP exactness 1.2c (exact: 100);
+#:                   softer weights that approximate the mutant
+#:   from:<job_id>   the compiled weights of another mutant with identical parameter shapes
+#:                   (usually of the same program; see `raspbugs.shape_twins`)
+INITS = ("compiled", *INIT_SCHEMES, "shuffled", "rescaled", "soft:<c>", "from:<job_id>")
+
+
+def check_init(init: str) -> str:
+    kind, sep, arg = init.partition(":")
+    ok = (not sep and kind in ("compiled", *INIT_SCHEMES, "shuffled", "rescaled")) or (
+        sep and kind == "soft" and arg.replace(".", "", 1).isdigit() and float(arg) > 0) or (
+        sep and kind == "from" and len(arg) == 32)
+    if not ok:
+        raise ValueError(f"init {init!r} is not one of {INITS}")
+    return init
+
+
+def _start_model(mutant, init: str, compiled: Model, seed: int) -> Model:
+    """The model training starts from (`compiled` itself for init="compiled")."""
+    kind, _, arg = init.partition(":")
+    if kind == "compiled":
+        return compiled
+    if kind == "soft":
+        c = float(arg)
+        return mutant.compile(MAX_LEN, softmax_coldness=c, mlp_exactness=c * MLP_EXACTNESS / SOFTMAX_COLDNESS)
+    model = mutant.compile(MAX_LEN)  # a fresh copy whose weights we replace
+    model.set_prng_key(seed)
+    if kind in INIT_SCHEMES:
+        model.set_random_weights(kind)
+    elif kind == "shuffled":
+        model.set_shuffled_weights()
+    elif kind == "rescaled":
+        model.set_rescaled_weights()
+    elif kind == "from":
+        if arg == mutant.job_id:
+            raise ValueError(f"from:{arg} must be another mutant")
+        model.set_weights(raspbugs.get(arg).compile(MAX_LEN).params)  # asserts identical shapes
+    return model
+
+
+def _agreement(a: Model, b: Model, X) -> float:
+    """Fraction of inputs on which two models predict the same full output sequence."""
+    import jax.numpy as jnp
+
+    pa = jnp.argmax(a.forward(X).unembedded_output, -1)
+    pb = jnp.argmax(b.forward(X).unembedded_output, -1)
+    mask = jnp.ones_like(X).at[:, 0].set(0)
+    mask = jnp.where(X != a.pad_token, mask, 0)
+    return float(jnp.mean(jnp.all((pa == pb) | (mask == 0), axis=-1)))
 
 
 @dataclass
@@ -53,7 +105,9 @@ class RunRecord:
     status: str = "ok"
     test_accuracy: float = float("nan")
     test_samples: int = 0
-    initial_test_accuracy: float = float("nan")
+    initial_test_accuracy: float = float("nan")  # the compiled mutant's (the bug's) accuracy
+    start_test_accuracy: float = float("nan")  # accuracy of the weights training starts from
+    start_agreement: float = float("nan")  # fraction of test inputs where the start = compiled mutant
     n_epochs: int = 0
     stopped_early: bool = False
     diverged: bool = False
@@ -102,25 +156,24 @@ def repair(
     the `n_train`/`n_val` subsample of the specification. `n_steps` fixes the gradient-step
     budget by setting the epoch count (spec-size ablation).
     """
-    if init not in INITS:
-        raise ValueError(f"init must be one of {INITS}")
+    check_init(init)
     mutant = raspbugs.get(job_id)
-    model = mutant.compile(MAX_LEN)
+    compiled = mutant.compile(MAX_LEN)
     # Benchmark mutants can represent every target output by construction (F6, F35).
-    missing = data.unrepresentable_outputs(mutant.program, model)
+    missing = data.unrepresentable_outputs(mutant.program, compiled)
     if missing:
         raise ValueError(f"{job_id}: compiled output vocabulary lacks {sorted(missing)[:5]}")
 
-    X, Y = data.encode(data.load(mutant.program, "train"), model)
-    Xv, Yv = data.encode(data.load(mutant.program, "val"), model)
-    Xt, Yt = data.encode(data.load(mutant.program, "test"), model)
+    X, Y = data.encode(data.load(mutant.program, "train"), compiled)
+    Xv, Yv = data.encode(data.load(mutant.program, "val"), compiled)
+    Xt, Yt = data.encode(data.load(mutant.program, "test"), compiled)
     X, Y = _subsample(X, Y, n_train, seed)
     Xv, Yv = _subsample(Xv, Yv, n_val, seed)
 
-    initial_test_acc = float(model.accuracy(Xt, Yt))
-    if init != "compiled":
-        model.set_prng_key(seed)
-        model.set_random_weights(init)
+    initial_test_acc = float(compiled.accuracy(Xt, Yt))
+    model = _start_model(mutant, init, compiled, seed)
+    start_test_acc = float(model.accuracy(Xt, Yt))
+    start_agreement = 1.0 if model is compiled else _agreement(model, compiled, Xt)
 
     n_epochs = config.n_epochs
     if n_steps is not None:
@@ -130,6 +183,7 @@ def repair(
         job_id=job_id, program=mutant.program, mutation_order=mutant.mutation_order,
         init=init, seed=seed, n_train=len(X), n_val=len(Xv), n_steps_budget=n_steps,
         config={**config.to_dict(), "n_epochs": n_epochs}, initial_test_accuracy=initial_test_acc,
+        start_test_accuracy=start_test_acc, start_agreement=start_agreement,
         git_commit=_git_commit(),
     )
 
@@ -180,10 +234,18 @@ def repair(
     return rec
 
 
+def _init_option(ctx, param, value):
+    try:
+        return check_init(value)
+    except ValueError as e:
+        raise click.BadParameter(str(e)) from e
+
+
 @click.command()
 @click.option("--job-id", required=True, help="RaspBugs mutant id")
 @click.option("--out", "out_dir", required=True, type=click.Path(), help="Run directory to write")
-@click.option("--init", type=click.Choice(INITS), default="compiled", show_default=True)
+@click.option("--init", default="compiled", show_default=True, callback=_init_option,
+              help=f"One of {', '.join(INITS)}")
 @click.option("--seed", type=int, default=42, show_default=True,
               help="Seed for batch order, re-initialisation and specification subsampling")
 @click.option("--n-train", type=int, default=None, help="Subsample the training split")

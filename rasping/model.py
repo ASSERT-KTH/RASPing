@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -14,12 +15,34 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from tracr.compiler import compiling
+from tracr.compiler import expr_to_craft_graph as _e2c
 from tracr.rasp import rasp
 
 from rasping.metrics import exact_match_accuracy
 
 #: Init schemes for `Model.set_random_weights` (fan-in/fan-out as in Haiku's VarianceScaling).
 INIT_SCHEMES = ("lecun", "xavier", "kaiming", "unit-normal")
+
+#: Tracr's sharpness constants as used for every compiled model in this repository.
+#: `mlp_exactness` scales the numerical MLPs (Tracr's default is 100; v1 used 120);
+#: `softmax_coldness` scales attention logits (hard-coded to 100 inside Tracr).
+MLP_EXACTNESS = 120
+SOFTMAX_COLDNESS = 100
+
+
+@contextlib.contextmanager
+def _softmax_coldness(coldness: float):
+    """Temporarily override the attention coldness Tracr hard-codes (100)."""
+    if coldness == SOFTMAX_COLDNESS:
+        yield
+        return
+    attn, width = _e2c.categorical_attn.categorical_attn, _e2c.selector_width.selector_width
+    _e2c.categorical_attn.categorical_attn = lambda *a, **k: attn(*a, **{**k, "softmax_coldness": coldness})
+    _e2c.selector_width.selector_width = lambda *a, **k: width(*a, **{**k, "softmax_coldness": coldness})
+    try:
+        yield
+    finally:
+        _e2c.categorical_attn.categorical_attn, _e2c.selector_width.selector_width = attn, width
 
 
 class Model:
@@ -33,14 +56,18 @@ class Model:
         assembled: Tracr's `AssembledTransformerModel` (holds `params` and encoders)
     """
 
-    def __init__(self, sop: rasp.SOp, vocab: Iterable, max_len: int, name: str):
+    def __init__(self, sop: rasp.SOp, vocab: Iterable, max_len: int, name: str,
+                 mlp_exactness: float = MLP_EXACTNESS, softmax_coldness: float = SOFTMAX_COLDNESS):
+        """Compile `sop`. Lower `mlp_exactness`/`softmax_coldness` give softer weights that
+        approximate the program less exactly (same architecture); the defaults are exact."""
         self.sop = sop
         self.vocab = set(vocab)
         self.max_len = max_len
         self.name = name
-        self.assembled = compiling.compile_rasp_to_model(
-            sop, self.vocab, max_len, compiler_bos="BOS", mlp_exactness=120
-        )
+        with _softmax_coldness(softmax_coldness):
+            self.assembled = compiling.compile_rasp_to_model(
+                sop, self.vocab, max_len, compiler_bos="BOS", mlp_exactness=mlp_exactness
+            )
         self._prng_key = jax.random.key(666)
         self.forward_fn = hk.without_apply_rng(hk.transform(self._forward))
         self._jit_accuracy = jax.jit(self._accuracy)
@@ -106,6 +133,30 @@ class Model:
         else:
             raise ValueError(f"Unknown init scheme {scheme!r}; choose from {INIT_SCHEMES}")
         self.assembled.params = new
+
+    def set_shuffled_weights(self) -> None:
+        """Permute the entries of every tensor independently (keeps each tensor's values,
+        scale and sparsity; destroys the compiled structure)."""
+        self._prng_key, key = jax.random.split(self._prng_key)
+        seq = hk.PRNGSequence(key)
+        self.assembled.params = jax.tree_util.tree_map(
+            lambda p: jax.random.permutation(next(seq), jnp.ravel(p)).reshape(p.shape), self.params)
+
+    def set_rescaled_weights(self) -> None:
+        """Keep the compiled structure at Xavier scale: rescale every >=2-D tensor to the
+        standard deviation Xavier init would give it and zero the biases (as "xavier" does).
+        Deterministic; all-zero tensors stay zero."""
+
+        def rescale(p):
+            if len(p.shape) < 2:
+                return jnp.zeros(p.shape, dtype=p.dtype)
+            std = float(jnp.std(p))
+            if std == 0.0:
+                return p
+            fan_in, fan_out = int(np.prod(p.shape[:-1])), int(p.shape[-1])
+            return p * (np.sqrt(2.0 / (fan_in + fan_out)) / std)
+
+        self.assembled.params = jax.tree_util.tree_map(rescale, self.params)
 
     def set_weights(self, params: hk.Params) -> None:
         """Replace the weights; structure and shapes must match the compiled model."""

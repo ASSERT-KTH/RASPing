@@ -25,6 +25,7 @@ python -m rasping.raspbugs <job_id>     # print a mutant and its diff
 | `run_mutations.py` | step 1: write cosmic-ray configs and run them per program and mutation order |
 | `build_manifest.py` | step 2: re-apply diffs, label mutants from the oracle output, write the manifest |
 | `raspbugs.jsonl.gz` | the benchmark manifest: the 847 mutants |
+| `architectures.py`, `architectures.csv` | each mutant's compiled architecture: parameter count, layers, shape signature (`rasping.raspbugs.shape_twins`) |
 
 ## Regenerating
 

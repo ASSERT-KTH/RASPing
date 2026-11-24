@@ -189,3 +189,47 @@ def weight_stats_ranges(ws: pd.DataFrame) -> pd.DataFrame:
         "zero_min": 100 * g["zero_frac"].min(), "zero_max": 100 * g["zero_frac"].max(),
         "std_min": g["std"].min(), "std_max": g["std"].max(), "max_abs": g["max_abs"].max(),
     }).reset_index()
+
+
+# --------------------------------------------------------------------------- init pilot
+
+
+def init_arm(init: str) -> str:
+    """Arm name of an init spec: "from:<job_id>" -> "from", others unchanged."""
+    return init.split(":", 1)[0] if init.startswith("from:") else init
+
+
+def arm_table(runs: pd.DataFrame, arms: list[str], programs: list[str],
+              threshold: float = THRESHOLD) -> pd.DataFrame:
+    """Per arm: runs, mean start agreement / accuracy, % repaired (all and per program),
+    mean final test accuracy and median epochs. `runs` needs columns arm, program,
+    test_accuracy, start_agreement, start_test_accuracy, n_epochs."""
+    rows = []
+    for arm in arms:
+        d = runs[runs["arm"] == arm]
+        if d.empty:
+            continue
+        row = {"arm": arm, "runs": len(d),
+               "start_agreement": 100 * d["start_agreement"].mean(),
+               # runs whose starting weights behave like the compiled mutant (>=99% agreement)
+               "behaviour_kept": 100 * (d["start_agreement"] >= threshold).mean(),
+               "start_acc": 100 * d["start_test_accuracy"].mean(),
+               "repaired": 100 * (d["test_accuracy"] >= threshold).mean()}
+        for p in programs:
+            dp = d[d["program"] == p]
+            row[f"repaired_{p}"] = 100 * (dp["test_accuracy"] >= threshold).mean() if len(dp) else np.nan
+        row["test_acc"] = 100 * d["test_accuracy"].mean()
+        row["median_epochs"] = d["n_epochs"].median()
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def paired_outcomes(runs: pd.DataFrame, arm: str, ref: str, threshold: float = THRESHOLD) -> dict:
+    """Repair outcomes of `arm` vs `ref` on the mutants (and seeds) both have."""
+    key = ["job_id", "seed"]
+    a = runs[runs["arm"] == arm].set_index(key)["test_accuracy"] >= threshold
+    b = runs[runs["arm"] == ref].set_index(key)["test_accuracy"] >= threshold
+    a, b = a.align(b, join="inner")
+    return {"arm": arm, "ref": ref, "pairs": len(a), "only_arm": int((a & ~b).sum()),
+            "both": int((a & b).sum()), "only_ref": int((~a & b).sum()), "neither": int((~a & ~b).sum())}
+

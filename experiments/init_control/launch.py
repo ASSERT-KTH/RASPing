@@ -14,28 +14,14 @@ selection is reproduced exactly by `select_mutants` (checked by a test).
 import json
 
 import click
-import numpy as np
 
 from rasping import cluster, raspbugs
 from rasping.config import PROGRAMS, RUNS_DIR
 
 
 def select_mutants(program: str, subset_size: int = 20, seed: int = 0) -> list[str]:
-    """Stratified sample by mutation order from the benchmark (manifest order)."""
-    ms = raspbugs.mutants(program=program, sort=False)
-    rng = np.random.default_rng(seed)
-    orders = sorted({m.mutation_order for m in ms})
-    per_order = max(1, subset_size // len(orders))
-    selected = []
-    for o in orders:
-        cands = [m.job_id for m in ms if m.mutation_order == o]
-        selected.extend(rng.choice(cands, size=min(per_order, len(cands)), replace=False))
-    if len(selected) < subset_size:  # top up from the remainder
-        rest = [m.job_id for m in ms if m.job_id not in set(selected)]
-        if rest:
-            selected.extend(rng.choice(rest, size=min(subset_size - len(selected), len(rest)),
-                                       replace=False))
-    return [str(j) for j in selected[:subset_size]]
+    """The v1 selection: `raspbugs.stratified_sample` (20 per program, seed 0)."""
+    return raspbugs.stratified_sample(program, subset_size, seed)
 
 
 @click.command()

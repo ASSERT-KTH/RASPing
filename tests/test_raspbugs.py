@@ -38,6 +38,28 @@ def test_compile_mutant(job_id):
     assert model.name == raspbugs.get(job_id).program
 
 
+def test_stratified_sample():
+    sel = raspbugs.stratified_sample("sort", 25, seed=0)
+    assert len(sel) == len(set(sel)) == 25
+    orders = [raspbugs.get(j).mutation_order for j in sel]
+    assert set(orders) == {1, 2, 3, 4, 5} and min(orders.count(o) for o in range(1, 6)) >= 5
+    assert sel == raspbugs.stratified_sample("sort", 25, seed=0)
+    assert len(raspbugs.stratified_sample("hist", 100)) == 46  # capped by the program's size
+
+
+def test_architecture_index():
+    t = raspbugs.architectures()
+    assert sorted(t["job_id"]) == sorted(m.job_id for m in raspbugs.mutants())
+    sig = t.set_index("job_id")["signature"]
+    prog = t.set_index("job_id")["program"]
+    for j in t["job_id"].iloc[::50]:
+        tw = raspbugs.shape_twins(j)
+        assert j not in tw and all(sig[k] == sig[j] and prog[k] == prog[j] for k in tw)
+        assert set(tw) <= set(raspbugs.shape_twins(j, same_program=False))
+    # the few cross-program twins (most_freq / reverse)
+    assert (t.groupby("signature")["program"].nunique() > 1).sum() == 2
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("program", PROGRAMS)
 def test_benchmark_rule(program):
