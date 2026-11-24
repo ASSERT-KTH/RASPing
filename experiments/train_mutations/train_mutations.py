@@ -12,7 +12,7 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 
 from src.trainer import Trainer
-from src.functions import load_dataset, encodeAndPadData
+from src.functions import load_dataset, encodeAndPadData, generateModel
 from src.loss import (
     cross_entropy_loss,
     cross_entropy_loss_smoothed_accuracy,
@@ -45,15 +45,45 @@ def train_mutated_model(
     n_val_samples: int = None,
     seed: int = 42,
     n_steps: int = None,
+    random_init: bool = False,
+    init_scheme: str = "xavier",
+    random_init_source: str = "buggy",
 ):
     if loss_fn_name not in LOSS_FUNCTIONS:
         raise ValueError(f"Loss function {loss_fn_name} not found")
     loss_fn = LOSS_FUNCTIONS[loss_fn_name]
 
-    # Load the buggy model
-    model = load_buggy_models(
-        max_length=max_len, program_name=program_name, job_id=job_id
-    )[job_id]
+    if random_init:
+        # Initialization-control baseline: randomize the weights instead of
+        # starting from the buggy mutation's compiled checkpoint. Everything
+        # else (data, optimizer, early stopping, evaluation) matches the
+        # mutant-repair path exactly.
+        #
+        # random_init_source controls WHICH architecture is randomized:
+        #   "ground-truth" compiles the correct program. This confounds the
+        #     comparison, because most mutants do not share the ground-truth
+        #     architecture, so the baseline is handed the right structure for
+        #     free -- it measures architecture + initialization together.
+        #   "buggy" (default) loads the mutant and randomizes that same
+        #     architecture, isolating the value of the compiled starting point
+        #     from the architecture it lives in. This is the paired control.
+        if random_init_source == "buggy":
+            if not job_id:
+                raise ValueError("--random-init-source buggy requires --job_id")
+            model = load_buggy_models(
+                max_length=max_len, program_name=program_name, job_id=job_id
+            )[job_id]
+        else:
+            model = generateModel(program_name, max_len)
+        model.setJaxPRNGKey(seed)
+        model.setRandomWeights(
+            scheme=None if init_scheme == "unit-normal" else init_scheme
+        )
+    else:
+        # Load the buggy model
+        model = load_buggy_models(
+            max_length=max_len, program_name=program_name, job_id=job_id
+        )[job_id]
 
     # Load dataset
     program_name_key = program_name
@@ -172,6 +202,31 @@ def train_mutated_model(
               help="Random seed for training-set subsampling")
 @click.option("--n_steps", type=int, default=None,
               help="Total gradient steps (overrides n_epochs; ensures equal compute across N values)")
+@click.option(
+    "--random-init/--no-random-init",
+    default=False,
+    help="Initialization control: compile the ground-truth program and randomize its weights "
+         "(seeded by --seed) instead of loading a buggy mutation. --job_id is not required in "
+         "this mode and defaults to seed{seed} if omitted.",
+)
+@click.option(
+    "--random-init-source",
+    type=click.Choice(["buggy", "ground-truth"]),
+    default="buggy",
+    help="With --random-init, which architecture to randomize. 'buggy' (default) randomizes the "
+         "mutant's own compiled architecture, isolating initialization from architecture. "
+         "'ground-truth' compiles the correct program instead, which also hands the baseline the "
+         "correct structure and so confounds the two.",
+)
+@click.option(
+    "--init-scheme",
+    type=click.Choice(["lecun", "xavier", "kaiming", "unit-normal"]),
+    default="xavier",
+    help="Weight initialization used with --random-init. Fan-in scaled schemes: 'xavier' "
+         "(default; Glorot & Bengio 2010, as in the original Transformer), 'lecun' (Haiku's "
+         "hk.Linear default), 'kaiming' (He et al. 2015). 'unit-normal' reproduces the historical "
+         "N(0,1) behaviour, which is NOT fan-in scaled and starts these models numerically broken.",
+)
 def run_test(
     program_name,
     job_id,
@@ -189,8 +244,15 @@ def run_test(
     n_val_samples,
     seed,
     n_steps,
+    random_init,
+    init_scheme,
+    random_init_source,
 ):
-    print(f"Training mutated model {program_name} (job {job_id}) with {loss_fn_name}...")
+    if random_init and not job_id:
+        job_id = f"seed{seed}"
+
+    print(f"Training {'random-init' if random_init else 'mutated'} model {program_name} "
+          f"(job {job_id}) with {loss_fn_name}...")
     if not output_dir:
         output_dir = f"saved_data/{program_name}/{loss_fn_name}/job_{job_id}/"
     train_mutated_model(
@@ -210,6 +272,9 @@ def run_test(
         n_val_samples=n_val_samples,
         seed=seed,
         n_steps=n_steps,
+        random_init=random_init,
+        init_scheme=init_scheme,
+        random_init_source=random_init_source,
     )
 
 

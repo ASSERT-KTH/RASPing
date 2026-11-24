@@ -160,13 +160,58 @@ class Model:
             for name2, _ in layer.items():
                 self.model.params[name1][name2] = self.initialWeights[name1][name2]
 
-    def setRandomWeights(self, mean=0.0, std=1.0):
+    def setRandomWeights(self, mean=0.0, std=1.0, scheme=None):
+        """Randomize the model weights.
+
+        scheme=None keeps the historical behaviour: every parameter drawn from
+        N(mean, std) with std=1.0 by default. That is NOT a sensible transformer
+        initialization -- it ignores fan-in, so activations grow multiplicatively
+        with depth and the model starts numerically broken (initial training loss
+        of 1e10-1e19 on these architectures). It is retained only for backwards
+        compatibility.
+
+        For an initialization-control baseline, pass one of the standard schemes,
+        which scale per-tensor by fan-in as any from-scratch training of this
+        architecture would:
+
+          "lecun"   var = 1 / fan_in            (Haiku's hk.Linear default)
+          "xavier"  var = 2 / (fan_in + fan_out) (Glorot & Bengio 2010)
+          "kaiming" var = 2 / fan_in             (He et al. 2015; ReLU-appropriate)
+
+        Following the usual convention (and Haiku's VarianceScaling), fan_in is
+        the product of all but the last dimension and fan_out is the last.
+        Biases (1-D tensors) are set to zero, as is standard.
+        """
         self.jaxPRNGKey, newPRNGKey = jax.random.split(self.jaxPRNGKey)
         PRNGSeq = hk.PRNGSequence(newPRNGKey)
-        randomParams = jax.tree_util.tree_map(
-            lambda p: jax.random.normal(next(PRNGSeq), p.shape) * std + mean,
-            self.model.params,
-        )
+
+        if scheme is None:
+            randomParams = jax.tree_util.tree_map(
+                lambda p: jax.random.normal(next(PRNGSeq), p.shape) * std + mean,
+                self.model.params,
+            )
+        else:
+            scheme = scheme.lower()
+            if scheme not in ("lecun", "xavier", "kaiming"):
+                raise ValueError(f"Unknown init scheme {scheme!r}")
+
+            def init_one(p):
+                shape = p.shape
+                if len(shape) < 2:
+                    # biases: zeros, standard practice
+                    return jax.numpy.zeros(shape, dtype=p.dtype)
+                fan_in = int(np.prod(shape[:-1]))
+                fan_out = int(shape[-1])
+                if scheme == "lecun":
+                    s = np.sqrt(1.0 / fan_in)
+                elif scheme == "xavier":
+                    s = np.sqrt(2.0 / (fan_in + fan_out))
+                else:  # kaiming
+                    s = np.sqrt(2.0 / fan_in)
+                return jax.random.normal(next(PRNGSeq), shape, dtype=p.dtype) * s
+
+            randomParams = jax.tree_util.tree_map(init_one, self.model.params)
+
         self.model.params = randomParams
 
     # Sets the model weights to 'params'
