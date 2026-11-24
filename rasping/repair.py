@@ -54,6 +54,7 @@ class RunRecord:
     initial_test_accuracy: float = float("nan")
     n_epochs: int = 0
     stopped_early: bool = False
+    diverged: bool = False
     best_step: int | None = None
     final_step: int = 0
     best_val_acc: float = float("nan")
@@ -152,6 +153,7 @@ def repair(
     rec.test_samples = int(len(Xt))
     rec.n_epochs = len(result.train_losses)
     rec.stopped_early = result.stopped_early
+    rec.diverged = result.diverged
     rec.best_step = result.best_step
     rec.final_step = result.final_step
     rec.best_val_acc = float(max(result.val_accs)) if result.val_accs else float("nan")

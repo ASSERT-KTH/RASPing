@@ -13,6 +13,9 @@ Package layout:
     repair      end-to-end repair of one mutant (the method), writes one run dir
     cluster     SLURM (submitit) + apptainer helpers for launchers
     tables      LaTeX table writer for paper artifacts
-"""
 
-from rasping import _jax_setup  # noqa: F401  (configures JAX before any use)
+JAX is configured (x64, float32 matmuls) by `rasping._jax_setup`, imported by the modules
+that use JAX (`model`, `losses`, `train`). The symbolic parts (programs, data loading,
+raspbugs manifest, baselines) do not import JAX, so the baselines' worker processes can
+be forked safely (F32).
+"""

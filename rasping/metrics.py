@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import jax.numpy as jnp
 import numpy as np
 
 from rasping.config import THRESHOLD
@@ -13,6 +12,8 @@ def exact_match_accuracy(logits, x, y, pad_token):
 
     The BOS position and padding positions (where `x == pad_token`) are ignored.
     """
+    import jax.numpy as jnp  # lazy: keep this module importable without JAX
+
     pred = jnp.argmax(logits, axis=-1)
     mask = jnp.ones_like(x).at[:, 0].set(0)
     mask = jnp.where(x != pad_token, mask, 0)

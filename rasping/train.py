@@ -68,6 +68,7 @@ class TrainResult:
     val_losses: list = field(default_factory=list)  # per epoch
     val_accs: list = field(default_factory=list)  # every `val_every` epochs (epoch 0, 10, ...)
     stopped_early: bool = False
+    diverged: bool = False  # training loss became non-finite; params are the last finite ones
     best_step: Optional[int] = None
     final_step: int = 0
     trajectory: list = field(default_factory=list)  # (step, params, val_loss) if requested
@@ -145,6 +146,7 @@ class Trainer:
         if self.store_trajectory:
             res.trajectory.append((0, jax.device_get(self.state.params), self._val_loss(self.state.params)))
 
+        prev_params = self.state.params
         epochs = tqdm.trange(self.n_epochs) if self.progress else range(self.n_epochs)
         for epoch in epochs:
             epoch_loss, n_batches = 0.0, 0
@@ -159,6 +161,11 @@ class Trainer:
                     res.trajectory.append((step, jax.device_get(self.state.params),
                                            self._val_loss(self.state.params)))
 
+            if not np.isfinite(float(epoch_loss)):
+                res.diverged = True
+                self.state = self.state._replace(params=prev_params)
+                break
+            prev_params = self.state.params
             res.train_losses.append(epoch_loss / n_batches)
             train_acc = self.model.accuracy(self.X_train, self.Y_train, self.state.params)
             res.train_accs.append(train_acc)

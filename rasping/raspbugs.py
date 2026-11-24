@@ -18,10 +18,13 @@ import json
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from rasping import programs
 from rasping.config import DYCK_PROGRAMS, MAIN_PROGRAMS, MAX_LEN, RASPBUGS_DIR
-from rasping.model import Model
+
+if TYPE_CHECKING:
+    from rasping.model import Model
 
 DEFAULT_VERSION = "v1"
 SUBSETS = ("all", "main", "dyck", "buggy")
@@ -39,8 +42,10 @@ class Mutant:
     oracle_accuracy_50: float | None = None
     mutations: list = field(default_factory=list, compare=False, hash=False)
 
-    def compile(self, max_len: int = MAX_LEN) -> Model:
+    def compile(self, max_len: int = MAX_LEN) -> "Model":
         """Compile this mutant into a Transformer (`Model`)."""
+        from rasping.model import Model
+
         p = programs.get(self.program)
         sop = programs.build_sop(self.source, p.name, max_len, f"mutation_{p.name}_{self.job_id}")
         return Model(sop, p.vocab, max_len, p.name)
@@ -99,7 +104,7 @@ def get(job_id: str, version: str = DEFAULT_VERSION) -> Mutant:
     return _load(version)[job_id]
 
 
-def compile_mutant(job_id: str, max_len: int = MAX_LEN, version: str = DEFAULT_VERSION) -> Model:
+def compile_mutant(job_id: str, max_len: int = MAX_LEN, version: str = DEFAULT_VERSION) -> "Model":
     return get(job_id, version).compile(max_len)
 
 

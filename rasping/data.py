@@ -14,7 +14,6 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable
 
-import jax.numpy as jnp
 import numpy as np
 
 from rasping import programs
@@ -161,7 +160,7 @@ def save(program: str, split: str, data: list[Example], data_dir: Path = DATA_DI
 # --------------------------------------------------------------------------- encoding
 
 
-def encode(data: list[Example], model: "Model") -> tuple[jnp.ndarray, jnp.ndarray]:
+def encode(data: list[Example], model: "Model"):
     """Encode and pad a specification with `model`'s input/output encoders.
 
     Inputs are padded with `compiler_pad` to `max_len + 1` (BOS included). Output
@@ -171,6 +170,8 @@ def encode(data: list[Example], model: "Model") -> tuple[jnp.ndarray, jnp.ndarra
     Raises KeyError if an output token is not in the model's output vocabulary (the
     compiled architecture cannot represent the target).
     """
+    import jax.numpy as jnp  # lazy: data loading must not import JAX (F32)
+
     in_enc = model.assembled.input_encoder
     out_enc = model.assembled.output_encoder
     filler = next(iter(out_enc.encoding_map))

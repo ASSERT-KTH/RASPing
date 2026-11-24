@@ -185,9 +185,11 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 - **Fix (cd73c9a):** all deps in `pyproject.toml`, git deps pinned to commits, transitive deps
   constrained to the v1 environment, real `uv.lock`.
 
-### F23 — `jax_debug_nans=True` set globally on import — `open`
+### F23 — `jax_debug_nans=True` set globally on import — `fixed`
 - **Evidence:** `src/model.py:14-16` changes global JAX config at import time (slows every
   computation and changes NaN behaviour for every importer).
+- **Fix:** removed; the Trainer stops when the epoch loss is non-finite, restores the last
+  finite parameters and records `diverged` in run.json. Golden tests unchanged.
 
 ## Found during the refactor (Nov 24, 2026)
 
@@ -239,9 +241,12 @@ with a full mirror of the pre-rewrite git history; see the README for where it l
 - The v1 spec-size baseline tables (budget 500) contain 1,691 GP / 1,760 BFS records — an
   older, larger mutant set; the analysis restricts them to the benchmark.
 
-### F32 — GP/BFS fork worker processes after JAX is initialised — `open`
+### F32 — GP/BFS fork worker processes after JAX is initialised — `fixed`
 - **Evidence:** `evaluate_with_timeout` uses `multiprocessing` with the default fork start
   method; Python warns this can deadlock with JAX's threads.
+- **Fix:** JAX is now imported only by the modules that use it (`model`, `losses`, `train`;
+  lazily in `data.encode` / `metrics.exact_match_accuracy`), so the symbolic baselines
+  never load JAX and forking is safe. Golden search results unchanged.
 
 ### F33 — Oracle accuracy round-tripped through pandas — `wontfix`
 - 80 `oracle_accuracy_50` values in `raspbugs_v1.jsonl.gz` carry float noise (0.9400000000000001)

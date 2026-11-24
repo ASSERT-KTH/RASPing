@@ -1,5 +1,7 @@
 """Correctness losses (Haiku-transformed so they can call the compiled forward pass)."""
 
+from rasping import _jax_setup  # noqa: F401
+
 import haiku as hk
 import jax
 import jax.numpy as jnp

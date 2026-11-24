@@ -7,6 +7,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Iterable
 
+from rasping import _jax_setup  # noqa: F401  (must precede any JAX use)
+
 import haiku as hk
 import jax
 import jax.numpy as jnp
