@@ -87,8 +87,11 @@ class TrainResult:
 class Trainer:
     """Supervised training of a `Model`'s weights on an encoded specification.
 
-    Minibatches are taken in order (no reshuffling between epochs). With early stopping,
-    the validation loss is checked every epoch and the best parameters are restored.
+    The training set is reshuffled at the start of every epoch with a NumPy generator
+    seeded by `seed`, so a run is reproducible given its seed and different seeds give
+    different batch orders. (v1 took minibatches in the same fixed order every epoch, which
+    made compiled-init runs deterministic: FINDINGS F36.) With early stopping, the
+    validation loss is checked every epoch and the best parameters are restored.
     """
 
     def __init__(
@@ -109,8 +112,11 @@ class Trainer:
         trajectory_store_interval: int = 10,
         wandb_run: Any = None,
         progress: bool = True,
+        seed: int = 0,
     ):
         self.model = model
+        # Own stream: `seed` also seeds subsampling and re-initialisation in rasping.repair.
+        self._rng = np.random.default_rng([seed, 1])
         self.X_train, self.Y_train = X_train, Y_train
         self.X_val, self.Y_val = X_val, Y_val
         self.X_test, self.Y_test = X_test, Y_test  # monitoring only, never used for decisions
@@ -157,9 +163,11 @@ class Trainer:
         epochs = tqdm.trange(self.n_epochs) if self.progress else range(self.n_epochs)
         for epoch in epochs:
             epoch_loss, n_batches = 0.0, 0
-            for i in range(0, len(self.X_train), self.batch_size):
-                x = self.X_train[i:i + self.batch_size]
-                y = self.Y_train[i:i + self.batch_size]
+            perm = self._rng.permutation(len(self.X_train))
+            X_epoch, Y_epoch = self.X_train[perm], self.Y_train[perm]
+            for i in range(0, len(X_epoch), self.batch_size):
+                x = X_epoch[i:i + self.batch_size]
+                y = Y_epoch[i:i + self.batch_size]
                 self.state, loss = self._update(self.state, x, y, pad)
                 epoch_loss += loss
                 n_batches += 1
