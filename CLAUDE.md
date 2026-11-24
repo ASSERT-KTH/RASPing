@@ -13,7 +13,8 @@ repository map and how each paper artifact is produced.
 ## Rules
 
 - **Constants live in `rasping/config.py`.** This covers the threshold, program lists, max length, training defaults and paths. Never redefine them in scripts.
-- **Program names.** Canonical names are `hist most_freq reverse sort shuffle_dyck shuffle_dyck2`. Data files use the historical `most-freq` and `shuffle_dyck1`. Map between them with `rasping.programs.canonical()` and `.data_name`; never hand-roll the mapping.
+- **Program names.** Canonical names are `hist most_freq reverse sort` (`config.PROGRAMS`). Data files use the historical `most-freq`. Map between them with `rasping.programs.canonical()` and `.data_name`; never hand-roll the mapping.
+- **One benchmark.** RaspBugs is the 847 mutants in `raspbugs/raspbugs.jsonl.gz`; there are no subsets or versions. The v1 results tables still contain Dyck rows, so filter by `config.PROGRAMS` when analysing them.
 - **Mutants** come from `rasping.raspbugs` (the manifest), never from raw cosmic-ray output.
 - **Never commit raw run outputs.** This covers `model.npy`, `trajectory.pkl` and anything under `runs/`. Only tidy tables go in `results/<version>/`, and only generated artifacts go in `paper_artifacts/<version>/`.
 - **`results/v1_tmlr/` is frozen.** It holds the submitted paper's data. `tests/test_paper_numbers.py` pins it, so never edit it. New results go in a new version directory, e.g. `results/v2/`.

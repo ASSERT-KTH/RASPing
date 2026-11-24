@@ -8,19 +8,21 @@ re-initialisation; and a tiny GP and BFS search for two mutants.
 Any intentional behaviour change (a FINDINGS fix) that breaks this test must
 re-record the golden file in the same commit and say so in docs/FINDINGS.md.
 
-Training is only bit-reproducible on one machine with one thread count. XLA's CPU backend
-splits reductions across threads, so the summation order differs between machines. The
-compiled models have very sharp logits, and a few optimizer steps amplify those last-bit
-differences: by epoch 4 a loss can be off by a few percent. The equivalence with the v1
-code was established with `--golden-exact` on the recording machine. By default this test
-checks what holds everywhere:
+Training from the compiled weights is only bit-reproducible on one machine with one thread
+count. XLA's CPU backend splits reductions by thread count and ISA, so the summation order
+differs between machines. The compiled models have very sharp logits, and from the first
+optimizer steps on, training amplifies those last-bit differences. On one GitHub runner the
+most_freq validation loss was off by 1.1e-3 after four steps, which is more than a 1%
+learning-rate change causes. The equivalence with the v1 code was established with
+`--golden-exact` on the recording machine. By default this test checks what holds everywhere:
 
 - compiled and re-initialised weights, encodings and accuracies, exactly;
-- the first epoch of each training run to `FIRST_EPOCH_RTOL` (hardware noise there is
-  ~2e-6 relative; a 1% learning-rate change moves it by >=2.5e-4 for every program);
-- later epochs' losses, loosely (`TAIL_RTOL`), as a sanity check.
+- training from the Xavier re-initialisation, to 1e-7. It is well-conditioned: across
+  thread counts it agrees to ~1e-16, while a 1% learning-rate change moves it by >=1.3e-4.
+  This is the tight check on the trainer, loss and data pipeline;
+- training from the compiled weights, losses only, to `COMPILED_TRAIN_RTOL`, as a sanity check.
 
-Pass `--golden-exact` to compare whole runs to 1e-7, including the trained weights.
+Pass `--golden-exact` to compare every training run to 1e-7, including the trained weights.
 """
 
 import json
@@ -36,9 +38,7 @@ from rasping.train import Trainer
 GOLDEN = json.loads((Path(__file__).parent / "golden" / "golden_v1.json").read_text())
 PROGRAMS = list(GOLDEN["programs"])
 RTOL = 1e-9
-EXACT_EPOCHS = 1  # epochs compared to FIRST_EPOCH_RTOL
-FIRST_EPOCH_RTOL = 2e-5  # see module docstring
-TAIL_RTOL = 0.1   # later epochs diverge chaotically (observed: up to 2.1%)
+COMPILED_TRAIN_RTOL = 0.1  # compiled-init training diverges chaotically across machines (seen: 2.1%)
 
 
 @pytest.fixture
@@ -61,18 +61,13 @@ def assert_digest(got: dict, exp: dict):
         np.testing.assert_allclose(got[k], exp[k], rtol=RTOL, atol=1e-9, err_msg=k)
 
 
-def assert_history(got: dict, exp: dict, exact: bool):
+def assert_history(got: dict, exp: dict, tight: bool):
     for k, v in exp.items():
-        if exact:
+        if tight:
             np.testing.assert_allclose(got[k], v, rtol=1e-7, atol=1e-9, err_msg=k)
-            continue
-        # Losses and train accuracies are per epoch; val_accs are every `val_every` epochs
-        # (from epoch 0). Compare the entries from the first EXACT_EPOCHS epochs tightly.
-        n_exact = max(1, len(v) * EXACT_EPOCHS // len(exp["train_losses"]))
-        np.testing.assert_allclose(got[k][:n_exact], v[:n_exact], rtol=FIRST_EPOCH_RTOL, atol=1e-9, err_msg=k)
-        if k.endswith("losses"):  # accuracies are discrete and can flip once runs diverge
+        elif k.endswith("losses"):  # accuracies are discrete and flip once runs diverge
             n = min(len(got[k]), len(v))
-            np.testing.assert_allclose(got[k][:n], v[:n], rtol=TAIL_RTOL, err_msg=k)
+            np.testing.assert_allclose(got[k][:n], v[:n], rtol=COMPILED_TRAIN_RTOL, err_msg=k)
 
 
 @pytest.mark.parametrize("program", PROGRAMS)
@@ -94,7 +89,7 @@ def test_golden_training(program, exact):
                  X_val=Xv, Y_val=Yv, early_stopping_patience=2, early_stopping_min_delta=1e-4,
                  val_every=2, progress=False)
     res = tr.train()
-    assert_history(res.history(), g["train"], exact)
+    assert_history(res.history(), g["train"], tight=exact)
     if exact:
         assert_digest(digest(tr.state.params), g["trained"])
 
@@ -104,4 +99,4 @@ def test_golden_training(program, exact):
     assert_digest(digest(m2.params), g["xavier_seed3"])
     res2 = Trainer(m2, X, Y, cross_entropy_loss, n_epochs=2, batch_size=64, lr=1e-4,
                    X_val=Xv, Y_val=Yv, val_every=1, progress=False).train()
-    assert_history(res2.history(), g["xavier_train"], exact)
+    assert_history(res2.history(), g["xavier_train"], tight=True)

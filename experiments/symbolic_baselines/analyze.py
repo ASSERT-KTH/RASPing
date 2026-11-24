@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 from rasping import analysis
-from rasping.config import MAIN_PROGRAMS, METHOD_LABEL, TrainConfig
+from rasping.config import PROGRAMS, METHOD_LABEL, TrainConfig
 from rasping.results import load_runs, results_dir
 from rasping.tables import save_figure
 
@@ -43,7 +43,7 @@ def load_series(version: str, budget: int):
     time_series[m][job] is (times, values).
     """
     main = load_runs(version, "main_repair")
-    main = main[main["program"].isin(MAIN_PROGRAMS)]
+    main = main[main["program"].isin(PROGRAMS)]
     d = results_dir(version, "main_repair")
     val = pd.read_csv(d / "val_curves.csv.gz")
     val = val[val["job_id"].isin(main["job_id"])]

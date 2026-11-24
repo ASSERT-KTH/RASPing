@@ -189,27 +189,3 @@ def weight_stats_ranges(ws: pd.DataFrame) -> pd.DataFrame:
         "zero_min": 100 * g["zero_frac"].min(), "zero_max": 100 * g["zero_frac"].max(),
         "std_min": g["std"].min(), "std_max": g["std"].max(), "max_abs": g["max_abs"].max(),
     }).reset_index()
-
-
-# --------------------------------------------------------------------------- dyck
-
-
-def dyck_summary(metrics: pd.DataFrame, threshold: float = THRESHOLD) -> pd.DataFrame:
-    """Table 6/7 columns: means and % of mutants >= threshold per program (and method)."""
-    if "method" in metrics.columns:
-        metrics = metrics.assign(method=metrics["method"].str.lower())
-    keys = [k for k in ("method", "program_name") if k in metrics.columns]
-    rows = []
-    for key, d in metrics.groupby(keys):
-        key = key if isinstance(key, tuple) else (key,)
-        rows.append({
-            **dict(zip(keys, key)), "n": len(d),
-            "acc": 100 * d["full_seq_exact_match_acc"].mean(),
-            "acc_fixed": 100 * (d["full_seq_exact_match_acc"] >= threshold).mean(),
-            "recall": 100 * d["positive_seq_exact_match_acc"].mean(),
-            "recall_fixed": 100 * (d["positive_seq_exact_match_acc"] >= threshold).mean(),
-            "bal_acc": 100 * d["token_balanced_accuracy"].mean(),
-            "bal_acc_fixed": 100 * (d["token_balanced_accuracy"] >= threshold).mean(),
-            "macro_f1": 100 * d["token_macro_f1"].mean(),
-        })
-    return pd.DataFrame(rows)

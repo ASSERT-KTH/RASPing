@@ -9,8 +9,7 @@ from rasping.model import compile_program
 
 @pytest.mark.parametrize("name", PROGRAMS)
 def test_generation_shapes(name):
-    exhaustive = name.startswith("shuffle_dyck")
-    ds = data.generate(name, MAX_LEN, 2000, exhaustive=exhaustive)
+    ds = data.generate(name, MAX_LEN, 2000)
     assert len(ds) == 2000
     for x, y in ds:
         assert 2 <= len(x) - 1 <= MAX_LEN
@@ -39,7 +38,7 @@ def test_split_train_val_test():
 
 @pytest.mark.parametrize("name", PROGRAMS)
 def test_save_load_roundtrip(tmp_path, name):
-    ds = data.generate(name, MAX_LEN, 10, exhaustive=name.startswith("shuffle_dyck"))
+    ds = data.generate(name, MAX_LEN, 10)
     for split, part in zip(("train", "val", "test"), data.split_train_val_test(ds)):
         path = data.save(name, split, part, data_dir=tmp_path)
         assert path.name.startswith(data.dataset_path(name, split).name.split("_")[0])
@@ -56,9 +55,7 @@ def test_load_errors(tmp_path):
 def test_committed_specification_sizes():
     """The specifications in data/ that all v1 results were computed on."""
     sizes = {p: [len(data.load(p, s)) for s in ("train", "val", "test")] for p in PROGRAMS}
-    for p in ("hist", "most_freq", "reverse", "sort", "shuffle_dyck2"):
-        assert sizes[p] == [40000, 5000, 5000], p
-    assert sizes["shuffle_dyck"] == [1635, 204, 205]
+    assert sizes == {p: [40000, 5000, 5000] for p in PROGRAMS}
 
 
 def test_encode_masks_and_pads():

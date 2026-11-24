@@ -10,7 +10,6 @@ from rasping.model import compile_program
 
 def test_aliases():
     assert programs.canonical("most-freq") == "most_freq"
-    assert programs.canonical("shuffle_dyck1") == "shuffle_dyck"
     assert programs.canonical("sort") == "sort"
     with pytest.raises(KeyError):
         programs.canonical("nope")
@@ -25,7 +24,7 @@ def test_registry_matches_config():
 def test_reference_program_is_correct(name):
     """The compiled reference program matches the ground-truth generator."""
     np.random.seed(0)
-    ds = data.generate(name, MAX_LEN, 100, exhaustive=name.startswith("shuffle_dyck"))
+    ds = data.generate(name, MAX_LEN, 100)
     model = compile_program(name)
     assert model.name == name and model.max_len == MAX_LEN
     assert model.evaluate(ds).all()

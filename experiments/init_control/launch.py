@@ -7,7 +7,7 @@ for several seeds. The buggy-init side of each pair is the mutant's main repair 
     python experiments/init_control/launch.py --dry-run
     python -m rasping.results collect init_control --version v2
 
-v1 (TMLR): 20 mutants per main program (selection seed 0), seeds 0-4, Xavier; the
+v1 (TMLR): 20 mutants per program (selection seed 0), seeds 0-4, Xavier; the
 selection is reproduced exactly by `select_mutants` (checked by a test).
 """
 
@@ -17,12 +17,12 @@ import click
 import numpy as np
 
 from rasping import cluster, raspbugs
-from rasping.config import MAIN_PROGRAMS, RUNS_DIR
+from rasping.config import PROGRAMS, RUNS_DIR
 
 
-def select_mutants(program: str, subset_size: int = 20, seed: int = 0, version: str = "v1") -> list[str]:
+def select_mutants(program: str, subset_size: int = 20, seed: int = 0) -> list[str]:
     """Stratified sample by mutation order from the benchmark (manifest order)."""
-    ms = raspbugs.mutants("all", program=program, version=version, sort=False)
+    ms = raspbugs.mutants(program=program, sort=False)
     rng = np.random.default_rng(seed)
     orders = sorted({m.mutation_order for m in ms})
     per_order = max(1, subset_size // len(orders))
@@ -46,7 +46,7 @@ def select_mutants(program: str, subset_size: int = 20, seed: int = 0, version: 
 @cluster.add_cli_options
 def main(subset_size, subset_seed, seeds, init, **cli):
     root = RUNS_DIR / "init_control"
-    selection = {p: select_mutants(p, subset_size, subset_seed) for p in MAIN_PROGRAMS}
+    selection = {p: select_mutants(p, subset_size, subset_seed) for p in PROGRAMS}
     root.mkdir(parents=True, exist_ok=True)
     (root / "selected_jobs.json").write_text(json.dumps(
         {"subset_seed": subset_seed, "subset_size": subset_size, "seeds": list(seeds),

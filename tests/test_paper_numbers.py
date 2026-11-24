@@ -1,7 +1,8 @@
 """The submitted TMLR paper's numbers, recomputed from the frozen v1 result tables.
 
 These tests are the oracle for the cleanup: they pin every number in the submitted
-paper (`tmlr-submission-1`) that can be recomputed from `results/v1_tmlr/`. They are
+paper (`tmlr-submission-1`) that can be recomputed from `results/v1_tmlr/`, except
+Appendix C (the Dyck programs, removed from RaspBugs: docs/FINDINGS.md F35). They are
 written as plain pandas on purpose — independent of the analysis code under
 `experiments/` — so that a refactor of the analysis code can be checked against them.
 
@@ -18,7 +19,7 @@ import pytest
 
 V1 = Path(__file__).resolve().parents[1] / "results" / "v1_tmlr"
 THRESHOLD = 0.99
-MAIN_PROGRAMS = ["hist", "most_freq", "reverse", "sort"]
+PROGRAMS = ["hist", "most_freq", "reverse", "sort"]
 FILE_TO_PROGRAM = {"most-freq": "most_freq", "shuffle_dyck1": "shuffle_dyck"}
 
 pytestmark = pytest.mark.skipif(not V1.exists(), reason="results/v1_tmlr not present")
@@ -48,7 +49,7 @@ def main_runs(mutants) -> pd.DataFrame:
 
 @pytest.fixture(scope="module")
 def main847(main_runs) -> pd.DataFrame:
-    return main_runs[main_runs["program"].isin(MAIN_PROGRAMS)]
+    return main_runs[main_runs["program"].isin(PROGRAMS)]
 
 
 # --------------------------------------------------------------------------- §4 / App. A
@@ -167,7 +168,7 @@ def test_section53_convergence_endpoints(baselines1000, main847):
 
     The baseline curves use the max over candidates of *test* accuracy (F17).
     """
-    b = baselines1000[baselines1000["program"].isin(MAIN_PROGRAMS)]
+    b = baselines1000[baselines1000["program"].isin(PROGRAMS)]
     b = b.assign(fixed=b["max_best_test_acc"] >= THRESHOLD)
     got = {(m, o): pct(g["fixed"]) for (m, o), g in b.groupby(["method", "mutation_order"])}
     assert got[("gp", 4)] == 22.1 and got[("bfs", 4)] == 29.4
@@ -300,44 +301,3 @@ def test_table9_weight_stats():
                 round(s["std"].min(), 2), round(s["std"].max(), 2), round(s["max_abs"].max(), 2),
             )
             assert got == exp, (prog, state)
-
-
-# --------------------------------------------------------------------------- Tables 6-7 (App. C)
-
-
-def test_table6_dyck_gbpr():
-    df = pd.read_csv(V1 / "dyck/gbpr_metrics.csv")
-    exp = {  # program -> n, acc, acc fixed%, recall, recall fixed%, balacc, balacc fixed%, F1
-        "shuffle_dyck": (331, 98.28, 7.9, 11.67, 7.3, 58.48, 7.6, 57.67),
-        "shuffle_dyck2": (288, 99.45, 99.7, 25.91, 6.6, 64.08, 7.6, 63.80),
-    }
-    for prog, e in exp.items():
-        s = df[df["program_name"] == prog]
-        got = (
-            len(s),
-            round(100 * s["full_seq_exact_match_acc"].mean(), 2),
-            pct(s["full_seq_exact_match_acc"] >= THRESHOLD),
-            round(100 * s["positive_seq_exact_match_acc"].mean(), 2),
-            pct(s["positive_seq_exact_match_acc"] >= THRESHOLD),
-            round(100 * s["token_balanced_accuracy"].mean(), 2),
-            pct(s["token_balanced_accuracy"] >= THRESHOLD),
-            round(100 * s["token_macro_f1"].mean(), 2),
-        )
-        assert got == e, prog
-
-
-def test_table7_dyck_all_methods():
-    gb = pd.read_csv(V1 / "dyck/gbpr_metrics.csv").assign(method="gbpr")
-    bl = pd.read_csv(V1 / "dyck/baseline_metrics.csv")
-    df = pd.concat([gb, bl])
-    exp = {  # (program, method) -> (% acc >= .99, % recall >= .99)
-        ("shuffle_dyck", "gbpr"): (7.9, 7.3), ("shuffle_dyck", "gp"): (30.5, 31.4),
-        ("shuffle_dyck", "bfs"): (56.5, 60.1), ("shuffle_dyck2", "gbpr"): (99.7, 6.6),
-        ("shuffle_dyck2", "gp"): (99.0, 3.8), ("shuffle_dyck2", "bfs"): (95.8, 18.8),
-    }
-    for (prog, method), e in exp.items():
-        s = df[(df["program_name"] == prog) & (df["method"].str.lower() == method)]
-        assert len(s) == {"shuffle_dyck": 331, "shuffle_dyck2": 288}[prog], (prog, method)
-        got = (pct(s["full_seq_exact_match_acc"] >= THRESHOLD),
-               pct(s["positive_seq_exact_match_acc"] >= THRESHOLD))
-        assert got == e, (prog, method)

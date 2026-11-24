@@ -7,7 +7,7 @@ writing `runs/main_repair/<program>/<job_id>/`. Already finished runs are skippe
     python experiments/main_repair/launch.py                    # submit
     python -m rasping.results collect main_repair --version v2  # then collect
 
-v1 (TMLR) runs: all buggy mutants, default TrainConfig (10k epochs, batch 256, lr 1e-4,
+v1 (TMLR) runs: the 1,466 v1 mutants (Dyck programs included), default TrainConfig (10k epochs, batch 256, lr 1e-4,
 patience 50), trajectories stored every 50 steps.
 """
 
@@ -18,13 +18,12 @@ from rasping.config import RUNS_DIR
 
 
 @click.command()
-@click.option("--subset", type=click.Choice(raspbugs.SUBSETS), default="all", show_default=True)
 @click.option("--extra", default="", help="Extra arguments passed to rasping.repair")
 @cluster.add_cli_options
-def main(subset, extra, **cli):
+def main(extra, **cli):
     root = RUNS_DIR / "main_repair"
     commands = []
-    for m in raspbugs.mutants(subset):
+    for m in raspbugs.mutants():
         out = root / m.program / m.job_id
         if (out / "run.json").exists():
             continue

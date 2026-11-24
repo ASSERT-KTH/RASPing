@@ -3,7 +3,7 @@
 Only for intentional behaviour changes (see CLAUDE.md): re-record exactly the entries the
 change affects, in the same commit as the change and its docs/FINDINGS.md entry.
 
-    python tests/golden/record.py training shuffle_dyck2   # one program's training entry
+    python tests/golden/record.py training sort            # one program's training entry
     python tests/golden/record.py search                   # the GP/BFS search entries
 """
 

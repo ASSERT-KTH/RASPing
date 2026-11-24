@@ -5,7 +5,7 @@
                                        which (best_train_acc, best_test_acc) changes,
                                        plus the first and last evaluation
 
-Used by `experiments/symbolic_baselines/collect.py` and `scripts/freeze_v1_results.py`.
+Used by `experiments/symbolic_baselines/collect.py`.
 """
 
 from __future__ import annotations

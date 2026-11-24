@@ -1,7 +1,7 @@
 """Registry of the base RASP programs.
 
-Each program has a canonical name (`most_freq`, `shuffle_dyck`, ...), the file prefix
-of its specification in `data/` (historically `most-freq`, `shuffle_dyck1`), an input
+Each program has a canonical name (`most_freq`, ...), the file prefix of its
+specification in `data/` (historically `most-freq` for most_freq), an input
 vocabulary, and a factory that builds the RASP SOp from a module containing the
 program's source (the reference source in `raspbugs/source/` or a mutant's source).
 """
@@ -54,12 +54,6 @@ _PROGRAMS = {
     "most_freq": Program(
         "most_freq", "most-freq", (1, 2, 3, 4, 5), lambda m, n, v: m.make_sort_freq(n)
     ),
-    "shuffle_dyck": Program(
-        "shuffle_dyck", "shuffle_dyck1", ("(", ")"), lambda m, n, v: m.make_shuffle_dyck(["()"])
-    ),
-    "shuffle_dyck2": Program(
-        "shuffle_dyck2", "shuffle_dyck2", ("(", ")", "{", "}"), lambda m, n, v: m.make_shuffle_dyck2()
-    ),
 }
 
 #: Historical names still found in data files and old result records.
@@ -67,7 +61,7 @@ ALIASES = {p.data_name: p.name for p in _PROGRAMS.values()}
 
 
 def canonical(name: str) -> str:
-    """Map any historical program name (e.g. `most-freq`, `shuffle_dyck1`) to the canonical one."""
+    """Map any historical program name (e.g. `most-freq`) to the canonical one."""
     name = ALIASES.get(name, name)
     if name not in _PROGRAMS:
         raise KeyError(f"Unknown program {name!r}; known: {sorted(_PROGRAMS)}")

@@ -5,16 +5,11 @@ one line per mutant with the mutation and the oracle's pytest output. This scrip
 re-applies each diff to the reference source, labels the mutant from the oracle output
 and writes
 
-    raspbugs_<version>.jsonl.gz   every BUGGY_MODEL mutant (source, diff, operators, ...)
-    mutants_<version>.csv         every mutant with its status (all labels)
+    raspbugs.jsonl.gz   the benchmark: buggy mutants whose compiled output vocabulary can
+                        represent the specification's outputs (F6), with source, diff, ...
+    mutants.csv         every mutant with its status and `representable` (not tracked)
 
-    python build_manifest.py --version v2 [--results-dir results]
-
-Benchmark membership (`in_raspbugs_<version>`): buggy mutants whose compiled output
-vocabulary can represent the specification's outputs (`representable`; see F6), unless
-`--membership-from` gives a CSV with a `job_id` column defining it instead (as for v1,
-whose membership was the buggy mutants with a GBPR result — the same rule, applied
-implicitly, minus one Dyck-2 mutant).
+    python build_manifest.py [--results-dir results]
 """
 
 from __future__ import annotations
@@ -35,8 +30,6 @@ HERE = Path(__file__).resolve().parent
 FAILED_MUTATION_MARKERS = [
     "SyntaxError", "TypeError", "AttributeError", "IndexError",
     "rasp.py:388: AssertionError",
-    "shuffle_dyck.py:100: AssertionError", "shuffle_dyck.py:95: AssertionError",
-    "shuffle_dyck2.py:100: AssertionError", "shuffle_dyck2.py:95: AssertionError",
 ]
 
 
@@ -97,34 +90,25 @@ def iter_mutants(results_dir: Path):
 
 
 @click.command()
-@click.option("--version", required=True)
 @click.option("--results-dir", default=str(HERE / "results"), show_default=True)
-@click.option("--membership-from", default=None, help="CSV whose job_ids define the benchmark")
-def main(version, results_dir, membership_from):
+def main(results_dir):
     rows = list(iter_mutants(Path(results_dir)))
-    members = set(pd.read_csv(membership_from)["job_id"]) if membership_from else None
     for r in rows:
-        if r["status"] == "BUGGY_MODEL":
-            r["representable"] = is_representable(r["program"], r["source"])
-    flag = f"in_raspbugs_{version}"
-    for r in rows:
-        r[flag] = r["status"] == "BUGGY_MODEL" and (
-            r["job_id"] in members if members is not None else r["representable"])
-
-    with gzip.open(HERE / f"raspbugs_{version}.jsonl.gz", "wt") as f:
-        for r in rows:
-            if r["status"] == "BUGGY_MODEL":
-                f.write(json.dumps({k: r.get(k) for k in (
-                    "job_id", "program", "mutation_order", "operators", flag, "representable",
-                    "oracle_accuracy_50",
-                    "diff", "source", "mutations")}) + "\n")
+        r["representable"] = (r["status"] == "BUGGY_MODEL"
+                              and is_representable(r["program"], r["source"]))
+    benchmark = [r for r in rows if r["representable"]]
+    with gzip.GzipFile(HERE / "raspbugs.jsonl.gz", "wb", mtime=0) as f:
+        for r in benchmark:
+            f.write((json.dumps({k: r.get(k) for k in (
+                "job_id", "program", "mutation_order", "operators", "oracle_accuracy_50",
+                "diff", "source", "mutations")}) + "\n").encode())
     table = pd.DataFrame([{k: r.get(k) for k in ("job_id", "program", "mutation_order", "status",
-                                                  "oracle_accuracy_50", "representable", flag)}
+                                                  "oracle_accuracy_50", "representable")}
                           for r in rows])
     table["operators"] = [";".join(r["operators"]) for r in rows]
-    table.to_csv(HERE / f"mutants_{version}.csv", index=False)
+    table.to_csv(HERE / "mutants.csv", index=False)
     print(table["status"].value_counts().to_string())
-    print(f"{flag}: {int(table[flag].sum())} mutants")
+    print(f"benchmark (buggy and representable): {len(benchmark)} mutants")
 
 
 if __name__ == "__main__":

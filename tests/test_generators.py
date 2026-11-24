@@ -3,8 +3,6 @@ from rasping.generators import (
     generate_hist_exhaustive,
     generate_sort_exhaustive,
     generate_most_freq_exhaustive,
-    generate_shuffle_dyck1_exhaustive,
-    generate_shuffle_dyck2_exhaustive,
 )
 
 from collections import Counter
@@ -102,69 +100,3 @@ def test_generate_most_freq_exhaustive():
 
         assert len(input_seq) == len(output_seq)
         assert 3 <= len(input_seq) <= max_length + 1
-
-
-def test_generate_shuffle_dyck1_exhaustive():
-    max_length = 4
-    pairs = generate_shuffle_dyck1_exhaustive(["(", ")"], max_length)
-
-    # Calculate number of sequences - should include all possible combinations
-    total_sequences = sum(2**i for i in range(2, max_length + 1))
-    assert len(pairs) == total_sequences
-
-    for input_seq, output_seq in pairs:
-        assert input_seq[0] == "BOS"
-        assert output_seq[0] == "BOS"
-
-        # Check if sequence is balanced
-        sequence = input_seq[1:]
-        balance = 0
-        valid = True
-        for t in sequence:
-            balance += 1 if t == "(" else -1
-            if balance < 0:
-                valid = False
-                break
-
-        # Output should be 1 only if sequence is balanced (valid and final balance is 0)
-        expected_output = 1 if valid and balance == 0 else 0
-        assert all(x == expected_output for x in output_seq[1:])
-
-        assert 2 <= len(sequence) <= max_length
-
-
-def test_generate_shuffle_dyck2_exhaustive():
-    max_length = 4
-    pairs = generate_shuffle_dyck2_exhaustive(["(", ")", "{", "}"], max_length)
-
-    # Calculate number of sequences - should include all possible combinations
-    total_sequences = sum(4**i for i in range(2, max_length + 1))
-    assert len(pairs) == total_sequences
-
-    for input_seq, output_seq in pairs:
-        assert input_seq[0] == "BOS"
-        assert output_seq[0] == "BOS"
-
-        # Check if sequence is balanced for both bracket types
-        sequence = input_seq[1:]
-        balance1 = balance2 = 0
-        valid = True
-        for t in sequence:
-            if t == "(":
-                balance1 += 1
-            elif t == ")":
-                balance1 -= 1
-            elif t == "{":
-                balance2 += 1
-            else:  # t == '}'
-                balance2 -= 1
-
-            if balance1 < 0 or balance2 < 0:
-                valid = False
-                break
-
-        # Output should be 1 only if sequence is balanced (valid and both balances are 0)
-        expected_output = 1 if valid and balance1 == 0 and balance2 == 0 else 0
-        assert all(x == expected_output for x in output_seq[1:])
-
-        assert 2 <= len(sequence) <= max_length

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from rasping import analysis, raspbugs
-from rasping.config import MAIN_PROGRAMS, METHOD_LABEL
+from rasping.config import PROGRAMS, METHOD_LABEL
 from rasping.results import load_runs
 from rasping.tables import latex_table, pct, save_figure, tt, write_table
 
@@ -20,7 +20,7 @@ from rasping.tables import latex_table, pct, save_figure, tt, write_table
 def before_accuracy(df):
     if "initial_test_accuracy" in df.columns:
         return df["initial_test_accuracy"]
-    oracle = {m.job_id: m.oracle_accuracy_50 for m in raspbugs.mutants("buggy")}
+    oracle = {m.job_id: m.oracle_accuracy_50 for m in raspbugs.mutants()}
     return df["job_id"].map(oracle)
 
 
@@ -71,11 +71,11 @@ def histograms(df, by, panels, title, version, name, ncols):
 @click.option("--version", default="v1_tmlr", show_default=True)
 def main(version):
     df = load_runs(version, "main_repair")
-    df = df[df["program"].isin(MAIN_PROGRAMS)].assign(before=lambda d: before_accuracy(d))
+    df = df[df["program"].isin(PROGRAMS)].assign(before=lambda d: before_accuracy(d))
     print(f"{len(df)} mutants of {sorted(df['program'].unique())}")
     table1(df, version)
     table5(df, version)
-    histograms(df, "program", list(MAIN_PROGRAMS),
+    histograms(df, "program", list(PROGRAMS),
                f"Distribution of Correctness Accuracy by Program (Before and After {METHOD_LABEL})",
                version, "fig3_accuracy_by_program.pdf", ncols=2)
     histograms(df, "mutation_order", sorted(df["mutation_order"].unique()),

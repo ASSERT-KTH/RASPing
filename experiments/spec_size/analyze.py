@@ -14,14 +14,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from rasping import analysis
-from rasping.config import MAIN_PROGRAMS, METHOD_LABEL
+from rasping.config import PROGRAMS, METHOD_LABEL
 from rasping.results import load_runs, results_dir
 from rasping.tables import latex_table, save_figure, write_table
 
 
 def load(version, budget):
     main = load_runs(version, "main_repair")
-    main = main[main["program"].isin(MAIN_PROGRAMS)]
+    main = main[main["program"].isin(PROGRAMS)]
     ref = set(main["job_id"])
     spec = load_runs(version, "spec_size")
     spec = spec[spec["job_id"].isin(ref)]

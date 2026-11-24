@@ -21,7 +21,6 @@ ANALYSES = [
     ("experiments/symbolic_baselines/analyze.py", "Fig 4, Fig 5"),
     ("experiments/spec_size/analyze.py", "Table 8, Fig 8"),
     ("experiments/init_control/analyze.py", "Table 2, Table 9, Fig 9, Fig 10"),
-    ("experiments/dyck/analyze.py", "Table 6, Table 7"),
 ]
 
 
