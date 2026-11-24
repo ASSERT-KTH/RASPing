@@ -1,7 +1,14 @@
-from typing import Counter
-import numpy as np
-from collections import Counter
+"""Ground-truth input/output generators for the base programs.
+
+Each generator returns `(input_seq, output_seq)` with a leading "BOS" token on both.
+Random generators draw from NumPy's *global* RNG (seed it before generating; F24).
+Exhaustive generators enumerate all inputs of length 2..max_len in length order.
+"""
+
 import itertools
+from collections import Counter
+
+import numpy as np
 
 
 def generate_reverse(acceptedTokens, maxSeqLength):
@@ -350,6 +357,7 @@ def generate_shuffle_dyck2_exhaustive(acceptedTokens, maxSeqLength):
     return all_pairs
 
 
+#: Keyed by the data-file program name (`most-freq`, `shuffle_dyck1`, ...).
 GENERATORS = {
     "reverse": generate_reverse,
     "reverse_exhaustive": generate_reverse_exhaustive,
@@ -364,3 +372,11 @@ GENERATORS = {
     "shuffle_dyck2": generate_shuffle_dyck2,
     "shuffle_dyck2_exhaustive": generate_shuffle_dyck2_exhaustive,
 }
+
+
+def get_generator(program: str, exhaustive: bool = False):
+    """Generator for a program given by any of its names."""
+    from rasping.programs import get
+
+    key = get(program).data_name + ("_exhaustive" if exhaustive else "")
+    return GENERATORS[key]

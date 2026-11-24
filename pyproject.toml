@@ -3,10 +3,128 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "differentiable-program-repair"
-version = "0.1.0"
-description = "RASPing project for program analysis"
-requires-python = ">=3.10"
+name = "rasping"
+version = "0.2.0"
+description = "Repairing Tracr-compiled RASP programs by gradient descent (RaspBugs benchmark, experiments)"
+requires-python = "==3.13.*"
+dependencies = [
+    # Core: compiling RASP to Transformers and training them. tracr and haiku are
+    # pinned to the exact commits the v1 (TMLR) experiments ran with.
+    "jax==0.4.38",
+    "jaxlib==0.4.38",
+    "optax==0.2.4",
+    "dm-haiku @ git+https://github.com/google-deepmind/dm-haiku@47500fbd438565b73508e3f443cdda85be26f39d",
+    "tracr @ git+https://github.com/google-deepmind/tracr@9ce2b8c82b6ba10e62e86cf6f390e7536d4fd2cd",
+    "numpy==2.2.1",
+    # Analysis and plotting
+    "pandas==2.2.3",
+    "matplotlib==3.10.0",
+    "seaborn==0.13.2",
+    "scikit-learn==1.6.1",
+    # Running experiments
+    "click==8.1.8",
+    "tqdm==4.67.1",
+    "submitit==1.5.2",
+    # Symbolic baselines (GP / BFS) mutate RASP source with the benchmark's operators
+    "parso==0.8.4",
+    "cosmic-ray @ git+https://github.com/andre15silva/cosmic-ray.git@91aaa76f31a2eaaa1483093cfa6abfb1c9a23400",
+    "rasp-operators",
+    "toml==0.10.2",
+]
+
+[project.optional-dependencies]
+# GPU training on the cluster (the container installs this extra)
+cuda = ["jax[cuda12]==0.4.38"]
+# Optional experiment tracking (`--wandb` flag of the repair runner)
+wandb = ["wandb==0.19.6"]
+
+[dependency-groups]
+dev = ["pytest==8.3.4", "pytest-skip-slow==0.0.5"]
+
+[tool.uv]
+default-groups = ["dev"]
+# Transitive dependencies pinned to the versions of the environment the v1 (TMLR)
+# experiments ran in, so that compiled models and training numerics reproduce.
+constraint-dependencies = [
+    "absl-py==2.4.0",
+    "aiohappyeyeballs==2.6.1",
+    "aiohttp==3.13.3",
+    "aiosignal==1.4.0",
+    "anybadge==1.16.0",
+    "attrs==25.4.0",
+    "chex==0.1.90",
+    "click==8.1.8",
+    "cloudpickle==3.1.2",
+    "contourpy==1.3.3",
+    "cycler==0.12.1",
+    "decorator==5.2.1",
+    "einops==0.8.2",
+    "etils==1.13.0",
+    "exit-codes==1.3.0",
+    "fonttools==4.61.1",
+    "frozenlist==1.8.0",
+    "gitdb==4.0.12",
+    "gitpython==3.1.46",
+    "idna==3.11",
+    "iniconfig==2.3.0",
+    "iterfzf==1.9.0.67.0",
+    "jax==0.4.38",
+    "jaxlib==0.4.38",
+    "jmp==0.0.4",
+    "joblib==1.5.3",
+    "kiwisolver==1.4.9",
+    "markdown-it-py==4.0.0",
+    "matplotlib==3.10.0",
+    "mdurl==0.1.2",
+    "ml-dtypes==0.5.4",
+    "multidict==6.7.1",
+    "networkx==3.6.1",
+    "numpy==2.2.1",
+    "optax==0.2.4",
+    "opt-einsum==3.4.0",
+    "packaging==26.0",
+    "pandas==2.2.3",
+    "parso==0.8.4",
+    "pillow==12.1.1",
+    "pluggy==1.6.0",
+    "propcache==0.4.1",
+    "pygments==2.19.2",
+    "pyparsing==3.3.2",
+    "pytest==8.3.4",
+    "pytest-skip-slow==0.0.5",
+    "python-dateutil==2.9.0.post0",
+    "pytz==2025.2",
+    "qprompt==0.16.3",
+    "rich==14.3.2",
+    "scikit-learn==1.6.1",
+    "scipy==1.17.0",
+    "seaborn==0.13.2",
+    "setuptools==82.0.0",
+    "smmap==5.0.2",
+    "sqlalchemy==2.0.46",
+    "stevedore==5.6.0",
+    "submitit==1.5.2",
+    "tabulate==0.9.0",
+    "threadpoolctl==3.6.0",
+    "toml==0.10.2",
+    "toolz==1.1.0",
+    "tqdm==4.67.1",
+    "typing-extensions==4.15.0",
+    "tzdata==2025.3",
+    "yarl==1.22.0",
+    "yattag==1.16.1",
+]
+
+[tool.uv.workspace]
+members = ["raspbugs/operators"]
+
+[tool.uv.sources]
+rasp-operators = { workspace = true }
 
 [tool.setuptools]
-packages = ["src", "tests", "experiments", "scripts"]
+packages = ["rasping"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+filterwarnings = ["ignore:'maxsplit' is passed as positional argument:DeprecationWarning"]

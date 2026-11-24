@@ -1,4 +1,4 @@
-from ..src.generators import (
+from rasping.generators import (
     generate_reverse_exhaustive,
     generate_hist_exhaustive,
     generate_sort_exhaustive,
@@ -7,7 +7,7 @@ from ..src.generators import (
     generate_shuffle_dyck2_exhaustive,
 )
 
-from typing import Counter
+from collections import Counter
 
 
 def test_generate_reverse_exhaustive():

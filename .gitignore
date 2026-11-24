@@ -175,3 +175,5 @@ submitit_logs/
 # Local copies of the paper and reviews
 paper.pdf
 reviews.txt
+# cosmic-ray working files written by raspbugs/run_mutations.py
+raspbugs/results/

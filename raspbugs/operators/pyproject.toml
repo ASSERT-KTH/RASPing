@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rasp-operators"
+version = "0.1.0"
+description = "RASP-specific mutation operators for cosmic-ray (used to build RaspBugs)"
+requires-python = ">=3.10"
+dependencies = ["parso"]
+
+# The entry-point name ("operators") becomes the prefix of the operator names recorded
+# in the benchmark (e.g. "operators/replace-rasp-comparison"); do not rename it.
+[project.entry-points."cosmic_ray.operator_providers"]
+operators = "rasp_operators.provider:Provider"
+
+[tool.setuptools]
+packages = ["rasp_operators"]

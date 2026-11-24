@@ -1,0 +1,1504 @@
+{
+ "jax_version": "0.4.38",
+ "programs": {
+  "hist": {
+   "job_id": "0532b1914bc2417486ac590b6672afb5",
+   "compiled": {
+    "n": 4544,
+    "sum": 1951.1385281385283,
+    "abs_sum": 3162.8614718614717,
+    "sq_sum": 325762.2070800772,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2"
+    ]
+   },
+   "evaluate_model_acc_30": 0.0,
+   "encoded_test_digest": [
+    5960,
+    4485
+   ],
+   "fast_eval_acc_200": 0.0,
+   "train": {
+    "train_losses": [
+     2.267607659724244,
+     1.7775958526036664,
+     1.6181430886290653,
+     1.5778495778314823
+    ],
+    "train_accs": [
+     0.01953125,
+     0.01953125,
+     0.01953125,
+     0.01953125
+    ],
+    "val_losses": [
+     1.947605222967838,
+     1.7570184947296605,
+     1.73673809085023,
+     1.6909748911658031
+    ],
+    "val_accs": [
+     0.0,
+     0.0
+    ]
+   },
+   "trained": {
+    "n": 4544,
+    "sum": 1951.4273452563405,
+    "abs_sum": 3164.272768809135,
+    "sq_sum": 325763.730727463,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2"
+    ]
+   },
+   "xavier_seed3": {
+    "n": 4544,
+    "sum": 18.217616901188485,
+    "abs_sum": 723.8243763400058,
+    "sq_sum": 190.50848816183134,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2"
+    ]
+   },
+   "xavier_train": {
+    "train_losses": [
+     2.460122078498491,
+     2.4426278641983505
+    ],
+    "train_accs": [
+     0.0,
+     0.0
+    ],
+    "val_losses": [
+     2.463152977721058,
+     2.4469928146300615
+    ],
+    "val_accs": [
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "most_freq": {
+   "job_id": "010d1cd204b84af397f31e73d4505e7a",
+   "compiled": {
+    "n": 95122,
+    "sum": 5604.2770562770565,
+    "abs_sum": 8247.722943722943,
+    "sq_sum": 794496.4141601544,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2",
+     "transformer/layer_4/attn/key",
+     "transformer/layer_4/attn/linear",
+     "transformer/layer_4/attn/query",
+     "transformer/layer_4/attn/value",
+     "transformer/layer_4/mlp/linear_1",
+     "transformer/layer_4/mlp/linear_2"
+    ]
+   },
+   "evaluate_model_acc_30": 0.0,
+   "encoded_test_digest": [
+    6826,
+    2994
+   ],
+   "fast_eval_acc_200": 0.0,
+   "train": {
+    "train_losses": [
+     1.5162288821707537,
+     1.4182226698931908,
+     1.40185874662463,
+     1.412908187097449
+    ],
+    "train_accs": [
+     0.0,
+     0.00390625,
+     0.0,
+     0.0
+    ],
+    "val_losses": [
+     1.4146576091358256,
+     1.3934813402404853,
+     1.424080690614193,
+     1.3958042554022327
+    ],
+    "val_accs": [
+     0.0,
+     0.015625
+    ]
+   },
+   "trained": {
+    "n": 95122,
+    "sum": 5604.3823524513255,
+    "abs_sum": 8253.17636264317,
+    "sq_sum": 794496.6126199025,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2",
+     "transformer/layer_4/attn/key",
+     "transformer/layer_4/attn/linear",
+     "transformer/layer_4/attn/query",
+     "transformer/layer_4/attn/value",
+     "transformer/layer_4/mlp/linear_1",
+     "transformer/layer_4/mlp/linear_2"
+    ]
+   },
+   "xavier_seed3": {
+    "n": 95122,
+    "sum": -21.676544638604653,
+    "abs_sum": 8618.653190487887,
+    "sq_sum": 1282.9441677743014,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2",
+     "transformer/layer_4/attn/key",
+     "transformer/layer_4/attn/linear",
+     "transformer/layer_4/attn/query",
+     "transformer/layer_4/attn/value",
+     "transformer/layer_4/mlp/linear_1",
+     "transformer/layer_4/mlp/linear_2"
+    ]
+   },
+   "xavier_train": {
+    "train_losses": [
+     1.8018467863184742,
+     1.6472908005852172
+    ],
+    "train_accs": [
+     0.0,
+     0.0
+    ],
+    "val_losses": [
+     1.6915792033004085,
+     1.6013711905956627
+    ],
+    "val_accs": [
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "reverse": {
+   "job_id": "0079c3471a1b4dd38da7364d04bf48dc",
+   "compiled": {
+    "n": 95054,
+    "sum": 18780.13852813853,
+    "abs_sum": 20211.86147186147,
+    "sq_sum": 1978761.2070800771,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2"
+    ]
+   },
+   "evaluate_model_acc_30": 0.0,
+   "encoded_test_digest": [
+    7062,
+    3149
+   ],
+   "fast_eval_acc_200": 0.0,
+   "train": {
+    "train_losses": [
+     1.46535931715061,
+     1.3750169202577143,
+     1.3496222116486447,
+     1.3167619839734188
+    ],
+    "train_accs": [
+     0.0078125,
+     0.015625,
+     0.015625,
+     0.0234375
+    ],
+    "val_losses": [
+     1.3827441523156363,
+     1.3381586327887078,
+     1.3151724708762116,
+     1.3028650959928951
+    ],
+    "val_accs": [
+     0.015625,
+     0.015625
+    ]
+   },
+   "trained": {
+    "n": 95054,
+    "sum": 18780.336208344714,
+    "abs_sum": 20224.501426337858,
+    "sq_sum": 1978754.9604566642,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2"
+    ]
+   },
+   "xavier_seed3": {
+    "n": 95054,
+    "sum": 33.78090543933498,
+    "abs_sum": 8622.216551527803,
+    "sq_sum": 1282.131690719879,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2"
+    ]
+   },
+   "xavier_train": {
+    "train_losses": [
+     1.6216650795982122,
+     1.57222523352727
+    ],
+    "train_accs": [
+     0.0,
+     0.0
+    ],
+    "val_losses": [
+     1.5633343494359602,
+     1.531442934922389
+    ],
+    "val_accs": [
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "sort": {
+   "job_id": "0152617485ba4c4f9a2c74f0f90a3c63",
+   "compiled": {
+    "n": 187346,
+    "sum": 180142.13852813852,
+    "abs_sum": 181473.86147186148,
+    "sq_sum": 18118623.207080077,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2"
+    ]
+   },
+   "evaluate_model_acc_30": 0.0,
+   "encoded_test_digest": [
+    8290,
+    3576
+   ],
+   "fast_eval_acc_200": 0.0,
+   "train": {
+    "train_losses": [
+     1.6033953382378097,
+     1.5477129226289446,
+     1.469420036888173,
+     1.3956434598626026
+    ],
+    "train_accs": [
+     0.00390625,
+     0.0078125,
+     0.01953125,
+     0.01953125
+    ],
+    "val_losses": [
+     1.5623563556351239,
+     1.4855687615980462,
+     1.4355299409048587,
+     1.3533286402419944
+    ],
+    "val_accs": [
+     0.0,
+     0.015625
+    ]
+   },
+   "trained": {
+    "n": 187346,
+    "sum": 180139.97151062568,
+    "abs_sum": 181491.46639577372,
+    "sq_sum": 18118621.761231128,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2"
+    ]
+   },
+   "xavier_seed3": {
+    "n": 187346,
+    "sum": -18.81308522568841,
+    "abs_sum": 15509.65689900878,
+    "sq_sum": 2041.6105029561795,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2"
+    ]
+   },
+   "xavier_train": {
+    "train_losses": [
+     1.9576073237497014,
+     1.8255301420441492
+    ],
+    "train_accs": [
+     0.0,
+     0.0
+    ],
+    "val_losses": [
+     1.8594107192597193,
+     1.792108370537886
+    ],
+    "val_accs": [
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "shuffle_dyck": {
+   "job_id": "01d3a605118c41aca3b6bac7f06b86d0",
+   "compiled": {
+    "n": 293055,
+    "sum": 74361.18614718615,
+    "abs_sum": 89515.86147186147,
+    "sq_sum": 9495474.692340849,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2",
+     "transformer/layer_4/attn/key",
+     "transformer/layer_4/attn/linear",
+     "transformer/layer_4/attn/query",
+     "transformer/layer_4/attn/value",
+     "transformer/layer_4/mlp/linear_1",
+     "transformer/layer_4/mlp/linear_2",
+     "transformer/layer_5/attn/key",
+     "transformer/layer_5/attn/linear",
+     "transformer/layer_5/attn/query",
+     "transformer/layer_5/attn/value",
+     "transformer/layer_5/mlp/linear_1",
+     "transformer/layer_5/mlp/linear_2"
+    ]
+   },
+   "evaluate_model_acc_30": 0.8666666666666667,
+   "encoded_test_digest": [
+    1847,
+    28
+   ],
+   "fast_eval_acc_200": 0.855,
+   "train": {
+    "train_losses": [
+     2.1163005583578456,
+     0.2919171083414539,
+     0.2477034902575906,
+     0.16374905525891076
+    ],
+    "train_accs": [
+     0.6015625,
+     0.97265625,
+     0.97265625,
+     0.97265625
+    ],
+    "val_losses": [
+     0.3306213390586087,
+     0.25674639936047344,
+     0.24749734963974265,
+     0.2224169257910234
+    ],
+    "val_accs": [
+     0.5,
+     0.953125
+    ]
+   },
+   "trained": {
+    "n": 293055,
+    "sum": 74353.99155640168,
+    "abs_sum": 89534.11816294464,
+    "sq_sum": 9495416.526534945,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2",
+     "transformer/layer_4/attn/key",
+     "transformer/layer_4/attn/linear",
+     "transformer/layer_4/attn/query",
+     "transformer/layer_4/attn/value",
+     "transformer/layer_4/mlp/linear_1",
+     "transformer/layer_4/mlp/linear_2",
+     "transformer/layer_5/attn/key",
+     "transformer/layer_5/attn/linear",
+     "transformer/layer_5/attn/query",
+     "transformer/layer_5/attn/value",
+     "transformer/layer_5/mlp/linear_1",
+     "transformer/layer_5/mlp/linear_2"
+    ]
+   },
+   "xavier_seed3": {
+    "n": 293055,
+    "sum": 70.44540283936938,
+    "abs_sum": 17828.013063534163,
+    "sq_sum": 1986.379464265227,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2",
+     "transformer/layer_4/attn/key",
+     "transformer/layer_4/attn/linear",
+     "transformer/layer_4/attn/query",
+     "transformer/layer_4/attn/value",
+     "transformer/layer_4/mlp/linear_1",
+     "transformer/layer_4/mlp/linear_2",
+     "transformer/layer_5/attn/key",
+     "transformer/layer_5/attn/linear",
+     "transformer/layer_5/attn/query",
+     "transformer/layer_5/attn/value",
+     "transformer/layer_5/mlp/linear_1",
+     "transformer/layer_5/mlp/linear_2"
+    ]
+   },
+   "xavier_train": {
+    "train_losses": [
+     0.332931436807093,
+     0.15657393870482883
+    ],
+    "train_accs": [
+     0.97265625,
+     0.97265625
+    ],
+    "val_losses": [
+     0.2715272595143693,
+     0.21309933846683723
+    ],
+    "val_accs": [
+     0.953125,
+     0.953125
+    ]
+   }
+  },
+  "shuffle_dyck2": {
+   "job_id": "011feaa061f24316995aa1d14301d847",
+   "compiled": {
+    "n": 1026950,
+    "sum": 131219.18614718615,
+    "abs_sum": 159178.9090909091,
+    "sq_sum": 16984666.474653773,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2",
+     "transformer/layer_4/attn/key",
+     "transformer/layer_4/attn/linear",
+     "transformer/layer_4/attn/query",
+     "transformer/layer_4/attn/value",
+     "transformer/layer_4/mlp/linear_1",
+     "transformer/layer_4/mlp/linear_2",
+     "transformer/layer_5/attn/key",
+     "transformer/layer_5/attn/linear",
+     "transformer/layer_5/attn/query",
+     "transformer/layer_5/attn/value",
+     "transformer/layer_5/mlp/linear_1",
+     "transformer/layer_5/mlp/linear_2",
+     "transformer/layer_6/attn/key",
+     "transformer/layer_6/attn/linear",
+     "transformer/layer_6/attn/query",
+     "transformer/layer_6/attn/value",
+     "transformer/layer_6/mlp/linear_1",
+     "transformer/layer_6/mlp/linear_2",
+     "transformer/layer_7/attn/key",
+     "transformer/layer_7/attn/linear",
+     "transformer/layer_7/attn/query",
+     "transformer/layer_7/attn/value",
+     "transformer/layer_7/mlp/linear_1",
+     "transformer/layer_7/mlp/linear_2"
+    ]
+   },
+   "evaluate_model_acc_30": 0.9666666666666667,
+   "encoded_test_digest": [
+    5392,
+    16
+   ],
+   "fast_eval_acc_200": 0.985,
+   "train": {
+    "train_losses": [
+     0.07920530948421291,
+     0.0,
+     0.0
+    ],
+    "train_accs": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "val_losses": [
+     9.214061738044956,
+     16.475451482377355,
+     21.855913901121674
+    ],
+    "val_accs": [
+     0.984375,
+     0.984375
+    ]
+   },
+   "trained": {
+    "n": 1026950,
+    "sum": 131222.41969490287,
+    "abs_sum": 159183.57776500907,
+    "sq_sum": 16984667.084191747,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2",
+     "transformer/layer_4/attn/key",
+     "transformer/layer_4/attn/linear",
+     "transformer/layer_4/attn/query",
+     "transformer/layer_4/attn/value",
+     "transformer/layer_4/mlp/linear_1",
+     "transformer/layer_4/mlp/linear_2",
+     "transformer/layer_5/attn/key",
+     "transformer/layer_5/attn/linear",
+     "transformer/layer_5/attn/query",
+     "transformer/layer_5/attn/value",
+     "transformer/layer_5/mlp/linear_1",
+     "transformer/layer_5/mlp/linear_2",
+     "transformer/layer_6/attn/key",
+     "transformer/layer_6/attn/linear",
+     "transformer/layer_6/attn/query",
+     "transformer/layer_6/attn/value",
+     "transformer/layer_6/mlp/linear_1",
+     "transformer/layer_6/mlp/linear_2",
+     "transformer/layer_7/attn/key",
+     "transformer/layer_7/attn/linear",
+     "transformer/layer_7/attn/query",
+     "transformer/layer_7/attn/value",
+     "transformer/layer_7/mlp/linear_1",
+     "transformer/layer_7/mlp/linear_2"
+    ]
+   },
+   "xavier_seed3": {
+    "n": 1026950,
+    "sum": -43.96151827383349,
+    "abs_sum": 46425.772119335845,
+    "sq_sum": 3996.728811704563,
+    "keys": [
+     "pos_embed",
+     "token_embed",
+     "transformer/layer_0/attn/key",
+     "transformer/layer_0/attn/linear",
+     "transformer/layer_0/attn/query",
+     "transformer/layer_0/attn/value",
+     "transformer/layer_0/mlp/linear_1",
+     "transformer/layer_0/mlp/linear_2",
+     "transformer/layer_1/attn/key",
+     "transformer/layer_1/attn/linear",
+     "transformer/layer_1/attn/query",
+     "transformer/layer_1/attn/value",
+     "transformer/layer_1/mlp/linear_1",
+     "transformer/layer_1/mlp/linear_2",
+     "transformer/layer_2/attn/key",
+     "transformer/layer_2/attn/linear",
+     "transformer/layer_2/attn/query",
+     "transformer/layer_2/attn/value",
+     "transformer/layer_2/mlp/linear_1",
+     "transformer/layer_2/mlp/linear_2",
+     "transformer/layer_3/attn/key",
+     "transformer/layer_3/attn/linear",
+     "transformer/layer_3/attn/query",
+     "transformer/layer_3/attn/value",
+     "transformer/layer_3/mlp/linear_1",
+     "transformer/layer_3/mlp/linear_2",
+     "transformer/layer_4/attn/key",
+     "transformer/layer_4/attn/linear",
+     "transformer/layer_4/attn/query",
+     "transformer/layer_4/attn/value",
+     "transformer/layer_4/mlp/linear_1",
+     "transformer/layer_4/mlp/linear_2",
+     "transformer/layer_5/attn/key",
+     "transformer/layer_5/attn/linear",
+     "transformer/layer_5/attn/query",
+     "transformer/layer_5/attn/value",
+     "transformer/layer_5/mlp/linear_1",
+     "transformer/layer_5/mlp/linear_2",
+     "transformer/layer_6/attn/key",
+     "transformer/layer_6/attn/linear",
+     "transformer/layer_6/attn/query",
+     "transformer/layer_6/attn/value",
+     "transformer/layer_6/mlp/linear_1",
+     "transformer/layer_6/mlp/linear_2",
+     "transformer/layer_7/attn/key",
+     "transformer/layer_7/attn/linear",
+     "transformer/layer_7/attn/query",
+     "transformer/layer_7/attn/value",
+     "transformer/layer_7/mlp/linear_1",
+     "transformer/layer_7/mlp/linear_2"
+    ]
+   },
+   "xavier_train": {
+    "train_losses": [
+     0.3102331843355145,
+     6.454358475363831e-09
+    ],
+    "train_accs": [
+     1.0,
+     1.0
+    ],
+    "val_losses": [
+     0.26419544457442307,
+     0.4432486837135279
+    ],
+    "val_accs": [
+     0.984375,
+     0.984375
+    ]
+   }
+  }
+ },
+ "search": {
+  "hist": {
+   "job_id": "0532b1914bc2417486ac590b6672afb5",
+   "gp": {
+    "status": "complete",
+    "num_programs": 12,
+    "num_duplicates": 2,
+    "num_compile_failures": 0,
+    "train_acc": 0.0,
+    "test_acc": 0.0,
+    "program_history": [
+     {
+      "step": 1,
+      "generation": 0,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 2,
+      "generation": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 3,
+      "generation": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 4,
+      "generation": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 5,
+      "generation": 3,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 6,
+      "generation": 3,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 7,
+      "generation": 3,
+      "status": "duplicate",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 8,
+      "generation": 3,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 9,
+      "generation": 3,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 10,
+      "generation": 4,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 11,
+      "generation": 4,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 12,
+      "generation": 4,
+      "status": "duplicate",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     }
+    ],
+    "job_id": "0532b1914bc2417486ac590b6672afb5",
+    "program_name": "hist",
+    "seed": 7,
+    "best_source_sha": "8842dcc339bf95d8534836c8d58197f21db194a0812cb7920d9c7d8b6b2703b7"
+   },
+   "bfs": {
+    "status": "complete",
+    "num_programs": 12,
+    "num_duplicates": 1,
+    "num_compile_failures": 0,
+    "train_acc": 0.0,
+    "test_acc": 0.0,
+    "program_history": [
+     {
+      "step": 1,
+      "depth": 0,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 2,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 3,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 4,
+      "depth": 1,
+      "status": "duplicate",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 5,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 6,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 7,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 8,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 9,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 10,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 11,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 12,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     }
+    ],
+    "job_id": "0532b1914bc2417486ac590b6672afb5",
+    "program_name": "hist",
+    "best_source_sha": "8842dcc339bf95d8534836c8d58197f21db194a0812cb7920d9c7d8b6b2703b7"
+   }
+  },
+  "sort": {
+   "job_id": "0152617485ba4c4f9a2c74f0f90a3c63",
+   "gp": {
+    "status": "complete",
+    "num_programs": 12,
+    "num_duplicates": 0,
+    "num_compile_failures": 0,
+    "train_acc": 0.0,
+    "test_acc": 0.0,
+    "program_history": [
+     {
+      "step": 1,
+      "generation": 0,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 2,
+      "generation": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 3,
+      "generation": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 4,
+      "generation": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 5,
+      "generation": 3,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 6,
+      "generation": 3,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 7,
+      "generation": 3,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 8,
+      "generation": 3,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 9,
+      "generation": 4,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 10,
+      "generation": 4,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 11,
+      "generation": 4,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 12,
+      "generation": 4,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     }
+    ],
+    "job_id": "0152617485ba4c4f9a2c74f0f90a3c63",
+    "program_name": "sort",
+    "seed": 7,
+    "best_source_sha": "e51aedb39c4eae957ac43a45bfc9e6c1392135c300a1c47ba5f93452896a7d8b"
+   },
+   "bfs": {
+    "status": "complete",
+    "num_programs": 12,
+    "num_duplicates": 2,
+    "num_compile_failures": 0,
+    "train_acc": 0.0,
+    "test_acc": 0.0,
+    "program_history": [
+     {
+      "step": 1,
+      "depth": 0,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 2,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 3,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 4,
+      "depth": 1,
+      "status": "duplicate",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 5,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 6,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 7,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 8,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 9,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 10,
+      "depth": 1,
+      "status": "duplicate",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 11,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     },
+     {
+      "step": 12,
+      "depth": 1,
+      "status": "ok",
+      "train_acc": 0.0,
+      "test_acc": 0.0,
+      "best_train_acc": 0.0,
+      "best_test_acc": 0.0
+     }
+    ],
+    "job_id": "0152617485ba4c4f9a2c74f0f90a3c63",
+    "program_name": "sort",
+    "best_source_sha": "e51aedb39c4eae957ac43a45bfc9e6c1392135c300a1c47ba5f93452896a7d8b"
+   }
+  }
+ }
+}

@@ -78,8 +78,11 @@ def _write_csv(df: pd.DataFrame, path: Path) -> None:
 
 
 def freeze_mutants(root: Path, out: Path) -> pd.DataFrame:
-    agg = pd.read_json(root / "experiments/mutation/results/aggregated_mutations.json")
-    raspbugs = pd.read_json(root / "experiments/mutation/raspbugs.json")
+    mut_dir = root / "experiments/mutation"
+    if not mut_dir.exists():  # layout after the cleanup
+        mut_dir = root / "raspbugs"
+    agg = pd.read_json(mut_dir / "results/aggregated_mutations.json")
+    raspbugs = pd.read_json(mut_dir / "raspbugs.json")
     in_raspbugs = set(raspbugs["job_id"])
     df = pd.DataFrame(
         {
@@ -96,9 +99,11 @@ def freeze_mutants(root: Path, out: Path) -> pd.DataFrame:
     df["in_raspbugs_v1"] = df["job_id"].isin(in_raspbugs)
     _write_csv(df, out / "mutants.csv")
 
-    # Sources of every buggy mutant (needed to recompile without the 56 MB aggregate).
+    # The benchmark manifest: every buggy mutant with its source, so mutants can be
+    # recompiled without the 56 MB cosmic-ray aggregate. Written next to the pipeline.
     buggy = agg[df["status"] == "BUGGY_MODEL"]
-    src_path = out / "mutant_sources.jsonl.gz"
+    src_path = root / "raspbugs" / "raspbugs_v1.jsonl.gz"
+    src_path.parent.mkdir(exist_ok=True)
     with gzip.open(src_path, "wt") as f:
         for _, r in buggy.iterrows():
             f.write(
@@ -107,16 +112,17 @@ def freeze_mutants(root: Path, out: Path) -> pd.DataFrame:
                         "job_id": r["job_id"],
                         "program": r["program_name"],
                         "mutation_order": int(r["mutation_order"]),
-                        "operators": list(r["operators"]),
+                        "operators": [o.replace("operators/", "") for o in r["operators"]],
+                        "in_raspbugs_v1": r["job_id"] in in_raspbugs,
+                        "oracle_accuracy_50": r["execution_result"].get("accuracy"),
                         "diff": r["diff"],
-                        "source_before": r["program_source_before"],
-                        "source_after": r["program_source_after"],
+                        "source": r["program_source_after"],
                         "mutations": r["mutation_object"].get("mutations"),
                     }
                 )
                 + "\n"
             )
-    print(f"  wrote {src_path.name} ({len(buggy)} buggy mutants)")
+    print(f"  wrote {src_path} ({len(buggy)} buggy mutants)")
     return df
 
 
