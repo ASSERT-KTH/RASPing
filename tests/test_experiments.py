@@ -13,6 +13,7 @@ LAUNCHERS = [
     "experiments/main_repair/launch.py",
     "experiments/spec_size/launch.py",
     "experiments/init_control/launch.py",
+    "experiments/init_pilot/launch.py",
     "experiments/trajectories/launch.py",
     "experiments/symbolic_baselines/launch.py --method gp",
     "experiments/symbolic_baselines/launch.py --method bfs",

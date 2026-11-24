@@ -99,3 +99,19 @@ def test_table9():
             got = (round(r.zero_min, 1), round(r.zero_max, 1), round(r.std_min, 2),
                    round(r.std_max, 2), round(r.max_abs, 2))
             assert got == exp, (prog, state)
+
+
+def test_init_pilot_summaries():
+    runs = pd.DataFrame({
+        "job_id": ["a", "b", "a", "b"], "seed": 0, "program": ["hist", "sort"] * 2,
+        "arm": ["compiled", "compiled", "xavier", "xavier"],
+        "test_accuracy": [1.0, 0.2, 1.0, 0.995], "start_agreement": [1, 1, 0, 0],
+        "start_test_accuracy": [0.3, 0.1, 0, 0], "n_epochs": [10, 20, 30, 40]})
+    t = analysis.arm_table(runs, ["compiled", "xavier"], ["hist", "sort"]).set_index("arm")
+    assert t.loc["compiled", "repaired"] == 50 and t.loc["xavier", "repaired"] == 100
+    assert t.loc["compiled", "repaired_sort"] == 0 and t.loc["xavier", "median_epochs"] == 35
+    assert t.loc["compiled", "behaviour_kept"] == 100 and t.loc["xavier", "behaviour_kept"] == 0
+    o = analysis.paired_outcomes(runs, "xavier", "compiled")
+    assert (o["pairs"], o["only_arm"], o["both"], o["only_ref"], o["neither"]) == (2, 1, 1, 0, 0)
+    assert analysis.init_arm("from:" + "a" * 32) == "from" and analysis.init_arm("soft:30") == "soft:30"
+

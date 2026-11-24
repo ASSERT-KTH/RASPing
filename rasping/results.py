@@ -95,7 +95,7 @@ def mutant_table(version: str | None = None) -> pd.DataFrame:
 
 
 #: Experiments whose runs are written by `rasping.repair` (collected with `collect`).
-REPAIR_EXPERIMENTS = ("main_repair", "spec_size", "init_control", "trajectories")
+REPAIR_EXPERIMENTS = ("main_repair", "spec_size", "init_control", "init_pilot", "trajectories")
 
 
 def _cli():
@@ -114,10 +114,9 @@ def _cli():
     @click.option("--no-curves", is_flag=True)
     def collect_cmd(experiment, version, runs, no_curves):
         collect(runs or RUNS_DIR / experiment, results_dir(version, experiment), not no_curves)
-        if experiment == "init_control":
-            sel = RUNS_DIR / "init_control" / "selected_jobs.json"
-            if sel.exists():
-                (results_dir(version, experiment) / "selected_jobs.json").write_text(sel.read_text())
+        sel = Path(runs or RUNS_DIR / experiment) / "selected_jobs.json"
+        if sel.exists():
+            (results_dir(version, experiment) / "selected_jobs.json").write_text(sel.read_text())
 
     cli()
 

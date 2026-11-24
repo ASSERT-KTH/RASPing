@@ -66,6 +66,7 @@ python experiments/main_repair/analyze.py --version v2
 | GP / BFS (§5.3) | `experiments/symbolic_baselines/launch.py --method gp\|bfs --budget 1000` | `experiments/symbolic_baselines/collect.py` |
 | spec size (§5.4) | `experiments/spec_size/launch.py` | `python -m rasping.results collect spec_size` |
 | init control (§5.5) | `experiments/init_control/launch.py` | `python -m rasping.results collect init_control` + `experiments/init_control/weight_stats.py` |
+| init pilot (v2) | `experiments/init_pilot/launch.py` | `python -m rasping.results collect init_pilot`, then `experiments/init_pilot/analyze.py` |
 | trajectories (§5.6) | `experiments/trajectories/launch.py` | — |
 
 To repair a single mutant locally:
@@ -74,7 +75,9 @@ To repair a single mutant locally:
 python -m rasping.repair --job-id 2a722d5d5449441fad93f98c73c633a2 --out runs/test/hist
 ```
 
-Useful options are `--init xavier|compiled`, `--n-train`, `--n-steps` and `--store-trajectory`.
+Useful options are `--init` (`compiled`, `xavier`, `shuffled`, `rescaled`, `soft:<c>`,
+`from:<job_id>`; see `rasping.repair.INITS`), `--seed`, `--n-train`, `--n-steps` and
+`--store-trajectory`.
 
 ## Repository map
 
