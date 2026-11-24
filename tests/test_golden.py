@@ -16,7 +16,8 @@ code was established with `--golden-exact` on the recording machine. By default 
 checks what holds everywhere:
 
 - compiled and re-initialised weights, encodings and accuracies, exactly;
-- the first epoch of each training run (`EXACT_EPOCHS`), tightly;
+- the first epoch of each training run to `FIRST_EPOCH_RTOL` (hardware noise there is
+  ~2e-6 relative; a 1% learning-rate change moves it by >=2.5e-4 for every program);
 - later epochs' losses, loosely (`TAIL_RTOL`), as a sanity check.
 
 Pass `--golden-exact` to compare whole runs to 1e-7, including the trained weights.
@@ -35,7 +36,8 @@ from rasping.train import Trainer
 GOLDEN = json.loads((Path(__file__).parent / "golden" / "golden_v1.json").read_text())
 PROGRAMS = list(GOLDEN["programs"])
 RTOL = 1e-9
-EXACT_EPOCHS = 1  # epochs that agree across machines and thread counts (to ~1e-12)
+EXACT_EPOCHS = 1  # epochs compared to FIRST_EPOCH_RTOL
+FIRST_EPOCH_RTOL = 2e-5  # see module docstring
 TAIL_RTOL = 0.1   # later epochs diverge chaotically (observed: up to 2.1%)
 
 
@@ -67,7 +69,7 @@ def assert_history(got: dict, exp: dict, exact: bool):
         # Losses and train accuracies are per epoch; val_accs are every `val_every` epochs
         # (from epoch 0). Compare the entries from the first EXACT_EPOCHS epochs tightly.
         n_exact = max(1, len(v) * EXACT_EPOCHS // len(exp["train_losses"]))
-        np.testing.assert_allclose(got[k][:n_exact], v[:n_exact], rtol=1e-7, atol=1e-9, err_msg=k)
+        np.testing.assert_allclose(got[k][:n_exact], v[:n_exact], rtol=FIRST_EPOCH_RTOL, atol=1e-9, err_msg=k)
         if k.endswith("losses"):  # accuracies are discrete and can flip once runs diverge
             n = min(len(got[k]), len(v))
             np.testing.assert_allclose(got[k][:n], v[:n], rtol=TAIL_RTOL, err_msg=k)
