@@ -72,8 +72,8 @@ def classify(df: pd.DataFrame, margin: float = 0.01) -> pd.DataFrame:
 
 
 def make_scatter(df: pd.DataFrame, out_path: Path):
-    sns.set_theme(style="whitegrid")
-    fig, axes = plt.subplots(1, 4, figsize=(20, 5), sharex=True, sharey=True)
+    sns.set_theme(style="whitegrid", font_scale=1.5)
+    fig, axes = plt.subplots(1, 4, figsize=(16, 4.2), sharex=True, sharey=True)
 
     palette = {"random_wins": "#C44E52", "tie": "#8C8C8C", "buggy_wins": "#4C72B0"}
 
@@ -82,16 +82,16 @@ def make_scatter(df: pd.DataFrame, out_path: Path):
         for outcome, color in palette.items():
             s = sub[sub["outcome"] == outcome]
             ax.scatter(s["buggy_init_acc"] * 100, s["random_init_acc_mean"] * 100,
-                       color=color, s=40, alpha=0.8, label=outcome.replace("_", " "))
+                       color=color, s=55, alpha=0.8, label=outcome.replace("_", " "))
         ax.plot([0, 100], [0, 100], "k--", linewidth=1, alpha=0.5)
         ax.set_xlim(-3, 103)
         ax.set_ylim(-3, 103)
         ax.set_xlabel("Buggy-init test acc. (%)")
         ax.set_title(program)
 
-    axes[0].set_ylabel("Random-init test acc. (%, mean of 5 seeds)")
-    axes[-1].legend(loc="lower right", fontsize=9)
-    fig.suptitle("Paired initialization control: same mutant architecture, buggy vs. random weights")
+    axes[0].set_ylabel("Random-init test acc. (%)")
+    axes[-1].legend(loc="lower right", fontsize=13)
+    # No in-figure title: the LaTeX caption serves that role.
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
