@@ -1,9 +1,9 @@
 """Symbolic repair baselines: genetic programming (`gp`) and breadth-first search (`bfs`)
 over RASP source programs, using the benchmark's mutation operators (paper §5.3).
 
-    from rasping import raspbugs
+    from rasping.benchmarks import get_mutant
     from rasping.baselines import gp, bfs
-    rec = gp.run_gp_for_mutant(raspbugs.get(job_id), budget=1000)
+    rec = gp.run_gp_for_mutant(get_mutant(job_id), budget=1000)
 
 Per-mutant result records live in `runs/symbolic_baselines/<method>_budget<B>/<job_id>.json`
 (see `experiments/symbolic_baselines/`); `records` turns them into tidy tables.

@@ -1,15 +1,17 @@
-"""Aggregate cosmic-ray outputs into the RaspBugs manifest (step 2 of the pipeline).
+"""Aggregate cosmic-ray outputs into a benchmark manifest (step 2 of the pipeline).
 
-Step 1, `run_mutations.py`, writes `results/<program>/tracr_<program>_order=<k>.jsonl`:
+Step 1, `run_mutations.py`, writes `<root>/results/<program>/tracr_<program>_order=<k>.jsonl`:
 one line per mutant with the mutation and the oracle's pytest output. This script
 re-applies each diff to the reference source, labels the mutant from the oracle output
-and writes
+and writes, for the benchmark in `<root>` (raspbugs or tracrbench):
 
-    raspbugs.jsonl.gz   the benchmark: buggy mutants whose compiled output vocabulary can
-                        represent the specification's outputs (F6), with source, diff, ...
-    mutants.csv         every mutant with its status and `representable` (not tracked)
+    <root>/<root>.jsonl.gz  the benchmark: buggy mutants whose compiled output vocabulary can
+                            represent the specification's outputs (F6), with source, diff, ...
+                            TracrBench: at most `config.TRACRBENCH.mutants_per_program` per
+                            program, stratified by mutation order (`selected`)
+    <root>/mutants.csv      every mutant with its status, `representable` and `selected`
 
-    python build_manifest.py [--results-dir results]
+    python raspbugs/build_manifest.py [--root raspbugs] [--results-dir <root>/results]
 """
 
 from __future__ import annotations
@@ -56,7 +58,10 @@ def label(result: dict) -> dict:
     if "MODEL IS NOT BUGGY" in out:
         return {"status": "CORRECT_MODEL"}
     if "Accuracy: " in out:
-        return {"status": "BUGGY_MODEL", "accuracy": float(out.split("Accuracy: ")[1].split("\n")[0])}
+        rec = {"status": "BUGGY_MODEL", "accuracy": float(out.split("Accuracy: ")[1].split("\n")[0])}
+        if "REPRESENTABLE: " in out:  # TracrBench's oracle checks it while the model is compiled
+            rec["oracle_representable"] = out.split("REPRESENTABLE: ")[1].split("\n")[0].strip() == "True"
+        return rec
     raise ValueError(f"Unknown oracle output: {out[:500]}")
 
 
@@ -66,14 +71,15 @@ def is_representable(program: str, source: str) -> bool:
     from rasping.model import Model
 
     p = programs.get(program)
-    model = Model(programs.build_sop(source, p.name, MAX_LEN), p.vocab, MAX_LEN, p.name)
+    model = Model(programs.build_sop(source, p.name, MAX_LEN), p.vocab, MAX_LEN, p.name,
+                  mlp_exactness=p.mlp_exactness)
     return not data.unrepresentable_outputs(p.name, model)
 
 
-def iter_mutants(results_dir: Path):
+def iter_mutants(root: Path, results_dir: Path):
     for f in sorted(results_dir.glob("**/tracr_*.jsonl")):
         program = f.parent.name
-        reference = (HERE / "source" / f"{program}.py").read_text()
+        reference = (root / "source" / f"{program}.py").read_text()
         for line in f.read_text().splitlines():
             mutation, result = json.loads(line)
             diff = result.get("diff")
@@ -85,30 +91,54 @@ def iter_mutants(results_dir: Path):
                 "diff": diff,
                 "source": apply_diff(reference, diff) if diff is not None else None,
                 "mutations": mutation["mutations"],
-                **{k if k == "status" else "oracle_accuracy_50": v for k, v in label(result).items()},
+                **{{"accuracy": "oracle_accuracy_50"}.get(k, k): v for k, v in label(result).items()},
             }
 
 
-@click.command()
-@click.option("--results-dir", default=str(HERE / "results"), show_default=True)
-def main(results_dir):
-    rows = list(iter_mutants(Path(results_dir)))
+def select(rows: list[dict], name: str) -> None:
+    """Mark the benchmark's mutants (`selected`): all representable ones for RaspBugs; for
+    TracrBench at most `mutants_per_program` per program, stratified by mutation order."""
+    from rasping.benchmarks import stratified_ids
+    from rasping.config import TRACRBENCH
+
     for r in rows:
-        r["representable"] = (r["status"] == "BUGGY_MODEL"
-                              and is_representable(r["program"], r["source"]))
-    benchmark = [r for r in rows if r["representable"]]
-    with gzip.GzipFile(HERE / "raspbugs.jsonl.gz", "wb", mtime=0) as f:
+        r["selected"] = r["representable"]
+    if name != "tracrbench":
+        return
+    for program in sorted({r["program"] for r in rows}):
+        cands = [(r["job_id"], r["mutation_order"]) for r in rows
+                 if r["program"] == program and r["representable"]]
+        keep = set(stratified_ids(cands, TRACRBENCH.mutants_per_program, TRACRBENCH.sample_seed))
+        for r in rows:
+            if r["program"] == program:
+                r["selected"] = r["job_id"] in keep
+
+
+@click.command()
+@click.option("--root", default=str(HERE), show_default=True, help="Benchmark directory")
+@click.option("--results-dir", default=None, help="cosmic-ray outputs (default: <root>/results)")
+def main(root, results_dir):
+    root = Path(root).resolve()
+    rows = list(iter_mutants(root, Path(results_dir) if results_dir else root / "results"))
+    for r in rows:
+        from_oracle = r.pop("oracle_representable", None)  # TracrBench; RaspBugs: compile here
+        r["representable"] = r["status"] == "BUGGY_MODEL" and (
+            from_oracle if from_oracle is not None else is_representable(r["program"], r["source"]))
+    select(rows, root.name)
+    benchmark = [r for r in rows if r["selected"]]
+    with gzip.GzipFile(root / f"{root.name}.jsonl.gz", "wb", mtime=0) as f:
         for r in benchmark:
             f.write((json.dumps({k: r.get(k) for k in (
                 "job_id", "program", "mutation_order", "operators", "oracle_accuracy_50",
                 "diff", "source", "mutations")}) + "\n").encode())
     table = pd.DataFrame([{k: r.get(k) for k in ("job_id", "program", "mutation_order", "status",
-                                                  "oracle_accuracy_50", "representable")}
+                                                  "oracle_accuracy_50", "representable", "selected")}
                           for r in rows])
     table["operators"] = [";".join(r["operators"]) for r in rows]
-    table.to_csv(HERE / "mutants.csv", index=False)
+    table.to_csv(root / "mutants.csv", index=False)
     print(table["status"].value_counts().to_string())
-    print(f"benchmark (buggy and representable): {len(benchmark)} mutants")
+    print(f"buggy and representable: {int(table['representable'].sum())}; "
+          f"benchmark: {len(benchmark)} mutants")
 
 
 if __name__ == "__main__":

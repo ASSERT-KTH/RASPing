@@ -14,8 +14,10 @@ repository map and how each paper artifact is produced.
 
 - **Constants live in `rasping/config.py`.** This covers the threshold, program lists, max length, training defaults and paths. Never redefine them in scripts.
 - **Program names.** Canonical names are `hist most_freq reverse sort` (`config.PROGRAMS`). Data files use the historical `most-freq`. Map between them with `rasping.programs.canonical()` and `.data_name`; never hand-roll the mapping.
-- **One benchmark.** RaspBugs is the 847 mutants in `raspbugs/raspbugs.jsonl.gz`; there are no subsets or versions. The v1 results tables still contain Dyck rows, so filter by `config.PROGRAMS` when analysing them.
-- **Mutants** come from `rasping.raspbugs` (the manifest), never from raw cosmic-ray output.
+- **Two benchmarks, one version each.**
+  - RaspBugs is the 847 mutants in `raspbugs/raspbugs.jsonl.gz`; there are no subsets or versions. The v1 results tables still contain Dyck rows, so filter by `config.PROGRAMS` when analysing them.
+  - TracrBench mutants are `tracrbench/tracrbench.jsonl.gz`, over the 77 programs that pass the fixed inclusion rules in `config.TracrBenchRules`; see `tracrbench/README.md`. Don't change the rules after seeing results. TracrBench programs compile with `mlp_exactness=1000` (`Program.mlp_exactness`); never hard-code 120.
+- **Mutants** come from the manifests (`rasping.raspbugs`, `rasping.tracrbench`, or `rasping.benchmarks.get_mutant` for either), never from raw cosmic-ray output.
 - **Never commit raw run outputs.** This covers `model.npy`, `trajectory.pkl` and anything under `runs/`. Only tidy tables go in `results/<version>/`, and only generated artifacts go in `paper_artifacts/<version>/`.
 - **`results/v1_tmlr/` is frozen.** It holds the submitted paper's data. `tests/test_paper_numbers.py` pins it, so never edit it. New results go in a new version directory, e.g. `results/v2/`.
 - **Behaviour changes must be visible.** `tests/test_golden.py` and `tests/test_golden_search.py` pin the v1 numerics. Late training epochs are only bit-exact on the machine that recorded them, so by default they are compared loosely; `pytest --golden-exact` compares them fully (F34). If a change is meant to alter behaviour, re-record the golden file in the same commit and add or update an entry in `docs/FINDINGS.md`. That entry gives the evidence, the fix commit, and which results and artifacts it invalidates.

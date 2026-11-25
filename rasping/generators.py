@@ -132,9 +132,25 @@ GENERATORS = {
 }
 
 
+def ground_truth_generator(program):
+    """Random generator for a TracrBench program: uniform length 2..max_len, uniform tokens,
+    outputs from the program's ground-truth function."""
+
+    def generate(acceptedTokens, maxSeqLength):
+        input_length = np.random.randint(2, maxSeqLength + 1)
+        input_seq = [int(t) for t in np.random.choice(acceptedTokens, input_length)]
+        return ["BOS", *input_seq], ["BOS", *program.target(input_seq)]
+
+    return generate
+
+
 def get_generator(program: str, exhaustive: bool = False):
     """Generator for a program given by any of its names."""
     from rasping.programs import get
 
-    key = get(program).data_name + ("_exhaustive" if exhaustive else "")
-    return GENERATORS[key]
+    p = get(program)
+    if p.ground_truth is not None:
+        if exhaustive:
+            raise ValueError(f"{p.name}: no exhaustive generator for TracrBench programs")
+        return ground_truth_generator(p)
+    return GENERATORS[p.data_name + ("_exhaustive" if exhaustive else "")]

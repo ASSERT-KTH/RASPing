@@ -1,4 +1,4 @@
-"""Index the compiled architecture of every RaspBugs mutant -> raspbugs/architectures.csv.
+"""Index the compiled architecture of every mutant -> <benchmark>/architectures.csv.
 
 One row per mutant: job_id, program, mutation_order, n_params, n_layers and `signature`,
 a hash of the sorted parameter names and shapes. Mutants with the same signature have
@@ -8,6 +8,7 @@ look-ups via `rasping.raspbugs.shape_twins`). The table also answers how archite
 within and across programs.
 
     python raspbugs/architectures.py [--program sort]   (compiles all 847 mutants, ~7 min)
+    python raspbugs/architectures.py --benchmark tracrbench
 """
 
 from __future__ import annotations
@@ -17,10 +18,7 @@ import hashlib
 import click
 import pandas as pd
 
-from rasping import raspbugs
-from rasping.config import PROGRAMS
-
-OUT = raspbugs.ARCHITECTURES
+from rasping.benchmarks import BENCHMARKS
 
 
 def signature(params) -> tuple[str, int, int]:
@@ -32,20 +30,24 @@ def signature(params) -> tuple[str, int, int]:
 
 
 @click.command()
+@click.option("--benchmark", "name", type=click.Choice(sorted(BENCHMARKS)), default="raspbugs",
+              show_default=True)
 @click.option("--program", "only", multiple=True, help="Only these programs (merged into the CSV)")
-def main(only):
+def main(name, only):
+    bench = BENCHMARKS[name]
+    out = bench.architectures_path
     rows = []
-    for p in only or PROGRAMS:
-        for m in raspbugs.mutants(program=p):
+    for p in only or bench.programs():
+        for m in bench.mutants(program=p):
             h, n, layers = signature(m.compile().params)
             rows.append({"job_id": m.job_id, "program": m.program, "mutation_order": m.mutation_order,
                          "n_params": n, "n_layers": layers, "signature": h})
         print(p, "done", flush=True)
     new = pd.DataFrame(rows)
-    if only and OUT.exists():
-        new = pd.concat([raspbugs.architectures()[lambda d: ~d["program"].isin(only)], new])
+    if only and out.exists():
+        new = pd.concat([bench.architectures()[lambda d: ~d["program"].isin(only)], new])
     new = new.sort_values(["program", "job_id"])
-    new.to_csv(OUT, index=False)
+    new.to_csv(out, index=False)
     g = new.groupby("program")
     print(pd.DataFrame({"mutants": g.size(), "architectures": g["signature"].nunique(),
                         "with_twin": g["signature"].apply(lambda s: s.duplicated(keep=False).sum()),

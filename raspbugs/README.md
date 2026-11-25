@@ -29,12 +29,13 @@ python -m rasping.raspbugs <job_id>     # print a mutant and its diff
 
 ## Regenerating
 
-Run both steps from this directory. Step 1 needs a fork of cosmic-ray with higher-order
-mutations. It's installed by `uv sync`, pinned in `pyproject.toml`.
+Step 1 needs a fork of cosmic-ray with higher-order mutations. It's installed by `uv sync`,
+pinned in `pyproject.toml`. Both steps also build the TracrBench benchmark with
+`--root tracrbench` (see `tracrbench/README.md`).
 
 ```bash
-python run_mutations.py --orders 1 2 3 4 5     # writes results/<program>/ (gitignored)
-python build_manifest.py                       # writes raspbugs.jsonl.gz, mutants.csv
+python raspbugs/run_mutations.py      # orders 1-5; writes raspbugs/results/<program>/ (gitignored)
+python raspbugs/build_manifest.py     # writes raspbugs.jsonl.gz, mutants.csv
 ```
 
 The oracle labels each mutant as one of:
