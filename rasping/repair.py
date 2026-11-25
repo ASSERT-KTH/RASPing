@@ -118,6 +118,14 @@ class RunRecord:
     epoch_end_times_s: list = field(default_factory=list)
     # provenance
     git_commit: str = ""
+    device: str = ""  # JAX device the run trained on, e.g. "cuda:0" or "cpu:0"
+
+
+def _device() -> str:
+    import jax
+
+    d = jax.devices()[0]
+    return f"{d.platform}:{d.id}"
 
 
 def _git_commit() -> str:
@@ -184,7 +192,7 @@ def repair(
         init=init, seed=seed, n_train=len(X), n_val=len(Xv), n_steps_budget=n_steps,
         config={**config.to_dict(), "n_epochs": n_epochs}, initial_test_accuracy=initial_test_acc,
         start_test_accuracy=start_test_acc, start_agreement=start_agreement,
-        git_commit=_git_commit(),
+        git_commit=_git_commit(), device=_device(),
     )
 
     wandb_run = None

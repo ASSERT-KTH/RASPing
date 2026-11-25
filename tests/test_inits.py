@@ -93,3 +93,4 @@ def test_repair_records_start_metrics():
     assert rec.start_test_accuracy == rec.initial_test_accuracy
     rec = repair(JOB, config=cfg, init="xavier", n_train=64, n_val=32, progress=False)
     assert rec.start_agreement < 0.5
+    assert rec.device == "cpu:0"  # provenance: the JAX device the run trained on
