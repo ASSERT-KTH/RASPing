@@ -115,3 +115,13 @@ def test_init_pilot_summaries():
     assert (o["pairs"], o["only_arm"], o["both"], o["only_ref"], o["neither"]) == (2, 1, 1, 0, 0)
     assert analysis.init_arm("from:" + "a" * 32) == "from" and analysis.init_arm("soft:30") == "soft:30"
 
+
+
+def test_patience_table():
+    runs = pd.DataFrame({
+        "arm": ["xavier"] * 4, "job_id": ["a", "b", "a", "b"], "seed": 0,
+        "program": ["most_freq", "sort"] * 2, "cfg_early_stopping_patience": [50, 50, 500, 500],
+        "test_accuracy": [0.95, 1.0, 0.995, 1.0], "n_epochs": [100, 200, 900, 400]})
+    r = analysis.patience_table(runs, 50, 500, ["most_freq", "sort"]).iloc[0]
+    assert (r.pairs, r.repaired_lo, r.repaired_hi, r.only_hi, r.only_lo) == (2, 50, 100, 1, 0)
+    assert (r.most_freq_lo, r.most_freq_hi, r.epochs_hi) == (0, 100, 650)
