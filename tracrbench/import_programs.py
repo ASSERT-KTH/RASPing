@@ -101,8 +101,6 @@ def analyse(item: tuple[str, dict]) -> dict:
     elif max(rec["const_baseline"], rec["identity_baseline"]) >= TRACRBENCH.max_trivial_accuracy:  # rule 3
         rec["reason"] = (f"trivial: constant {rec['const_baseline']:.0%}, "
                          f"identity {rec['identity_baseline']:.0%} exact match")
-    elif rec["n_params"] > TRACRBENCH.max_params:  # rule 4
-        rec["reason"] = f"too large: {rec['n_params']:,} parameters"
     else:
         rec["included"] = True
         return {**rec, "_source": source, "_splits": (train, val, test)}

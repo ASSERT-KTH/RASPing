@@ -542,8 +542,8 @@
  {
   "name": "element_divide",
   "entry": "make_element_divide",
-  "included": false,
-  "reason": "too large: 1,426,228 parameters",
+  "included": true,
+  "reason": null,
   "uses_attention": true,
   "n_params": 1426228,
   "n_layers": 26,
@@ -1382,8 +1382,8 @@
  {
   "name": "swap_min_max",
   "entry": "make_swap_min_max",
-  "included": false,
-  "reason": "too large: 2,790,815 parameters",
+  "included": true,
+  "reason": null,
   "uses_attention": true,
   "n_params": 2790815,
   "n_layers": 38,

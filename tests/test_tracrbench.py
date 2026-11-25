@@ -24,7 +24,6 @@ def test_records_follow_the_rules():
     for r in INCLUDED:
         assert r["reason"] is None and r["test_accuracy"] == 1.0
         assert max(r["const_baseline"], r["identity_baseline"]) < TRACRBENCH.max_trivial_accuracy
-        assert r["n_params"] <= TRACRBENCH.max_params
     assert all(r["reason"] for r in RECORDS if not r["included"])
 
 

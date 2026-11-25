@@ -53,10 +53,12 @@ def stream_jsonl(path: str | Path) -> Iterable[dict]:
 
 def write_jsonl(path: str | Path, records: Iterable[dict]) -> None:
     path = Path(path)
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "wt") as fp:
-        for r in records:
-            fp.write(json.dumps(r, cls=NumpyJSONEncoder) + "\n")
+    lines = "".join(json.dumps(r, cls=NumpyJSONEncoder) + "\n" for r in records)
+    if path.suffix == ".gz":  # mtime=0: the same records give the same bytes
+        with gzip.GzipFile(path, "wb", mtime=0) as fp:
+            fp.write(lines.encode())
+    else:
+        path.write_text(lines)
 
 
 # --------------------------------------------------------------------------- generation

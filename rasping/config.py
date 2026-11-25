@@ -45,8 +45,9 @@ class TracrBenchRules:
       1. its RASP code runs in TracrBench's own environment (`from tracr.rasp import rasp`),
       2. compiled with `mlp_exactness`, it reproduces the ground truth on every test example,
       3. it is not trivial: neither one constant output sequence nor copying the input
-         reaches `max_trivial_accuracy` exact-match accuracy on the test split,
-      4. it compiles to at most `max_params` parameters.
+         reaches `max_trivial_accuracy` exact-match accuracy on the test split.
+    There is no size limit. (A 1.2M-parameter cap, the largest RaspBugs model, was dropped
+    on Nov 25, 2026, before any mutant was generated: it had no scientific basis.)
     Mutants: buggy and representable (as RaspBugs), then at most `mutants_per_program` per
     program, stratified by mutation order (seed `sample_seed`).
     """
@@ -56,7 +57,6 @@ class TracrBenchRules:
     vocab: tuple = tuple(range(10))
     mlp_exactness: float = 1000  # TracrBench's own setting; 3 programs are wrong at 120
     max_trivial_accuracy: float = 0.5
-    max_params: int = 1_200_000
     mutants_per_program: int = 20
     sample_seed: int = 0
 
