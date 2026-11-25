@@ -31,6 +31,7 @@ def run_row(rec: dict, method: str, budget: int) -> dict:
         "num_duplicates": rec.get("num_duplicates"),
         "num_compile_failures": rec.get("num_compile_failures"),
         **({"num_timeouts": rec["num_timeouts"]} if "num_timeouts" in rec else {}),
+        **({"num_killed": rec["num_killed"]} if "num_killed" in rec else {}),
         "train_acc": rec.get("train_acc"),
         "test_acc": rec.get("test_acc"),
         "max_best_test_acc": max(((e.get("best_test_acc") or 0.0) for e in h), default=0.0),

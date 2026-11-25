@@ -71,12 +71,12 @@ def run_gp(
 
     seen: set[str] = set()
     cache: Dict[str, Tuple[float, float]] = {}
-    num_programs = num_duplicates = num_compile_failures = num_timeouts = 0
+    num_programs = num_duplicates = num_compile_failures = num_timeouts = num_killed = 0
     program_history: List[Dict[str, Any]] = []
     best: Optional[Candidate] = None  # best by fitness; ties keep the incumbent
 
     def evaluate(src: str) -> Optional[Tuple[float, float]]:
-        nonlocal num_compile_failures, num_timeouts
+        nonlocal num_compile_failures, num_timeouts, num_killed
         h = hash_source(src)
         if h in cache:
             return cache[h]
@@ -86,6 +86,8 @@ def run_gp(
         except CandidateError as e:
             if e.kind == "timeout":
                 num_timeouts += 1
+            elif e.kind == "killed":
+                num_killed += 1
             else:
                 num_compile_failures += 1
             return None
@@ -138,6 +140,7 @@ def run_gp(
     if not population:
         return {"status": "failed_to_initialize", "num_programs": num_programs,
                 "num_compile_failures": num_compile_failures, "num_timeouts": num_timeouts,
+                "num_killed": num_killed,
                 "program_history": program_history}
 
     def tournament_select(pop: List[Candidate]) -> Candidate:
@@ -164,6 +167,7 @@ def run_gp(
         "num_duplicates": num_duplicates,
         "num_compile_failures": num_compile_failures,
         "num_timeouts": num_timeouts,
+        "num_killed": num_killed,
         "train_acc": best.train_acc,
         "test_acc": best.test_acc,
         "best_source": best.source,

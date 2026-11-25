@@ -378,6 +378,27 @@ weights and training numerics (`tests/test_golden.py`).
   lazily in `data.encode` / `metrics.exact_match_accuracy`), so the symbolic baselines
   never load JAX and forking is safe. Golden search results unchanged.
 
+### F37 — A worker killed by the job's memory limit counts as a failed candidate — `fixed`
+- **Evidence:** GP/BFS budget calibration on Berzelius (Nov 25, 2026). GP task 18464968_47
+  (mutant `c3c77ba3afd54bbabe7fb5ec5fdb1f5d`, most_freq, order 5) ran under the 1-CPU
+  default memory of 7,950 MB, because the launcher requested none. SLURM logged 8 oom_kill
+  events (MaxRSS 7.27 GB), yet the job wrote a normal record (status `complete`, 1,147
+  compile failures). `evaluate_with_timeout` (`rasping/baselines/common.py`) reported a worker
+  that exited from SIGKILL as `CandidateError("error")`. GP and BFS then counted it in
+  `num_compile_failures` and dropped the candidate, so 8 candidates were discarded because
+  of the machine's memory, not because they were bad programs. The other 199 calibration
+  jobs had no oom_kill events (largest MaxRSS 4.05 GB).
+- **Fix:** a worker that dies from a signal raises `CandidateError("killed")`. GP and BFS
+  count it in `num_killed` (in the record and in `records.run_row`), not in
+  `num_compile_failures`; the search still drops the candidate, so trajectories are
+  unchanged when nothing is killed. The baseline launcher requests `--mem-gb 16` by default.
+  A record with `num_killed > 0` depends on the machine and should be rerun with more memory.
+- **Tests:** `tests/test_baselines.py::test_killed_worker_is_its_own_failure_kind`; golden
+  search results unchanged.
+- **Invalidates:** the affected calibration record, which was moved aside and rerun with 32 GB.
+  The v1 runs can't be checked (no SLURM accounting kept); v1 used the same default memory
+  and budget 1,000, where the calibration's peak was lower.
+
 ### F33 — Oracle accuracy round-tripped through pandas — `obsolete` (F35)
 - 80 `oracle_accuracy_50` values in the v1 manifest (`raspbugs_v1.jsonl.gz`) carried float
   noise (0.9400000000000001) from the v1 pandas JSON round trip. All 80 were Dyck mutants, so

@@ -55,7 +55,8 @@ def compute_max_length(program: str, data_dir: Path = DATA_DIR) -> int:
 
 
 class CandidateError(Exception):
-    """A candidate could not be evaluated: `kind` is "error" (build/eval failed) or "timeout"."""
+    """A candidate could not be evaluated: `kind` is "error" (build/eval failed), "timeout",
+    or "killed" (the worker died from a signal, e.g. the job's memory limit; F37)."""
 
     def __init__(self, kind: str, detail: str = ""):
         super().__init__(f"{kind}: {detail}")
@@ -121,7 +122,10 @@ def evaluate_with_timeout(source_code: str, program: str, max_length: int,
     """Accuracy of a candidate, evaluated in a separate process.
 
     Raises `CandidateError("error")` if the program cannot be built or evaluated and
-    `CandidateError("timeout")` on timeout (v1 silently scored both as 0.0; F30).
+    `CandidateError("timeout")` on timeout (v1 silently scored both as 0.0; F30). A worker
+    killed by a signal (the OOM killer under a SLURM memory limit) raises
+    `CandidateError("killed")`: that says nothing about the candidate, so searches count it
+    separately (F37).
     Runtime errors on individual inputs count as wrong predictions.
     """
     result_queue = multiprocessing.Queue()
@@ -146,6 +150,8 @@ def evaluate_with_timeout(source_code: str, program: str, max_length: int,
         if status == "success":
             return result
         raise CandidateError("error", repr(result))
+    if process.exitcode is not None and process.exitcode < 0:
+        raise CandidateError("killed", f"worker killed by signal {-process.exitcode}")
     raise CandidateError("error", f"worker exited with code {process.exitcode}")
 
 

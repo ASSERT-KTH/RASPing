@@ -8,8 +8,9 @@ from pathlib import Path
 import parso
 import pytest
 
-from rasping.baselines import bfs, gp, records
+from rasping.baselines import bfs, common, gp, records
 from rasping.baselines.common import (
+    CandidateError,
     all_single_step_neighbors,
     apply_mutation_once,
     compute_max_length,
@@ -133,3 +134,25 @@ def test_records_tables():
     assert runs.iloc[0][["program_file", "history_len", "max_step", "max_best_test_acc"]].tolist() \
         == ["most_freq", 5, 5, 0.4]
     assert h["step"].tolist() == [1, 3, 5]  # change points + last entry
+
+
+def test_killed_worker_is_its_own_failure_kind(monkeypatch):
+    """A worker killed by a signal (e.g. the OOM killer) is not a failed candidate (F37)."""
+    import os
+    import signal
+
+    def die(*args):
+        os.kill(os.getpid(), signal.SIGKILL)
+
+    monkeypatch.setattr(common, "build_program_from_source", die)  # inherited by the fork
+    with pytest.raises(CandidateError) as e:
+        common.evaluate_with_timeout(MINI_SORT_SRC, "sort", 5, [], timeout=30)
+    assert e.value.kind == "killed"
+
+    def broken(*args):
+        raise ValueError("does not compile")
+
+    monkeypatch.setattr(common, "build_program_from_source", broken)
+    with pytest.raises(CandidateError) as e:
+        common.evaluate_with_timeout(MINI_SORT_SRC, "sort", 5, [], timeout=30)
+    assert e.value.kind == "error"
