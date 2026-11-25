@@ -17,6 +17,12 @@ On the 847 benchmark mutants, v1 at budget 1,000 took at most 3.5 h per run (med
 0.7 h GP, 0.9 h BFS) and 664 / 891 CPU-hours in total. A run's record is written only when
 it finishes, so set --timeout-hours above the longest expected run.
 
+Memory: candidates are evaluated in forked workers, and a worker the OOM killer stops is
+counted as `num_killed`, not as a failed candidate (F37). The launcher requests --mem-gb
+(32 GB). In the budget-5000 calibration, 199 of 200 jobs peaked below 4.1 GB, but one GP job
+had 8 workers killed under the 1-CPU default of 7.9 GB, and its rerun with 32 GB peaked at
+18.5 GB. A record with num_killed > 0 should be rerun with more memory.
+
 The v1 (TMLR) runs in `results/v1_tmlr/symbolic_baselines/` covered the 1,466 v1 mutants
 (Dyck programs included), with BFS limited to depth = mutation order (F3, since fixed).
 The budget-500 tables in `results/v1_tmlr/spec_size/` came from an earlier round over a
@@ -44,8 +50,9 @@ RUN_SCRIPT = "experiments/symbolic_baselines/run.py"
 @click.option("--sample-seed", type=int, default=0, show_default=True)
 @click.option("--timeout-hours", type=float, default=12, show_default=True, help="SLURM time limit per job")
 @click.option("--partition", default=None, help="SLURM partition (e.g. the cluster's CPU partition)")
+@click.option("--mem-gb", type=int, default=32, show_default=True, help="SLURM memory per job (F37)")
 @cluster.add_cli_options
-def main(method, budget, n_per_program, sample_seed, timeout_hours, partition, dry_run, local,
+def main(method, budget, n_per_program, sample_seed, timeout_hours, partition, mem_gb, dry_run, local,
          no_container, limit):
     out = run_dir(method, budget)
     python = sys.executable if no_container else "python"
@@ -61,7 +68,7 @@ def main(method, budget, n_per_program, sample_seed, timeout_hours, partition, d
                  "--budget", str(budget)] for m in todo]
     cluster.submit_from_cli(
         commands, f"symbolic_{method}_budget{budget}", dry_run, local, no_container, limit,
-        gpu=False, timeout_min=int(timeout_hours * 60),
+        gpu=False, timeout_min=int(timeout_hours * 60), mem_gb=mem_gb,
         **({"slurm_partition": partition} if partition else {}),
         slurm_additional_parameters={},  # CPU-only: drop the default GPU (MIG) reservation
     )

@@ -53,12 +53,12 @@ def run_bfs(
     start = time.time()
 
     cache: Dict[str, Tuple[float, float]] = {}
-    num_programs = num_duplicates = num_compile_failures = num_timeouts = 0
+    num_programs = num_duplicates = num_compile_failures = num_timeouts = num_killed = 0
     best_train, best_test, best_source = -1.0, -1.0, base_source
     program_history: List[Dict[str, Any]] = []
 
     def evaluate(src: str) -> Tuple[str, Optional[Tuple[float, float]]]:
-        nonlocal num_programs, num_duplicates, num_compile_failures, num_timeouts
+        nonlocal num_programs, num_duplicates, num_compile_failures, num_timeouts, num_killed
         num_programs += 1  # every attempt counts toward the budget
         h = hash_source(src)
         if h in cache:
@@ -70,6 +70,8 @@ def run_bfs(
         except CandidateError as e:
             if e.kind == "timeout":
                 num_timeouts += 1
+            elif e.kind == "killed":
+                num_killed += 1
             else:
                 num_compile_failures += 1
             return "compile_fail", None
@@ -113,6 +115,7 @@ def run_bfs(
         "num_duplicates": num_duplicates,
         "num_compile_failures": num_compile_failures,
         "num_timeouts": num_timeouts,
+        "num_killed": num_killed,
         "train_acc": best_train,
         "test_acc": best_test,
         "best_source": best_source,
