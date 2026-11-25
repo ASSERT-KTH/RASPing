@@ -20,7 +20,7 @@ from pathlib import Path
 
 import click
 
-from rasping import raspbugs
+from rasping.benchmarks import get_mutant
 from rasping.baselines import METHODS, bfs, gp, run_dir
 from rasping.config import DATA_DIR, RUNS_DIR
 
@@ -48,7 +48,7 @@ def main(method, job_id, budget, population_size, tournament_k, seed, max_depth,
          log_every, data_dir, runs_dir, log_level):
     logging.basicConfig(level=getattr(logging, log_level),
                         format="[%(asctime)s] %(levelname)s %(name)s: %(message)s")
-    mutant = raspbugs.get(job_id)
+    mutant = get_mutant(job_id)
     if method == "gp":
         result = gp.run_gp_for_mutant(
             mutant, data_dir, budget=budget, population_size=population_size,

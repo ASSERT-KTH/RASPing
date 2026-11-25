@@ -82,9 +82,10 @@ Useful options are `--init` (`compiled`, `xavier`, `shuffled`, `rescaled`, `soft
 ## Repository map
 
 ```
-rasping/            the package: config, programs, data, model, train, repair, raspbugs,
+rasping/            the package: config, programs, data, model, train, repair, benchmarks (raspbugs, tracrbench),
                     baselines/ (GP, BFS), analysis, results, cluster, tables
 raspbugs/           benchmark generation pipeline + manifest raspbugs.jsonl.gz (see its README)
+tracrbench/         second benchmark: TracrBench programs, their import and mutants (see its README)
 experiments/        one directory per paper experiment: launch.py / analyze.py
 data/               input-output specifications (train/val/test JSONL per program)
 results/<version>/  tidy result tables (tracked); v1_tmlr = the submitted paper

@@ -1,4 +1,4 @@
-"""Gradient-based repair of one RaspBugs mutant: the method, end to end.
+"""Gradient-based repair of one benchmark mutant (RaspBugs or TracrBench), end to end.
 
     compile mutant -> (optionally re-initialise weights) -> encode specification
     -> train with early stopping on validation loss -> evaluate on the test split
@@ -27,10 +27,11 @@ from pathlib import Path
 import click
 import numpy as np
 
-from rasping import data, raspbugs
+from rasping import data
+from rasping.benchmarks import get_mutant
 from rasping.config import MAX_LEN, REPO_ROOT, TrainConfig
 from rasping.losses import LOSSES
-from rasping.model import INIT_SCHEMES, MLP_EXACTNESS, SOFTMAX_COLDNESS, Model
+from rasping.model import INIT_SCHEMES, SOFTMAX_COLDNESS, Model
 from rasping.train import Trainer
 
 #: Starting points, all in the mutant's own compiled architecture:
@@ -39,10 +40,10 @@ from rasping.train import Trainer
 #:   shuffled        compiled values permuted within each tensor: scale and sparsity kept,
 #:                   structure destroyed
 #:   rescaled        compiled structure at Xavier scale, biases zeroed
-#:   soft:<c>        compiled with attention coldness c and MLP exactness 1.2c (exact: 100);
-#:                   softer weights that approximate the mutant
+#:   soft:<c>        compiled with attention coldness c and the program's MLP exactness scaled
+#:                   by c/100 (exact: 100); softer weights that approximate the mutant
 #:   from:<job_id>   the compiled weights of another mutant with identical parameter shapes
-#:                   (usually of the same program; see `raspbugs.shape_twins`)
+#:                   (usually of the same program; see `Benchmark.shape_twins`)
 INITS = ("compiled", *INIT_SCHEMES, "shuffled", "rescaled", "soft:<c>", "from:<job_id>")
 
 
@@ -63,7 +64,8 @@ def _start_model(mutant, init: str, compiled: Model, seed: int) -> Model:
         return compiled
     if kind == "soft":
         c = float(arg)
-        return mutant.compile(MAX_LEN, softmax_coldness=c, mlp_exactness=c * MLP_EXACTNESS / SOFTMAX_COLDNESS)
+        exactness = c * compiled.mlp_exactness / SOFTMAX_COLDNESS
+        return mutant.compile(MAX_LEN, softmax_coldness=c, mlp_exactness=exactness)
     model = mutant.compile(MAX_LEN)  # a fresh copy whose weights we replace
     model.set_prng_key(seed)
     if kind in INIT_SCHEMES:
@@ -75,7 +77,7 @@ def _start_model(mutant, init: str, compiled: Model, seed: int) -> Model:
     elif kind == "from":
         if arg == mutant.job_id:
             raise ValueError(f"from:{arg} must be another mutant")
-        model.set_weights(raspbugs.get(arg).compile(MAX_LEN).params)  # asserts identical shapes
+        model.set_weights(get_mutant(arg).compile(MAX_LEN).params)  # asserts identical shapes
     return model
 
 
@@ -165,7 +167,7 @@ def repair(
     budget by setting the epoch count (spec-size ablation).
     """
     check_init(init)
-    mutant = raspbugs.get(job_id)
+    mutant = get_mutant(job_id)
     compiled = mutant.compile(MAX_LEN)
     # Benchmark mutants can represent every target output by construction (F6, F35).
     missing = data.unrepresentable_outputs(mutant.program, compiled)
@@ -250,7 +252,7 @@ def _init_option(ctx, param, value):
 
 
 @click.command()
-@click.option("--job-id", required=True, help="RaspBugs mutant id")
+@click.option("--job-id", required=True, help="Mutant id (RaspBugs or TracrBench)")
 @click.option("--out", "out_dir", required=True, type=click.Path(), help="Run directory to write")
 @click.option("--init", default="compiled", show_default=True, callback=_init_option,
               help=f"One of {', '.join(INITS)}")

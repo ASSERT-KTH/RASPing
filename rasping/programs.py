@@ -1,26 +1,37 @@
-"""Registry of the base RASP programs.
+"""Registry of the base RASP programs of both benchmarks.
 
 Each program has a canonical name (`most_freq`, ...), the file prefix of its
 specification in `data/` (historically `most-freq` for most_freq), an input
 vocabulary, and a factory that builds the RASP SOp from a module containing the
-program's source (the reference source in `raspbugs/source/` or a mutant's source).
+program's source (the reference source in `<benchmark>/source/` or a mutant's source).
+
+RaspBugs programs (`config.PROGRAMS`) are defined here. TracrBench programs are read from
+`tracrbench/programs.json` (written by `tracrbench/import_programs.py`); only the
+included ones are registered (`tracrbench_programs()`). Their specifications live in
+`data/tracrbench/` and are generated from TracrBench's ground-truth functions.
 """
 
 from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 import sys
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 from typing import Callable
 
 from tracr.rasp import rasp
 
-from rasping.config import MAX_LEN, RASPBUGS_DIR
+from rasping.config import MAX_LEN, MLP_EXACTNESS, RASPBUGS_DIR, TRACRBENCH, TRACRBENCH_DIR
 
 SOURCE_DIR = RASPBUGS_DIR / "source"
+#: TracrBench programs: one record per program of eval_data.json, included or not.
+TRACRBENCH_PROGRAMS = TRACRBENCH_DIR / "programs.json"
+#: Prepended to every TracrBench program, as TracrBench's own pipeline does.
+TRACRBENCH_HEADER = "from tracr.rasp import rasp\n\n"
 
 
 @dataclass(frozen=True)
@@ -29,6 +40,10 @@ class Program:
     data_name: str
     vocab: tuple
     _factory: Callable[[ModuleType, int, tuple], rasp.SOp]
+    benchmark: str = "raspbugs"
+    mlp_exactness: float = MLP_EXACTNESS
+    #: TracrBench: ground truth on a raw input list (a list, or one value for every position)
+    ground_truth: Callable[[list], object] | None = None
 
     def build(self, module: ModuleType, max_len: int = MAX_LEN) -> rasp.SOp:
         """Build the SOp from a module that defines this program's `make_*` function."""
@@ -36,7 +51,19 @@ class Program:
 
     @property
     def source_path(self) -> Path:
-        return SOURCE_DIR / f"{self.name}.py"
+        root = RASPBUGS_DIR if self.benchmark == "raspbugs" else TRACRBENCH_DIR
+        return root / "source" / f"{self.name}.py"
+
+    def data_file(self, split: str) -> str:
+        """Specification file of a split, relative to the data directory."""
+        if self.benchmark == "raspbugs":
+            return f"{self.data_name}_{split}.jsonl"
+        return f"tracrbench/{self.data_name}_{split}.jsonl.gz"
+
+    def target(self, inputs: list) -> list:
+        """TracrBench: the ground-truth output sequence for `inputs` (no BOS)."""
+        y = self.ground_truth(list(inputs))
+        return list(y) if isinstance(y, (list, tuple)) else [y] * len(inputs)
 
 
 _PROGRAMS = {
@@ -60,20 +87,59 @@ _PROGRAMS = {
 ALIASES = {p.data_name: p.name for p in _PROGRAMS.values()}
 
 
+def _ground_truth(source: str) -> Callable[[list], object]:
+    ns: dict = {}
+    exec(source, ns)
+    return ns["fun"]
+
+
+@lru_cache(maxsize=1)
+def tracrbench_records() -> tuple[dict, ...]:
+    """Every TracrBench program record (included or not), from `tracrbench/programs.json`."""
+    if not TRACRBENCH_PROGRAMS.exists():
+        return ()
+    return tuple(json.loads(TRACRBENCH_PROGRAMS.read_text()))
+
+
+@lru_cache(maxsize=1)
+def _tracrbench() -> dict[str, Program]:
+    out = {}
+    for r in tracrbench_records():
+        if not r["included"]:
+            continue
+        assert r["name"] not in _PROGRAMS, f"TracrBench program {r['name']} shadows a RaspBugs program"
+        entry = r["entry"]
+        out[r["name"]] = Program(
+            r["name"], r["name"], TRACRBENCH.vocab, lambda m, n, v, entry=entry: getattr(m, entry)(),
+            benchmark="tracrbench", mlp_exactness=TRACRBENCH.mlp_exactness,
+            ground_truth=_ground_truth(r["ground_truth"]))
+    return out
+
+
 def canonical(name: str) -> str:
     """Map any historical program name (e.g. `most-freq`) to the canonical one."""
     name = ALIASES.get(name, name)
-    if name not in _PROGRAMS:
-        raise KeyError(f"Unknown program {name!r}; known: {sorted(_PROGRAMS)}")
+    if name not in _PROGRAMS and name not in _tracrbench():
+        raise KeyError(f"Unknown program {name!r}; known: {sorted(_PROGRAMS)} and "
+                       f"{len(_tracrbench())} TracrBench programs")
     return name
 
 
-def get(name: str) -> Program:
-    return _PROGRAMS[canonical(name)]
+def get(name: str | Program) -> Program:
+    if isinstance(name, Program):  # e.g. a TracrBench program being imported
+        return name
+    name = canonical(name)
+    return _PROGRAMS[name] if name in _PROGRAMS else _tracrbench()[name]
 
 
 def all_programs() -> list[Program]:
+    """The RaspBugs programs (see `tracrbench_programs` for the others)."""
     return list(_PROGRAMS.values())
+
+
+def tracrbench_programs() -> list[Program]:
+    """The included TracrBench programs, sorted by name."""
+    return [p for _, p in sorted(_tracrbench().items())]
 
 
 def module_from_source(source: str, module_name: str | None = None) -> ModuleType:

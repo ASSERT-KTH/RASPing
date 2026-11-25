@@ -18,15 +18,15 @@ from tracr.compiler import compiling
 from tracr.compiler import expr_to_craft_graph as _e2c
 from tracr.rasp import rasp
 
+from rasping.config import MLP_EXACTNESS
 from rasping.metrics import exact_match_accuracy
 
 #: Init schemes for `Model.set_random_weights` (fan-in/fan-out as in Haiku's VarianceScaling).
 INIT_SCHEMES = ("lecun", "xavier", "kaiming", "unit-normal")
 
-#: Tracr's sharpness constants as used for every compiled model in this repository.
-#: `mlp_exactness` scales the numerical MLPs (Tracr's default is 100; v1 used 120);
+#: Tracr's sharpness constants. `mlp_exactness` scales the numerical MLPs (the default is
+#: RaspBugs'; each program carries its own, see `programs.Program.mlp_exactness`);
 #: `softmax_coldness` scales attention logits (hard-coded to 100 inside Tracr).
-MLP_EXACTNESS = 120
 SOFTMAX_COLDNESS = 100
 
 
@@ -64,6 +64,7 @@ class Model:
         self.vocab = set(vocab)
         self.max_len = max_len
         self.name = name
+        self.mlp_exactness, self.softmax_coldness = mlp_exactness, softmax_coldness
         with _softmax_coldness(softmax_coldness):
             self.assembled = compiling.compile_rasp_to_model(
                 sop, self.vocab, max_len, compiler_bos="BOS", mlp_exactness=mlp_exactness
@@ -201,6 +202,27 @@ class Model:
             out[i] = all(pred[j] == target[j] for j in range(len(target)))
         return out
 
+    def predict(self, inputs: list[list], batch_size: int = 1024) -> list[list]:
+        """Decoded output sequences (BOS position included) for raw inputs (BOS first), in
+        batches. Only the inputs are encoded, so any target can be compared against the result."""
+        width = self.max_len + 1
+        dec = self.assembled.output_encoder.decode
+        out = []
+        for i in range(0, len(inputs), batch_size):
+            chunk = inputs[i:i + batch_size]
+            x = [list(s) + ["compiler_pad"] * (width - len(s)) for s in chunk]
+            X = jnp.array([self.assembled.input_encoder.encode(s) for s in x])
+            logits = self.forward(X).unembedded_output
+            # Tracr squeezes the output axis when the output space has a single value
+            ids = np.zeros(X.shape, int) if logits.ndim == 2 else np.asarray(jnp.argmax(logits, -1))
+            out += [dec(list(r[:len(s)])) for r, s in zip(ids, chunk)]
+        return out
+
+    def exact_match(self, data: list[tuple[list, list]]) -> np.ndarray:
+        """Per-example exact-match correctness (bool array), BOS excluded, batched (`predict`)."""
+        preds = self.predict([x for x, _ in data])
+        return np.array([list(p[1:]) == list(y[1:]) for p, (_, y) in zip(preds, data)], dtype=bool)
+
     def _accuracy(self, params, x, y):
         logits = self.forward_fn.apply(params, jnp.array(x)).unembedded_output
         return exact_match_accuracy(logits, x, y, self.pad_token)
@@ -273,4 +295,4 @@ def compile_program(program: str, source: str | None = None, max_len: int | None
     p = programs.get(program)
     sop = programs.build_sop(source if source is not None else programs.reference_source(p.name),
                              p.name, max_len)
-    return Model(sop, p.vocab, max_len, p.name)
+    return Model(sop, p.vocab, max_len, p.name, mlp_exactness=p.mlp_exactness)

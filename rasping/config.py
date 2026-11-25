@@ -14,6 +14,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO_ROOT / "data"  # input-output specifications (train/val/test JSONL)
 RASPBUGS_DIR = REPO_ROOT / "raspbugs"  # benchmark generation pipeline + manifest
+TRACRBENCH_DIR = REPO_ROOT / "tracrbench"  # second benchmark: mutants of TracrBench programs
 RESULTS_DIR = REPO_ROOT / "results"  # tidy, versioned result tables (tracked)
 ARTIFACTS_DIR = REPO_ROOT / "paper_artifacts"  # generated tables / figures (tracked)
 RUNS_DIR = REPO_ROOT / "runs"  # raw run outputs incl. weights (gitignored)
@@ -26,6 +27,41 @@ PROGRAMS = ("hist", "most_freq", "reverse", "sort")
 
 #: Maximum input length (excluding BOS) of the specifications and compiled models.
 MAX_LEN = 10
+
+#: Tracr's MLP sharpness (`mlp_exactness`) for RaspBugs programs (Tracr's default is 100;
+#: v1 used 120). TracrBench programs need more to compile exactly (see `TRACRBENCH`).
+MLP_EXACTNESS = 120
+
+# --------------------------------------------------------------------------- TracrBench
+
+
+@dataclass(frozen=True)
+class TracrBenchRules:
+    """How the TracrBench benchmark is built (fixed Nov 25, 2026, before any mutant was run).
+
+    Source: github.com/HannesThurnherr/TracrBench (Thurnherr & Riesen, 2024), `eval_data.json`
+    at `commit`: 101 programs with RASP code and a ground-truth Python function. A program
+    is included if
+      1. its RASP code runs in TracrBench's own environment (`from tracr.rasp import rasp`),
+      2. compiled with `mlp_exactness`, it reproduces the ground truth on every test example,
+      3. it is not trivial: neither one constant output sequence nor copying the input
+         reaches `max_trivial_accuracy` exact-match accuracy on the test split.
+    There is no size limit. (A 1.2M-parameter cap, the largest RaspBugs model, was dropped
+    on Nov 25, 2026, before any mutant was generated: it had no scientific basis.)
+    Mutants: buggy and representable (as RaspBugs), then at most `mutants_per_program` per
+    program, stratified by mutation order (seed `sample_seed`).
+    """
+
+    repo: str = "https://github.com/HannesThurnherr/TracrBench"
+    commit: str = "48abdd9749b568af1015bcee72ff19140063cc5e"
+    vocab: tuple = tuple(range(10))
+    mlp_exactness: float = 1000  # TracrBench's own setting; 3 programs are wrong at 120
+    max_trivial_accuracy: float = 0.5
+    mutants_per_program: int = 20
+    sample_seed: int = 0
+
+
+TRACRBENCH = TracrBenchRules()
 
 # --------------------------------------------------------------------------- labels
 

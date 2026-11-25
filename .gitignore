@@ -177,3 +177,4 @@ paper.pdf
 reviews.txt
 # cosmic-ray working files written by raspbugs/run_mutations.py
 raspbugs/results/
+tracrbench/results/

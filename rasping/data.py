@@ -1,7 +1,8 @@
 """Input-output specifications: generate, split, save, load and encode.
 
 A specification is a list of `(input_seq, output_seq)` pairs, both starting with "BOS".
-On disk they live in `data/<data_name>_<split>.jsonl` (`data_name` from `programs`).
+On disk they live in `data/<data_name>_<split>.jsonl` (`data_name` from `programs`), or
+`data/tracrbench/<name>_<split>.jsonl.gz` for TracrBench programs.
 """
 
 from __future__ import annotations
@@ -52,10 +53,12 @@ def stream_jsonl(path: str | Path) -> Iterable[dict]:
 
 def write_jsonl(path: str | Path, records: Iterable[dict]) -> None:
     path = Path(path)
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "wt") as fp:
-        for r in records:
-            fp.write(json.dumps(r, cls=NumpyJSONEncoder) + "\n")
+    lines = "".join(json.dumps(r, cls=NumpyJSONEncoder) + "\n" for r in records)
+    if path.suffix == ".gz":  # mtime=0: the same records give the same bytes
+        with gzip.GzipFile(path, "wb", mtime=0) as fp:
+            fp.write(lines.encode())
+    else:
+        path.write_text(lines)
 
 
 # --------------------------------------------------------------------------- generation
@@ -140,7 +143,7 @@ def split_train_val_test(data: list, train_pct: float = 0.8, val_pct: float = 0.
 
 
 def dataset_path(program: str, split: str, data_dir: Path = DATA_DIR) -> Path:
-    return Path(data_dir) / f"{programs.get(program).data_name}_{split}.jsonl"
+    return Path(data_dir) / programs.get(program).data_file(split)
 
 
 def load(program: str, split: str = "train", data_dir: Path = DATA_DIR) -> list[Example]:

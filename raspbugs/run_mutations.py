@@ -1,250 +1,112 @@
-import os
+"""Run cosmic-ray on a benchmark's reference programs (step 1 of the generation pipeline).
+
+For every program and mutation order, cosmic-ray generates up to 200 mutants and runs the
+benchmark's oracle on each. Results go to `<root>/results/<program>/`:
+    tracr_<program>_order=<k>.{toml,sqlite,jsonl}   config, session, dump (read by step 2)
+    report_<program>_order=<k>.html                 cosmic-ray's HTML report
+
+    python raspbugs/run_mutations.py                                          # RaspBugs
+    python raspbugs/run_mutations.py --root tracrbench --program sorting --orders 1,2
+
+cosmic-ray mutates the program file in place. Each program therefore runs in its own
+temporary copy of `source/` and `oracle/`, so the checkout is never left mutated (e.g. if
+a cluster job is killed) and programs can run in parallel. Orders of one program run one
+after the other. The oracle is `oracle/test_<program>.py` if that file exists (RaspBugs),
+else the parametrized `oracle/test_program.py::test_model[<program>]` (TracrBench).
+"""
+
+from __future__ import annotations
+
 import shutil
-import toml
 import subprocess
-import time
+import tempfile
+from multiprocessing import Pool
 from pathlib import Path
-from multiprocessing import Pool, Manager, Value
-from typing import Optional, Tuple, List, Dict
-import argparse
-from tqdm import tqdm
+
+import click
+import toml
+
+HERE = Path(__file__).resolve().parent
+MUTATION_LIMIT = 200
 
 
-def create_config(source_file: str, mutation_order: int = 1) -> str:
-    """Create a cosmic-ray config file for a given source file.
-
-    Args:
-        source_file: Path to the source file to mutate
-        mutation_order: Order of mutations to generate (default: 1)
-    """
-
-    # Get the base filename without extension
-    base_name = os.path.splitext(os.path.basename(source_file))[0]
-
-    config = {
-        "cosmic-ray": {
-            "module-path": f"source/{os.path.basename(source_file)}",
-            "timeout": 60.0,
-            "excluded-modules": [],
-            "test-command": f"pytest -s oracle/test_{base_name}.py",
-            "distributor": {"name": "local"},
-            # Add higher-order mutation parameters
-            "mutation-order": mutation_order,
-            "specific-order": mutation_order,  # Only generate mutations of this exact order
-            "mutation-limit": 200,  # Limit the number of mutations to avoid explosion
-            "disable-overlapping-mutations": True,  # Prevent mutations from overlapping
-        }
-    }
-
-    # Create results directory if it doesn't exist
-    results_dir = Path("results") / base_name
-    results_dir.mkdir(parents=True, exist_ok=True)
-
-    # Create config filename in the results directory
-    config_file = results_dir / f"tracr_{base_name}_order={mutation_order}.toml"
-
-    # Write config to file
-    with open(config_file, "w") as f:
-        toml.dump(config, f)
-
-    return config_file
+def test_command(root: Path, program: str) -> str:
+    if (root / "oracle" / f"test_{program}.py").exists():
+        return f"pytest -s -p no:cacheprovider oracle/test_{program}.py"
+    return f"pytest -s -p no:cacheprovider oracle/test_program.py::test_model[{program}]"
 
 
-def process_file_with_order(args: Tuple[Path, int, Dict]) -> Optional[str]:
-    """Process a single source file with cosmic-ray using specified mutation order.
-
-    Args:
-        args: Tuple containing (source_file, mutation_order, shared_dict)
-    """
-    source_file, mutation_order, shared_dict = args
-    process_id = os.getpid()
-    program_name = source_file.stem
-
-    try:
-        # Instead of updating a shared progress bar, we'll print status updates
-        print(f"Processing {program_name} (order={mutation_order}, PID={process_id})")
-        
-        # Get the base filename without extension
-        base_name = source_file.stem
-
-        # Create results directory if it doesn't exist
-        results_dir = Path("results") / base_name
-        results_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create config file for this mutation order
-        config_file = create_config(str(source_file), mutation_order)
-
-        # Create unique filenames for this mutation order
-        sqlite_file = results_dir / f"tracr_{base_name}_order={mutation_order}.sqlite"
-        jsonl_file = results_dir / f"tracr_{base_name}_order={mutation_order}.jsonl"
-        html_file = results_dir / f"report_{base_name}_order={mutation_order}.html"
-
-        # Initialize the session
-        init_result = subprocess.run(
-            ["cosmic-ray", "init", str(config_file), str(sqlite_file)], 
-            check=True
-        )
-        
-        # Run the mutations
-        exec_result = subprocess.run(
-            ["cosmic-ray", "exec", str(config_file), str(sqlite_file)], 
-            check=True
-        )
-
-        # Dump to JSON
-        with open(jsonl_file, "w") as f:
-            # Can't use capture_output with stdout specified
-            dump_result = subprocess.run(
-                ["cosmic-ray", "dump", str(sqlite_file)], 
-                stdout=f, 
-                check=True
-            )
-
-        # Generate HTML report
-        with open(html_file, "w") as f:
-            # Can't use capture_output with stdout specified
-            html_result = subprocess.run(
-                ["cr-html", str(sqlite_file)], 
-                stdout=f, 
-                check=True
-            )
-
-        # Increment completed tasks in the shared dictionary
-        with shared_dict["lock"]:
-            shared_dict["completed"] += 1
-            print(f"Progress: {shared_dict['completed']}/{shared_dict['total']} tasks completed")
-
-        return None
-
-    except subprocess.CalledProcessError as e:
-        error_msg = f"ERROR in {program_name} (order={mutation_order}, PID={process_id}): {e}\n"
-        error_msg += f"Command: {e.cmd}\n"
-        if hasattr(e, 'stdout') and e.stdout:
-            error_msg += f"STDOUT: {e.stdout.decode('utf-8')}\n"
-        if hasattr(e, 'stderr') and e.stderr:
-            error_msg += f"STDERR: {e.stderr.decode('utf-8')}\n"
-        print(error_msg)
-        
-        # Increment completed tasks in the shared dictionary
-        with shared_dict["lock"]:
-            shared_dict["completed"] += 1
-            print(f"Progress: {shared_dict['completed']}/{shared_dict['total']} tasks completed")
-            
-        return error_msg
-    except Exception as e:
-        error_msg = f"EXCEPTION in {program_name} (order={mutation_order}, PID={process_id}): {e}"
-        print(error_msg)
-        
-        # Increment completed tasks in the shared dictionary
-        with shared_dict["lock"]:
-            shared_dict["completed"] += 1
-            print(f"Progress: {shared_dict['completed']}/{shared_dict['total']} tasks completed")
-            
-        return error_msg
+def config(root: Path, program: str, order: int, timeout: float) -> dict:
+    return {"cosmic-ray": {
+        "module-path": f"source/{program}.py",
+        "timeout": timeout,
+        "excluded-modules": [],
+        "test-command": test_command(root, program),
+        "distributor": {"name": "local"},
+        # higher-order mutations (cosmic-ray fork): exactly `order` mutations per mutant
+        "mutation-order": order,
+        "specific-order": order,
+        "mutation-limit": MUTATION_LIMIT,
+        "disable-overlapping-mutations": True,
+    }}
 
 
-def process_file(source_file: Path) -> Optional[str]:
-    """Process a single source file with cosmic-ray."""
-    # This function is kept for backward compatibility
-    manager = Manager()
-    shared_dict = manager.dict()
-    shared_dict["completed"] = 0
-    shared_dict["total"] = 1
-    shared_dict["lock"] = manager.Lock()
-    return process_file_with_order((source_file, 1, shared_dict))
-
-
-def process_program_sequentially(args: Tuple[Path, List[Tuple[Path, int]], Dict]) -> List[Optional[str]]:
-    """Process all tasks for a single program sequentially.
-    
-    Args:
-        args: Tuple containing (source_file, list_of_tasks, shared_dict)
-    
-    Returns:
-        List of error messages, if any
-    """
-    source_file, tasks, shared_dict = args
-    program_name = source_file.stem
-    print(f"Starting sequential processing for program: {program_name} with {len(tasks)} tasks")
-    
+def run_program(args: tuple[Path, str, list[int], float]) -> list[str]:
+    """All orders of one program, in a temporary working copy; returns error messages."""
+    root, program, orders, timeout = args
+    out = root / "results" / program
+    out.mkdir(parents=True, exist_ok=True)
     errors = []
-    for task in tasks:
-        source_file, mutation_order = task
-        error = process_file_with_order((source_file, mutation_order, shared_dict))
-        if error:
-            errors.append(error)
+    with tempfile.TemporaryDirectory(prefix=f"mut_{program}_") as tmp:
+        work = Path(tmp)
+        (work / "source").mkdir()
+        for f in ["__init__.py", f"{program}.py"]:
+            if (root / "source" / f).exists():
+                shutil.copy(root / "source" / f, work / "source" / f)
+        shutil.copytree(root / "oracle", work / "oracle", ignore=shutil.ignore_patterns("__pycache__"))
+        for order in orders:
+            stem = f"tracr_{program}_order={order}"
+            try:
+                cfg = work / f"{stem}.toml"
+                cfg.write_text(toml.dumps(config(root, program, order, timeout)))
+                db = work / f"{stem}.sqlite"
+                subprocess.run(["cosmic-ray", "init", cfg.name, db.name], cwd=work, check=True)
+                subprocess.run(["cosmic-ray", "exec", cfg.name, db.name], cwd=work, check=True)
+                with open(work / f"{stem}.jsonl", "w") as f:
+                    subprocess.run(["cosmic-ray", "dump", db.name], cwd=work, stdout=f, check=True)
+                with open(work / f"report_{program}_order={order}.html", "w") as f:
+                    subprocess.run(["cr-html", db.name], cwd=work, stdout=f, check=True)
+                for name in [cfg.name, db.name, f"{stem}.jsonl", f"report_{program}_order={order}.html"]:
+                    shutil.copy(work / name, out / name)
+                print(f"{program} order {order}: done", flush=True)
+            except subprocess.CalledProcessError as e:
+                errors.append(f"{program} order {order}: {e}")
+                print(errors[-1], flush=True)
     return errors
 
 
-def main():
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(
-        description="Run mutation testing with different mutation orders"
-    )
-    parser.add_argument(
-        "--orders",
-        type=int,
-        nargs="+",
-        default=[1],
-        help="Mutation orders to run (default: [1])",
-    )
-    parser.add_argument(
-        "--clean", action="store_true", help="Clean results directory before running"
-    )
-    args = parser.parse_args()
-
-    # Create main results directory if it doesn't exist
-    Path("results").mkdir(exist_ok=True)
-
-    # Get all Python files in source directory
-    source_dir = Path("source")
-    source_files = [f for f in source_dir.glob("*.py") if f.name != "__init__.py"]
-
-    # Clean results directories if requested
-    if args.clean:
-        for source_file in source_files:
-            results_dir = Path("results") / source_file.stem
-            if results_dir.exists():
-                print(f"Cleaning {results_dir}...")
-                shutil.rmtree(results_dir)
-
-    # Group tasks by program (source file)
-    program_tasks: Dict[Path, List[Tuple[Path, int]]] = {}
-    for source_file in source_files:
-        program_tasks[source_file] = []
-        for order in args.orders:
-            program_tasks[source_file].append((source_file, order))
-
-    # Calculate total number of tasks
-    total_tasks = sum(len(tasks) for tasks in program_tasks.values())
-    print(f"Total tasks to process: {total_tasks}")
-    
-    # Create shared dictionary for tracking progress across processes
-    manager = Manager()
-    shared_dict = manager.dict()
-    shared_dict["completed"] = 0
-    shared_dict["total"] = total_tasks
-    shared_dict["lock"] = manager.Lock()
-    
-    # Process each program's tasks in parallel (but tasks within a program sequentially)
-    pool_input = [(file, tasks, shared_dict) for file, tasks in program_tasks.items()]
-    
-    # Use multiprocessing to process different programs in parallel
-    print(f"Starting processing with {len(program_tasks)} parallel program workers")
-    with Pool() as pool:
-        results = pool.map(process_program_sequentially, pool_input)
-    
-    # Flatten the results and filter out None values
-    errors = [err for sublist in results for err in sublist if err]
-    
-    # Print a summary of errors at the end
+@click.command()
+@click.option("--root", default=str(HERE), show_default=True,
+              help="Benchmark directory with source/ and oracle/ (raspbugs or tracrbench)")
+@click.option("--program", "only", multiple=True, help="Only these programs (default: all in source/)")
+@click.option("--orders", default="1,2,3,4,5", show_default=True, help="Comma-separated mutation orders")
+@click.option("--timeout", type=float, default=60.0, show_default=True, help="Oracle timeout per mutant (s)")
+@click.option("--workers", type=int, default=None, help="Programs run in parallel (default: one per CPU)")
+@click.option("--clean", is_flag=True, help="Delete the programs' previous results first")
+def main(root, only, orders, timeout, workers, clean):
+    root = Path(root).resolve()
+    orders = [int(o) for o in orders.split(",")]
+    names = list(only) or sorted(f.stem for f in (root / "source").glob("*.py") if f.stem != "__init__")
+    if clean:
+        for n in names:
+            shutil.rmtree(root / "results" / n, ignore_errors=True)
+    print(f"{len(names)} programs x orders {orders} in {root}")
+    with Pool(workers) as pool:
+        errors = [e for errs in pool.map(run_program, [(root, n, orders, timeout) for n in names])
+                  for e in errs]
     if errors:
-        print("\nErrors encountered during mutation testing:")
-        for error in errors:
-            print(error)
-        print(f"\nTotal errors: {len(errors)} out of {total_tasks} tasks")
-    else:
-        print(f"\nAll {total_tasks} mutation tests completed successfully!")
+        raise SystemExit("Errors:\n" + "\n".join(errors))
+    print(f"All {len(names) * len(orders)} runs completed")
 
 
 if __name__ == "__main__":
