@@ -21,6 +21,14 @@ weights produce exactly the compiled mutant's output. Probes on 24 mutants (Nov 
   loses up to two thirds of the behaviour, while x0.3 keeps none.
 
     python experiments/init_pilot/launch.py --dry-run
+
+Early-stopping check (Nov 25, 2026): in the first round every most_freq run stopped early
+just below the threshold (median test accuracy 0.88-0.96 for xavier, rescaled and soft:10).
+Rerun four arms with patience 500 instead of 50; these runs go to
+`<arm>_seed_<s>_patience500` next to the patience-50 runs, and the analysis pairs them:
+
+    python experiments/init_pilot/launch.py --patience 500 \
+        --arm compiled --arm xavier --arm rescaled --arm soft:10
     python -m rasping.results collect init_pilot --version v2
     python experiments/init_pilot/analyze.py --version v2
 """
@@ -31,7 +39,7 @@ import click
 import numpy as np
 
 from rasping import cluster, raspbugs
-from rasping.config import PROGRAMS, RUNS_DIR
+from rasping.config import PROGRAMS, RUNS_DIR, TrainConfig
 
 ARMS = ("compiled", "xavier", "rescaled", "shuffled", "soft:50", "soft:30", "soft:10", "from")
 
@@ -51,16 +59,23 @@ def pick_twin(job_id: str, seed: int) -> str | None:
 @click.option("--seed", "seeds", type=int, multiple=True, default=(0,), show_default=True)
 @click.option("--arm", "arms", multiple=True, default=ARMS, show_default=True,
               type=click.Choice(ARMS))
+@click.option("--program", "programs", multiple=True, default=PROGRAMS, show_default=True,
+              type=click.Choice(PROGRAMS))
+@click.option("--patience", type=int, default=TrainConfig.early_stopping_patience, show_default=True,
+              help="Early-stopping patience; non-default values get a _patience<P> run directory")
 @cluster.add_cli_options
-def main(n_per_program, sample_seed, seeds, arms, **cli):
+def main(n_per_program, sample_seed, seeds, arms, programs, patience, **cli):
     root = RUNS_DIR / "init_pilot"
-    selection = {p: raspbugs.stratified_sample(p, n_per_program, sample_seed) for p in PROGRAMS}
+    default = patience == TrainConfig.early_stopping_patience
+    suffix = "" if default else f"_patience{patience}"
+    selection = {p: raspbugs.stratified_sample(p, n_per_program, sample_seed) for p in programs}
     twins = {j: pick_twin(j, sample_seed) for js in selection.values() for j in js}
     if not cli["dry_run"]:
         root.mkdir(parents=True, exist_ok=True)
-        (root / "selected_jobs.json").write_text(json.dumps(
+        (root / f"selected_jobs{suffix}.json").write_text(json.dumps(
             {"sample_seed": sample_seed, "n_per_program": n_per_program, "seeds": list(seeds),
-             "arms": list(arms), "selection": selection, "twins": twins}, indent=2))
+             "arms": list(arms), "patience": patience, "selection": selection, "twins": twins},
+            indent=2))
     commands = []
     for program, job_ids in selection.items():
         for job_id in job_ids:
@@ -72,14 +87,15 @@ def main(n_per_program, sample_seed, seeds, arms, **cli):
                 else:
                     init = arm
                 for seed in seeds:
-                    out = root / program / job_id / f"{arm.replace(':', '_')}_seed_{seed}"
+                    out = root / program / job_id / f"{arm.replace(':', '_')}_seed_{seed}{suffix}"
                     if not (out / "run.json").exists():
                         commands.append(["python", "-m", "rasping.repair", "--job-id", job_id,
-                                         "--out", str(out), "--init", init, "--seed", str(seed)])
+                                         "--out", str(out), "--init", init, "--seed", str(seed),
+                                         "--patience", str(patience)])
     n_twinless = sum(t is None for t in twins.values())
     print(f"{sum(map(len, selection.values()))} mutants x {len(arms)} arms x {len(seeds)} seeds; "
           f"{n_twinless} mutants have no shape twin (no 'from' run); {len(commands)} runs to submit")
-    cluster.submit_from_cli(commands, "init_pilot", **cli)
+    cluster.submit_from_cli(commands, f"init_pilot{suffix}", **cli)
 
 
 if __name__ == "__main__":

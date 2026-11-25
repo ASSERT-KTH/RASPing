@@ -7,6 +7,10 @@ Reads results/<version>/init_pilot/runs.csv (collect with
     tables/init_pilot_arms.tex     per arm: start agreement, % repaired (all, per program), epochs
     tables/init_pilot_paired.tex   per arm vs compiled and vs xavier: who repairs which mutants
     figures/init_pilot_repaired.pdf  % repaired per program and arm
+    tables/init_pilot_patience.tex  per arm: % repaired with patience 50 vs 500 (if those runs exist)
+
+The arm tables use the default patience only; the patience-500 runs (`launch.py --patience
+500`) appear only in the patience table, paired with the same mutants at patience 50.
 """
 
 import click
@@ -14,7 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from rasping import analysis
-from rasping.config import PROGRAMS
+from rasping.config import PROGRAMS, TrainConfig
 from rasping.results import load_runs
 from rasping.tables import latex_table, pct, save_figure, tt, write_table
 
@@ -24,9 +28,27 @@ LABELS = {"compiled": "compiled", "xavier": "Xavier", "rescaled": "rescaled (str
           "soft:10": "soft 10", "from": "other mutant (same shapes)"}
 
 
+PATIENCE = TrainConfig.early_stopping_patience
+HIGH_PATIENCE = 500
+
+
 def load(version):
     runs = load_runs(version, "init_pilot")
     return runs.assign(arm=runs["init"].map(analysis.init_arm))
+
+
+def patience_table(runs, version):
+    t = analysis.patience_table(runs, PATIENCE, HIGH_PATIENCE, list(PROGRAMS))
+    if t.empty:
+        return
+    print(t.round(1).to_string(index=False))
+    rows = [[LABELS[r.arm], r.pairs, f"{pct(r.repaired_lo)} / {pct(r.repaired_hi)}",
+             *[f"{pct(getattr(r, f'{p}_lo'))} / {pct(getattr(r, f'{p}_hi'))}" for p in PROGRAMS],
+             r.only_hi, r.only_lo, f"{int(r.epochs_lo)} / {int(r.epochs_hi)}"]
+            for r in t.itertuples()]
+    header = ["Start", "Pairs", "All", *[tt(p) for p in PROGRAMS], f"Only {HIGH_PATIENCE}",
+              f"Only {PATIENCE}", "Epochs"]
+    write_table(version, "init_pilot_patience.tex", latex_table(header, rows))
 
 
 def arms_table(t, version):
@@ -66,7 +88,8 @@ def figure(t, version):
 @click.command()
 @click.option("--version", default="v2", show_default=True)
 def main(version):
-    runs = load(version)
+    all_runs = load(version)
+    runs = all_runs[all_runs["cfg_early_stopping_patience"] == PATIENCE]
     t = analysis.arm_table(runs, ARMS, list(PROGRAMS))
     print(t.round(1).to_string(index=False))
     # Arms whose starting behaviour varies per mutant: repair rate when the start does / does
@@ -77,6 +100,7 @@ def main(version):
     arms_table(t, version)
     paired_table(runs, version)
     figure(t, version)
+    patience_table(all_runs, version)
 
 
 if __name__ == "__main__":

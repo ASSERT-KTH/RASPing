@@ -233,3 +233,31 @@ def paired_outcomes(runs: pd.DataFrame, arm: str, ref: str, threshold: float = T
     return {"arm": arm, "ref": ref, "pairs": len(a), "only_arm": int((a & ~b).sum()),
             "both": int((a & b).sum()), "only_ref": int((~a & b).sum()), "neither": int((~a & ~b).sum())}
 
+
+
+def patience_table(runs: pd.DataFrame, low: int, high: int, programs: list[str],
+                   threshold: float = THRESHOLD) -> pd.DataFrame:
+    """Per arm: % repaired with early-stopping patience `low` vs `high` on the same mutants
+    and seeds (all and per program), median epochs, and how many runs only one repairs.
+    `runs` needs columns arm, job_id, seed, program, cfg_early_stopping_patience,
+    test_accuracy, n_epochs."""
+    key = ["arm", "job_id", "seed"]
+    cols = ["program", "test_accuracy", "n_epochs"]
+    lo = runs[runs["cfg_early_stopping_patience"] == low].set_index(key)[cols]
+    hi = runs[runs["cfg_early_stopping_patience"] == high].set_index(key)[cols]
+    m = lo.join(hi, how="inner", lsuffix="_lo", rsuffix="_hi")
+    m["rep_lo"] = m["test_accuracy_lo"] >= threshold
+    m["rep_hi"] = m["test_accuracy_hi"] >= threshold
+    rows = []
+    for arm, d in m.groupby(level="arm", sort=False):
+        row = {"arm": arm, "pairs": len(d), "repaired_lo": 100 * d["rep_lo"].mean(),
+               "repaired_hi": 100 * d["rep_hi"].mean()}
+        for p in programs:
+            dp = d[d["program_lo"] == p]
+            row[f"{p}_lo"] = 100 * dp["rep_lo"].mean() if len(dp) else np.nan
+            row[f"{p}_hi"] = 100 * dp["rep_hi"].mean() if len(dp) else np.nan
+        row.update(only_hi=int((d["rep_hi"] & ~d["rep_lo"]).sum()),
+                   only_lo=int((d["rep_lo"] & ~d["rep_hi"]).sum()),
+                   epochs_lo=d["n_epochs_lo"].median(), epochs_hi=d["n_epochs_hi"].median())
+        rows.append(row)
+    return pd.DataFrame(rows)
