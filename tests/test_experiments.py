@@ -50,3 +50,10 @@ def test_reproduce_paper_v1(tmp_path):
     diff = subprocess.run(["git", "status", "--porcelain", "paper_artifacts/v1_tmlr"],
                           capture_output=True, text=True, cwd=REPO_ROOT)
     assert diff.returncode == 0 and diff.stdout == "", "regenerated artifacts differ:\n" + diff.stdout
+
+
+def test_submitit_executor_loads(tmp_path):
+    """Dry runs never import submitit; real submissions do (setuptools 82 broke it)."""
+    import submitit
+
+    assert submitit.AutoExecutor(folder=tmp_path) is not None

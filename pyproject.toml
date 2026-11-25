@@ -99,7 +99,7 @@ constraint-dependencies = [
     "scikit-learn==1.6.1",
     "scipy==1.17.0",
     "seaborn==0.13.2",
-    "setuptools==82.0.0",
+    "setuptools==81.0.0",  # 82 removed pkg_resources, which submitit 1.5.2 imports
     "smmap==5.0.2",
     "sqlalchemy==2.0.46",
     "stevedore==5.6.0",
