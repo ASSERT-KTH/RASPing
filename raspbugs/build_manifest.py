@@ -36,6 +36,8 @@ FAILED_MUTATION_MARKERS = [
 
 
 def apply_diff(source: str, diff: str) -> str:
+    if "@@" not in diff:  # mutations that cancel out (e.g. - -> % -> -): a header, no hunks (F38)
+        return source
     with tempfile.TemporaryDirectory() as tmp:
         src, patch = Path(tmp) / "src.py", Path(tmp) / "diff.patch"
         src.write_text(source)
@@ -79,6 +81,9 @@ def is_representable(program: str, source: str) -> bool:
 def iter_mutants(root: Path, results_dir: Path):
     for f in sorted(results_dir.glob("**/tracr_*.jsonl")):
         program = f.parent.name
+        if not (root / "source" / f"{program}.py").exists():
+            print(f"skipping {f.relative_to(results_dir)}: {program} is not a benchmark program")
+            continue
         reference = (root / "source" / f"{program}.py").read_text()
         for line in f.read_text().splitlines():
             mutation, result = json.loads(line)

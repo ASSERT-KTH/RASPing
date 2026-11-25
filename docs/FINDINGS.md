@@ -405,6 +405,22 @@ weights and training numerics (`tests/test_golden.py`).
   The v1 runs can't be checked (no SLURM accounting kept); v1 used the same default memory
   and budget 1,000, where the calibration's peak was lower.
 
+### F38 — Mutations that cancel out leave an empty diff, which crashed the manifest build — `fixed`
+- **Evidence:** first TracrBench manifest build on Berzelius (Nov 25, 2026). `build_manifest.py`
+  failed with `CalledProcessError` from `patch` ("Only garbage was found in the patch input").
+  8 of 50,250 cosmic-ray diffs were only the header `--- mutation diff ---`, with no hunks.
+  All 8 were order-2 mutants whose two mutations undo each other at the same position (e.g.
+  `ReplaceBinaryOperator_Sub_Mod` then `_Mod_Sub`), so the source is unchanged. The oracle
+  labelled all 8 `CORRECT_MODEL`, so none could be selected.
+- **Fix:** `apply_diff` returns the reference source for a diff with no hunk. The build
+  also skips results of programs that aren't in `source/`, such as the duplicates removed by
+  TracrBench rule 4, and prints a line for each.
+- **Tests:** `tests/test_tracrbench.py::test_empty_diff_leaves_the_source_unchanged`.
+- **Invalidates:** nothing. None of RaspBugs' 847 mutants has an empty diff or the reference
+  source. A cancelling mutant is equivalent to the reference, and the oracle already excludes
+  those. Cosmic-ray still spends an oracle run on each, and `mutants.csv` lists them as
+  order-2 `CORRECT_MODEL` mutants.
+
 ### F33 — Oracle accuracy round-tripped through pandas — `obsolete` (F35)
 - 80 `oracle_accuracy_50` values in the v1 manifest (`raspbugs_v1.jsonl.gz`) carried float
   noise (0.9400000000000001) from the v1 pandas JSON round trip. All 80 were Dyck mutants, so

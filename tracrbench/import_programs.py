@@ -107,6 +107,22 @@ def analyse(item: tuple[str, dict]) -> dict:
     return rec
 
 
+def dedupe(records: list[dict]) -> None:
+    """Rule 4: of included programs with the same source up to names, comments and docstrings
+    (`programs.canonical_source`), keep the first by name; their mutants would be duplicates."""
+    from rasping import programs
+
+    first: dict[str, str] = {}
+    for rec in sorted(records, key=lambda r: r["name"]):
+        if rec["included"]:
+            key = programs.canonical_source(rec["_source"])
+            if key in first:
+                rec["included"] = False
+                rec["reason"] = f"duplicate of {first[key]} (same source up to names)"
+            else:
+                first[key] = rec["name"]
+
+
 def load_eval_data(path: str | None) -> dict:
     if path:
         raw = Path(path).read_bytes()
@@ -142,6 +158,7 @@ def main(eval_data, workers, only):
             print(f"{rec['name']:32s} {'IN ' if rec['included'] else 'out'} {rec['reason'] or ''}",
                   flush=True)
             records.append(rec)
+    dedupe(records)
     if only:
         return
 

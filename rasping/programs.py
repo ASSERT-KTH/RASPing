@@ -13,6 +13,7 @@ included ones are registered (`tracrbench_programs()`). Their specifications liv
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import importlib.util
 import json
@@ -140,6 +141,49 @@ def all_programs() -> list[Program]:
 def tracrbench_programs() -> list[Program]:
     """The included TracrBench programs, sorted by name."""
     return [p for _, p in sorted(_tracrbench().items())]
+
+
+def canonical_source(source: str) -> str:
+    """`source` with names, comments and docstrings abstracted away (TracrBench rule 4).
+
+    Variables, functions, arguments and `.named("...")` labels are renamed in order of first
+    use; attribute names (`rasp.Select`, `Comparison.EQ`) and all other constants are kept.
+    Two programs with the same canonical source compile to the same circuit and have the
+    same mutants.
+    """
+
+    class Canon(ast.NodeTransformer):
+        def __init__(self):
+            self.names: dict[str, str] = {}
+
+        def rename(self, name: str) -> str:
+            return self.names.setdefault(name, f"v{len(self.names)}")
+
+        def visit_Name(self, node):
+            node.id = self.rename(node.id)
+            return node
+
+        def visit_arg(self, node):
+            node.arg, node.annotation = self.rename(node.arg), None
+            return node
+
+        def visit_FunctionDef(self, node):
+            node.name, node.returns = self.rename(node.name), None
+            body = node.body
+            if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+                    and isinstance(body[0].value.value, str):
+                body = body[1:] or [ast.Pass()]
+            node.body = body
+            return self.generic_visit(node)
+
+        def visit_Call(self, node):
+            self.generic_visit(node)
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "named" and node.args \
+                    and isinstance(node.args[0], ast.Constant):
+                node.args[0] = ast.Constant(self.rename("label:" + str(node.args[0].value)))
+            return node
+
+    return ast.dump(Canon().visit(ast.parse(source)))
 
 
 def module_from_source(source: str, module_name: str | None = None) -> ModuleType:

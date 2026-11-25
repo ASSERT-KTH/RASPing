@@ -16,7 +16,7 @@ repository map and how each paper artifact is produced.
 - **Program names.** Canonical names are `hist most_freq reverse sort` (`config.PROGRAMS`). Data files use the historical `most-freq`. Map between them with `rasping.programs.canonical()` and `.data_name`; never hand-roll the mapping.
 - **Two benchmarks, one version each.**
   - RaspBugs is the 847 mutants in `raspbugs/raspbugs.jsonl.gz`; there are no subsets or versions. The v1 results tables still contain Dyck rows, so filter by `config.PROGRAMS` when analysing them.
-  - TracrBench mutants are `tracrbench/tracrbench.jsonl.gz`, over the 79 programs that pass the fixed inclusion rules in `config.TracrBenchRules`; see `tracrbench/README.md`. Don't change the rules after seeing results. TracrBench programs compile with `mlp_exactness=1000` (`Program.mlp_exactness`); never hard-code 120.
+  - TracrBench mutants are `tracrbench/tracrbench.jsonl.gz`, over the 77 programs that pass the fixed inclusion rules in `config.TracrBenchRules`; see `tracrbench/README.md`. Don't change the rules after seeing results. TracrBench programs compile with `mlp_exactness=1000` (`Program.mlp_exactness`); never hard-code 120.
 - **Mutants** come from the manifests (`rasping.raspbugs`, `rasping.tracrbench`, or `rasping.benchmarks.get_mutant` for either), never from raw cosmic-ray output.
 - **Never commit raw run outputs.** This covers `model.npy`, `trajectory.pkl` and anything under `runs/`. Only tidy tables go in `results/<version>/`, and only generated artifacts go in `paper_artifacts/<version>/`.
 - **`results/v1_tmlr/` is frozen.** It holds the submitted paper's data. `tests/test_paper_numbers.py` pins it, so never edit it. New results go in a new version directory, e.g. `results/v2/`.
