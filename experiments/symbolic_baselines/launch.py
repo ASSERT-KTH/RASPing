@@ -19,9 +19,9 @@ it finishes, so set --timeout-hours above the longest expected run.
 
 Memory: candidates are evaluated in forked workers, and a worker the OOM killer stops is
 counted as `num_killed`, not as a failed candidate (F37). The launcher requests --mem-gb
-(16 GB) so that does not happen; the largest calibration job peaked at 4 GB, and one GP job
-under the 1-CPU default of 7.9 GB had 8 workers killed. A record with num_killed > 0
-should be rerun with more memory.
+(32 GB). In the budget-5000 calibration, 199 of 200 jobs peaked below 4.1 GB, but one GP job
+had 8 workers killed under the 1-CPU default of 7.9 GB, and its rerun with 32 GB peaked at
+18.5 GB. A record with num_killed > 0 should be rerun with more memory.
 
 The v1 (TMLR) runs in `results/v1_tmlr/symbolic_baselines/` covered the 1,466 v1 mutants
 (Dyck programs included), with BFS limited to depth = mutation order (F3, since fixed).
@@ -50,7 +50,7 @@ RUN_SCRIPT = "experiments/symbolic_baselines/run.py"
 @click.option("--sample-seed", type=int, default=0, show_default=True)
 @click.option("--timeout-hours", type=float, default=12, show_default=True, help="SLURM time limit per job")
 @click.option("--partition", default=None, help="SLURM partition (e.g. the cluster's CPU partition)")
-@click.option("--mem-gb", type=int, default=16, show_default=True, help="SLURM memory per job (F37)")
+@click.option("--mem-gb", type=int, default=32, show_default=True, help="SLURM memory per job (F37)")
 @cluster.add_cli_options
 def main(method, budget, n_per_program, sample_seed, timeout_hours, partition, mem_gb, dry_run, local,
          no_container, limit):

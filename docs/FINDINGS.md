@@ -391,11 +391,17 @@ weights and training numerics (`tests/test_golden.py`).
 - **Fix:** a worker that dies from a signal raises `CandidateError("killed")`. GP and BFS
   count it in `num_killed` (in the record and in `records.run_row`), not in
   `num_compile_failures`; the search still drops the candidate, so trajectories are
-  unchanged when nothing is killed. The baseline launcher requests `--mem-gb 16` by default.
+  unchanged when nothing is killed. The baseline launcher requests `--mem-gb 32` by default.
   A record with `num_killed > 0` depends on the machine and should be rerun with more memory.
+- **Rerun with 32 GB** (job 18466873): peak memory 18.5 GB, no kills. The 8 candidates ran
+  into the 30 s evaluation timeout instead, so compile failures fell from 1,147 to 1,139 and
+  timeouts rose from 31 to 39. The best program (test accuracy 0.2544) is unchanged. A
+  killed candidate and a timed-out candidate are both dropped, so the search outcome didn't
+  depend on memory here; only the failure counts did. The danger is the job itself being
+  killed, or kills being counted as candidate failures.
 - **Tests:** `tests/test_baselines.py::test_killed_worker_is_its_own_failure_kind`; golden
   search results unchanged.
-- **Invalidates:** the affected calibration record, which was moved aside and rerun with 32 GB.
+- **Invalidates:** only the failure counts of the affected calibration record (replaced by the rerun).
   The v1 runs can't be checked (no SLURM accounting kept); v1 used the same default memory
   and budget 1,000, where the calibration's peak was lower.
 
