@@ -97,8 +97,7 @@ def histograms(df, by, panels, title, version, name, ncols):
 BASELINE_LABELS = {"gp": "GP", "bfs": "BFS"}
 #: (a, b) pairs compared on the same mutants: each start against Xavier and against the
 #: compiled weights, and GBPR's starts against the symbolic baselines.
-PAIRS = [("compiled", "xavier"), ("rescaled", "xavier"), ("soft:10", "xavier"),
-         ("rescaled", "compiled"), ("soft:10", "compiled")]
+PAIRS = [("compiled", "xavier"), ("rescaled", "xavier"), ("rescaled", "compiled")]
 
 
 def method_label(m: str) -> str:

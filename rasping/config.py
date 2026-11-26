@@ -82,7 +82,10 @@ THRESHOLD = 0.99
 
 #: v2 main reruns: starting points (`rasping.repair.INITS`), chosen from the init pilot,
 #: and seeds. Results are reported as pass@1 over the seeds (`analysis.pass_at_1`).
-V2_INITS = ("compiled", "xavier", "rescaled", "soft:10")
+#: soft:10 was dropped before launch (Nov 26, 2026): in the pilot it never beat rescaled
+#: (pass@1 82 vs 86; equal on most_freq, worse on hist), and its pilot results stay in
+#: the appendix.
+V2_INITS = ("compiled", "xavier", "rescaled")
 V2_SEEDS = (0, 1, 2)
 
 #: Symbolic baselines (GP, BFS): v2 budget in evaluated programs, chosen from a
