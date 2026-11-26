@@ -6,11 +6,11 @@ written `soft_10`). Already finished runs are skipped, so re-running the launche
 resubmits only missing runs.
 
     python experiments/main_repair/launch.py --dry-run          # show the commands
-    python experiments/main_repair/launch.py                    # submit (v2: 4 starts x 3 seeds)
+    python experiments/main_repair/launch.py                    # submit (v2: 3 starts x 3 seeds)
     python -m rasping.results collect main_repair --version v2  # then collect
 
-v2 (Nov 26, 2026): starts compiled, xavier, rescaled and soft:10 (chosen from the init
-pilot, `experiments/init_pilot`), seeds 0-2, `TrainConfig` (patience 500, F2). GPU runs
+v2 (Nov 26, 2026): starts compiled, xavier and rescaled (`config.V2_INITS`, chosen from
+the init pilot, `experiments/init_pilot`), seeds 0-2, `TrainConfig` (patience 500, F2). GPU runs
 are not reproducible one by one (F39), so results are reported per mutant over seeds.
 
 v1 (TMLR) runs: the 1,466 v1 mutants (Dyck programs included), compiled start only, one
