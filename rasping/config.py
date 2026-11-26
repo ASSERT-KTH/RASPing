@@ -83,18 +83,23 @@ THRESHOLD = 0.99
 # --------------------------------------------------------------------------- training
 
 
+#: Early-stopping patience of the v1 (TMLR) runs and of the init pilot's first round (F2).
+V1_EARLY_STOPPING_PATIENCE = 50
+
+
 @dataclass(frozen=True)
 class TrainConfig:
     """Gradient-based repair hyperparameters (paper §5.1).
 
-    These are the values the v1 (TMLR) runs actually used. Note the early-stopping
-    patience: the v1 paper text says 10, the runs used 50 (docs/FINDINGS.md F2).
+    These are the values the v1 (TMLR) runs used, except the early-stopping patience. The
+    v1 runs used 50 (`V1_EARLY_STOPPING_PATIENCE`; the v1 paper text says 10). v2 uses 500,
+    because at 50 compiled, rescaled and soft starts stopped too early (docs/FINDINGS.md F2).
     """
 
     n_epochs: int = 10_000
     batch_size: int = 256
     learning_rate: float = 1e-4
-    early_stopping_patience: int = 50
+    early_stopping_patience: int = 500
     early_stopping_min_delta: float = 1e-4
     val_every: int = 10  # validation accuracy is computed every `val_every` epochs
     grad_clip_norm: float = 1.0
