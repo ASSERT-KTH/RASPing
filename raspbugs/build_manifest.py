@@ -9,7 +9,7 @@ and writes, for the benchmark in `<root>` (raspbugs or tracrbench):
                             represent the specification's outputs (F6), with source, diff, ...
                             TracrBench: at most `config.TRACRBENCH.mutants_per_program` per
                             program, stratified by mutation order (`selected`)
-    <root>/mutants.csv      every mutant with its status, `representable` and `selected`
+    <root>/mutants.csv.gz   every mutant with its status, `representable` and `selected`
 
     python raspbugs/build_manifest.py [--root raspbugs] [--results-dir <root>/results]
 """
@@ -36,6 +36,8 @@ FAILED_MUTATION_MARKERS = [
 
 
 def apply_diff(source: str, diff: str) -> str:
+    if "@@" not in diff:  # mutations that cancel out (e.g. - -> % -> -): a header, no hunks (F38)
+        return source
     with tempfile.TemporaryDirectory() as tmp:
         src, patch = Path(tmp) / "src.py", Path(tmp) / "diff.patch"
         src.write_text(source)
@@ -79,6 +81,9 @@ def is_representable(program: str, source: str) -> bool:
 def iter_mutants(root: Path, results_dir: Path):
     for f in sorted(results_dir.glob("**/tracr_*.jsonl")):
         program = f.parent.name
+        if not (root / "source" / f"{program}.py").exists():
+            print(f"skipping {f.relative_to(results_dir)}: {program} is not a benchmark program")
+            continue
         reference = (root / "source" / f"{program}.py").read_text()
         for line in f.read_text().splitlines():
             mutation, result = json.loads(line)
@@ -135,7 +140,7 @@ def main(root, results_dir):
                                                   "oracle_accuracy_50", "representable", "selected")}
                           for r in rows])
     table["operators"] = [";".join(r["operators"]) for r in rows]
-    table.to_csv(root / "mutants.csv", index=False)
+    table.to_csv(root / "mutants.csv.gz", index=False, compression={"method": "gzip", "mtime": 0})
     print(table["status"].value_counts().to_string())
     print(f"buggy and representable: {int(table['representable'].sum())}; "
           f"benchmark: {len(benchmark)} mutants")

@@ -110,3 +110,55 @@ def test_selection_caps_per_program_by_order():
 def test_programs_json_is_sorted_and_stable():
     names = [r["name"] for r in json.loads(programs.TRACRBENCH_PROGRAMS.read_text())]
     assert names == sorted(names)
+
+
+def test_empty_diff_leaves_the_source_unchanged():
+    # order-2 mutants whose mutations cancel (e.g. - -> % -> -) have a header but no hunks (F38)
+    bm = _build_manifest()
+    src = "def f(x):\n    return x - 1\n"
+    assert bm.apply_diff(src, "--- mutation diff ---\n") == src
+    diff = "--- a/f.py\n+++ b/f.py\n@@ -1,2 +1,2 @@\n def f(x):\n-    return x - 1\n+    return x % 1\n"
+    assert bm.apply_diff(src, diff) == "def f(x):\n    return x % 1\n"
+
+
+def test_canonical_source_ignores_names_only():
+    a = '''def make_a() -> rasp.SOp:
+    """Doc."""
+    sel = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named("sel")  # comment
+    return rasp.SelectorWidth(sel).named("a")
+'''
+    b = '''def make_b():
+    s = rasp.Select(rasp.tokens, rasp.tokens, rasp.Comparison.EQ).named("eq")
+    return rasp.SelectorWidth(s).named("b")
+'''
+    assert programs.canonical_source(a) == programs.canonical_source(b)
+    assert programs.canonical_source(a) != programs.canonical_source(a.replace("EQ", "LT"))
+    assert programs.canonical_source(a) != programs.canonical_source(a.replace("tokens, rasp.tokens", "tokens, rasp.indices"))
+
+
+def test_rule_4_no_duplicate_programs():
+    keys = [programs.canonical_source(p.source_path.read_text()) for p in programs.tracrbench_programs()]
+    assert len(set(keys)) == len(keys)
+    dups = {r["name"]: r["reason"] for r in RECORDS if (r["reason"] or "").startswith("duplicate")}
+    assert dups == {n: "duplicate of count_frequency (same source up to names)"
+                    for n in ("count_occurrences", "histogram")}
+
+
+def test_manifest_matches_labels_and_architectures():
+    import collections
+
+    import pandas as pd
+
+    from rasping import tracrbench
+    from rasping.config import TRACRBENCH_DIR
+
+    ms = tracrbench.mutants()
+    assert len(ms) == len({m.job_id for m in ms}) == 1153
+    per_program = collections.Counter(m.program for m in ms)
+    assert set(per_program) <= {p.name for p in programs.tracrbench_programs()}
+    assert len(per_program) == 58 and max(per_program.values()) == TRACRBENCH.mutants_per_program
+    labels = pd.read_csv(TRACRBENCH_DIR / "mutants.csv.gz")
+    sel = labels[labels.selected]
+    assert set(sel.job_id) == {m.job_id for m in ms}
+    assert (sel.status == "BUGGY_MODEL").all() and sel.representable.all()
+    assert set(pd.read_csv(TRACRBENCH_DIR / "architectures.csv").job_id) == set(sel.job_id)

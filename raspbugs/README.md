@@ -35,7 +35,7 @@ pinned in `pyproject.toml`. Both steps also build the TracrBench benchmark with
 
 ```bash
 python raspbugs/run_mutations.py      # orders 1-5; writes raspbugs/results/<program>/ (gitignored)
-python raspbugs/build_manifest.py     # writes raspbugs.jsonl.gz, mutants.csv
+python raspbugs/build_manifest.py     # writes raspbugs.jsonl.gz, mutants.csv.gz
 ```
 
 The oracle labels each mutant as one of:

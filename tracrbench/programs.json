@@ -407,8 +407,8 @@
  {
   "name": "count_occurrences",
   "entry": "make_count_occurrences",
-  "included": true,
-  "reason": null,
+  "included": false,
+  "reason": "duplicate of count_frequency (same source up to names)",
   "uses_attention": true,
   "n_params": 4153,
   "n_layers": 8,
@@ -677,8 +677,8 @@
  {
   "name": "histogram",
   "entry": "make_histogram",
-  "included": true,
-  "reason": null,
+  "included": false,
+  "reason": "duplicate of count_frequency (same source up to names)",
   "uses_attention": true,
   "n_params": 4153,
   "n_layers": 8,
