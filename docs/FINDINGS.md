@@ -418,7 +418,7 @@ weights and training numerics (`tests/test_golden.py`).
 - **Tests:** `tests/test_tracrbench.py::test_empty_diff_leaves_the_source_unchanged`.
 - **Invalidates:** nothing. None of RaspBugs' 847 mutants has an empty diff or the reference
   source. A cancelling mutant is equivalent to the reference, and the oracle already excludes
-  those. Cosmic-ray still spends an oracle run on each, and `mutants.csv` lists them as
+  those. Cosmic-ray still spends an oracle run on each, and `tracrbench/mutants.csv.gz` lists them as
   order-2 `CORRECT_MODEL` mutants.
 
 ### F33 — Oracle accuracy round-tripped through pandas — `obsolete` (F35)

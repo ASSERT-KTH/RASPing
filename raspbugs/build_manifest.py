@@ -9,7 +9,7 @@ and writes, for the benchmark in `<root>` (raspbugs or tracrbench):
                             represent the specification's outputs (F6), with source, diff, ...
                             TracrBench: at most `config.TRACRBENCH.mutants_per_program` per
                             program, stratified by mutation order (`selected`)
-    <root>/mutants.csv      every mutant with its status, `representable` and `selected`
+    <root>/mutants.csv.gz   every mutant with its status, `representable` and `selected`
 
     python raspbugs/build_manifest.py [--root raspbugs] [--results-dir <root>/results]
 """
@@ -140,7 +140,7 @@ def main(root, results_dir):
                                                   "oracle_accuracy_50", "representable", "selected")}
                           for r in rows])
     table["operators"] = [";".join(r["operators"]) for r in rows]
-    table.to_csv(root / "mutants.csv", index=False)
+    table.to_csv(root / "mutants.csv.gz", index=False, compression={"method": "gzip", "mtime": 0})
     print(table["status"].value_counts().to_string())
     print(f"buggy and representable: {int(table['representable'].sum())}; "
           f"benchmark: {len(benchmark)} mutants")

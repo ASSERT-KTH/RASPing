@@ -14,7 +14,7 @@ The TracrBench repository has no license. Its programs are copied here (`source/
 ```python
 from rasping import tracrbench, programs
 programs.tracrbench_programs()                  # the 77 included programs
-m = tracrbench.mutants(program="sorting")[0]    # once the manifest is built
+m = tracrbench.mutants(program="sorting")[0]    # 1,153 mutants, 20 of them of sorting
 model = m.compile()                             # mlp_exactness 1000
 ```
 
@@ -69,7 +69,8 @@ baselines and ground truth.
 |---|---|---|
 | 0 | `python tracrbench/import_programs.py` | `programs.json`, `source/`, `data/tracrbench/` (downloads `eval_data.json` at the pinned commit and checks its SHA-256) |
 | 1 | `python tracrbench/launch_mutations.py --partition <cpu>` (one cluster job per program), or `python raspbugs/run_mutations.py --root tracrbench` locally | `results/<program>/` (gitignored) |
-| 2 | `python raspbugs/build_manifest.py --root tracrbench` | `tracrbench.jsonl.gz`, `mutants.csv` |
+| 2 | `python raspbugs/build_manifest.py --root tracrbench` | `tracrbench.jsonl.gz`, `mutants.csv.gz` |
+| 3 | `python raspbugs/architectures.py --benchmark tracrbench` | `architectures.csv` |
 
 **Step 1.** It runs cosmic-ray with RaspBugs' operators: orders 1–5, up to 200 mutants per
 program and order. The oracle `oracle/test_program.py` compiles each mutant and checks it
@@ -77,5 +78,44 @@ on the whole test split. While the model is compiled, it also checks that the ou
 vocabulary contains every target token.
 
 **Step 2.** It labels the mutants and keeps the buggy, representable ones. It then selects
-**at most 20 per program, stratified by mutation order** (seed 0; `mutants.csv`, column
+**at most 20 per program, stratified by mutation order** (seed 0; `mutants.csv.gz`, column
 `selected`).
+
+## The mutants
+
+Generated on Berzelius on Nov 25, 2026 (SLURM array 18476981; 1–8 h per program on one CPU).
+
+| | Mutants |
+|---|---|
+| generated (77 programs × orders 1–5) | 52,535 |
+| `BUGGY_MODEL` | 40,179 |
+| `UNCOMPILABLE_MODEL` | 7,078 |
+| `UNKNOWN_FAILURE` (cosmic-ray outcome `no-test`: never run) | 2,475 |
+| `CORRECT_MODEL` | 1,523 |
+| `FAILED_MUTATION` | 651 |
+| `TIMEOUT` (60 s; mostly count_prime_factors and next_prime) | 629 |
+| buggy and representable | 17,283 |
+| **selected: the benchmark** | **1,153** |
+
+**58 of the 77 programs contribute mutants**: 56 have 20, multiply_by_length has 19 and
+next_prime has 14. Some programs have no representable mutant at some orders, so their
+orders aren't balanced (`mutants.csv.gz`).
+
+**19 programs contribute none**: cosine, cube_each_element, cube_root, decrement,
+element_double, element_subtract_constant, exponential, factorial, hyperbolic_sine, increment,
+increment_by_index, negation, position, set_to_index, sine, square_each_element, square_root,
+tangent and triple. All are elementwise numeric maps. Every buggy mutant of them is
+unrepresentable. A mutated map such as `x + 1` → `x - 1` compiles to an output vocabulary
+without some correct outputs (here 9 and 10), so no weights can repair it. They stay in the
+program list, which is what the rules give, and the benchmark reports them as
+contributing no mutants.
+
+count_frequency, count_greater_than and count_less_than differ only in the comparison
+(`EQ`, `GT`, `LT`), so they have the same mutation sites and the same counts per order.
+They are different functions with different specifications, so their mutants are different
+repair tasks.
+
+The selected mutants' compiled accuracy (exact match on the whole test split, the
+manifest field `oracle_accuracy_50`, named after RaspBugs' 50-sample oracle) has median
+0.008. 12% are at 0 and 3% above 0.5. `architectures.csv` has each mutant's parameter count
+and shape signature: median 18.8k parameters, maximum 3.4M (a swap_min_max mutant).

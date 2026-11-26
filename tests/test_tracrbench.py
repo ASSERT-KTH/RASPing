@@ -142,3 +142,23 @@ def test_rule_4_no_duplicate_programs():
     dups = {r["name"]: r["reason"] for r in RECORDS if (r["reason"] or "").startswith("duplicate")}
     assert dups == {n: "duplicate of count_frequency (same source up to names)"
                     for n in ("count_occurrences", "histogram")}
+
+
+def test_manifest_matches_labels_and_architectures():
+    import collections
+
+    import pandas as pd
+
+    from rasping import tracrbench
+    from rasping.config import TRACRBENCH_DIR
+
+    ms = tracrbench.mutants()
+    assert len(ms) == len({m.job_id for m in ms}) == 1153
+    per_program = collections.Counter(m.program for m in ms)
+    assert set(per_program) <= {p.name for p in programs.tracrbench_programs()}
+    assert len(per_program) == 58 and max(per_program.values()) == TRACRBENCH.mutants_per_program
+    labels = pd.read_csv(TRACRBENCH_DIR / "mutants.csv.gz")
+    sel = labels[labels.selected]
+    assert set(sel.job_id) == {m.job_id for m in ms}
+    assert (sel.status == "BUGGY_MODEL").all() and sel.representable.all()
+    assert set(pd.read_csv(TRACRBENCH_DIR / "architectures.csv").job_id) == set(sel.job_id)
