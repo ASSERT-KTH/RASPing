@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from rasping import raspbugs
+from rasping.config import DETERMINISTIC_XLA_FLAG
 from rasping.model import MLP_EXACTNESS, SOFTMAX_COLDNESS
 from rasping.repair import check_init, repair
 
@@ -94,3 +95,4 @@ def test_repair_records_start_metrics():
     rec = repair(JOB, config=cfg, init="xavier", n_train=64, n_val=32, progress=False)
     assert rec.start_agreement < 0.5
     assert rec.device == "cpu:0"  # provenance: the JAX device the run trained on
+    assert DETERMINISTIC_XLA_FLAG in rec.xla_flags.split()  # set by rasping._jax_setup (F39)

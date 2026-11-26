@@ -457,7 +457,7 @@ weights and training numerics (`tests/test_golden.py`).
   those. Cosmic-ray still spends an oracle run on each, and `tracrbench/mutants.csv.gz` lists them as
   order-2 `CORRECT_MODEL` mutants.
 
-### F39 — GPU training is not reproducible run by run — `open`
+### F39 — GPU training is not reproducible run by run — `fixed`
 - **Evidence:** the patience replay (F2) compared the replayed patience-50 outcome against
   the actual patience-50 runs (100 mutants × 4 starts, seed 0, same code, same start
   weights). Stopping epochs matched in 44/400 runs and test accuracies in 175/400.
@@ -475,8 +475,27 @@ weights and training numerics (`tests/test_golden.py`).
   vs 73, soft:10 72 vs 72, xavier 75 vs 75), so aggregate comparisons hold. A single GPU
   run is not reproducible, and the noise is largest for compiled starts. v2 reports each
   mutant over 3 seeds (repaired in k of 3), which absorbs this along with seed variance.
-- **Next:** test `XLA_FLAGS=--xla_gpu_deterministic_ops=true`: whether runs become
-  bit-reproducible and what it costs in speed. Decide before the v2 main reruns.
+- **Determinism test (Nov 26, 2026, jobs 18485069–78):** 10 pilot mutants were trained for
+  300 epochs four times each on the same A100 MIG slice, alternating
+  `XLA_FLAGS=--xla_gpu_deterministic_ops=true` with no flag. The mutants were 6 compiled
+  starts whose outcome had flipped, 2 rescaled most_freq and 2 xavier.
+  - With the flag, both runs were bit-identical in 10/10 (validation-loss curves and final
+    parameters).
+  - Without it, the runs differed in 10/10, from epoch 0 in 9 of them. Compiled starts are
+    chaotic: two identical runs of d207dc97 ended at test accuracy 0.012 and 1.0, and of
+    8606a012 at 0.74 and 0.011.
+  - The flag costs 1.27× the time per epoch (median per mutant; range 1.15–1.46; shared
+    node). It raised no XLA error.
+- **Fix:** `rasping._jax_setup` adds `config.DETERMINISTIC_XLA_FLAG` to XLA_FLAGS before JAX
+  starts, unless XLA_FLAGS already sets it. Every run records `xla_flags` in `run.json`.
+  CPU runs and the golden tests are unaffected.
+- **What it does and doesn't fix:** a v2 run is reproducible on the same hardware. The
+  flag changes the arithmetic, so a deterministic run matches neither of the
+  nondeterministic ones. It removes run-to-run noise but not the sensitivity: a compiled
+  start's outcome still depends on tiny perturbations, now through the seed (batch order).
+  That sensitivity is a result in itself, and the 3 seeds per mutant measure it.
+- **Invalidates:** nothing frozen. The init pilot and patience-500 runs were made without
+  the flag. Their aggregate comparisons hold, but they can't be reproduced run by run.
 
 ### F33 — Oracle accuracy round-tripped through pandas — `obsolete` (F35)
 - 80 `oracle_accuracy_50` values in the v1 manifest (`raspbugs_v1.jsonl.gz`) carried float
