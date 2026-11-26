@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from rasping import raspbugs
+from rasping.benchmarks import BENCHMARKS
 from rasping.config import RESULTS_DIR
 
 #: Columns that identify a run (besides job_id) in each experiment's runs.csv.
@@ -74,28 +74,31 @@ def load_runs(version: str, experiment: str, name: str = "runs.csv",
     df = pd.read_csv(results_dir(version, experiment) / name)
     if with_mutant_info and "job_id" in df:
         meta = mutant_table(version)
-        drop = [c for c in ("program", "mutation_order") if c in df.columns]
+        drop = [c for c in ("program", "mutation_order", "benchmark") if c in df.columns]
         df = df.drop(columns=drop).merge(meta, on="job_id", how="left")
     return df
 
 
 def mutant_table(version: str | None = None) -> pd.DataFrame:
-    """job_id -> program, mutation_order.
+    """job_id -> program, mutation_order (and benchmark).
 
     A results version can freeze its own mutant table as `results/<version>/mutants.csv`.
     v1_tmlr does: it records the submitted paper's 1,466-mutant benchmark, Dyck programs
-    included. Otherwise the table comes from the current benchmark manifest.
+    included. Otherwise the table comes from the current manifests of both benchmarks
+    (RaspBugs and TracrBench; their job ids are distinct).
     """
     frozen = results_dir(version) / "mutants.csv" if version else None
     if frozen is not None and frozen.exists():
         return pd.read_csv(frozen, usecols=["job_id", "program", "mutation_order"])
-    ms = raspbugs.mutants()
+    ms = [m for b in BENCHMARKS.values() for m in b.mutants()]
     return pd.DataFrame({"job_id": [m.job_id for m in ms], "program": [m.program for m in ms],
-                         "mutation_order": [m.mutation_order for m in ms]})
+                         "mutation_order": [m.mutation_order for m in ms],
+                         "benchmark": [m.benchmark for m in ms]})
 
 
 #: Experiments whose runs are written by `rasping.repair` (collected with `collect`).
-REPAIR_EXPERIMENTS = ("main_repair", "spec_size", "init_control", "init_pilot", "trajectories")
+REPAIR_EXPERIMENTS = ("main_repair", "tracrbench_repair", "spec_size", "init_control", "init_pilot",
+                      "trajectories")
 
 
 def _cli():

@@ -367,17 +367,17 @@ def order_trend(pm: pd.DataFrame, methods: list[str] | None = None, n_boot: int 
     methods = methods or list(dict.fromkeys(pm["method"]))
     rng = np.random.default_rng(seed)
 
-    def slope(d):
-        progs = sorted(d["program"].unique())
-        X = np.column_stack([d["mutation_order"].to_numpy(float)]
-                            + [(d["program"] == p).to_numpy(float) for p in progs])
-        return np.linalg.lstsq(X, d["pass1"].to_numpy(float), rcond=None)[0][0]
+    def slope(X, y):  # programs missing from a resample give zero columns: min-norm solution
+        return np.linalg.lstsq(X, y, rcond=None)[0][0]
 
     rows = []
     for m in methods:
         d = pm[pm["method"] == m].reset_index(drop=True)
-        s = slope(d)
-        boots = [slope(d.iloc[rng.integers(0, len(d), len(d))]) for _ in range(n_boot)]
+        X = np.column_stack([d["mutation_order"].to_numpy(float),
+                             pd.get_dummies(d["program"]).to_numpy(float)])
+        y = d["pass1"].to_numpy(float)
+        s = slope(X, y)
+        boots = [slope(X[i], y[i]) for i in (rng.integers(0, len(d), len(d)) for _ in range(n_boot))]
         lo, hi = np.quantile(boots, [0.025, 0.975])
         rows.append({"method": m, "mutants": len(d), "slope": 100 * s,
                      "ci_lo": 100 * lo, "ci_hi": 100 * hi})

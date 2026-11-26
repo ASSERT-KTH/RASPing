@@ -162,3 +162,19 @@ def test_manifest_matches_labels_and_architectures():
     assert set(sel.job_id) == {m.job_id for m in ms}
     assert (sel.status == "BUGGY_MODEL").all() and sel.representable.all()
     assert set(pd.read_csv(TRACRBENCH_DIR / "architectures.csv").job_id) == set(sel.job_id)
+
+
+def test_launch_paths_and_mutant_table():
+    from rasping.baselines import run_dir as baseline_dir
+    from rasping.benchmarks import REPAIR_EXPERIMENT, TRACRBENCH, get_mutant
+    from rasping.config import RUNS_DIR
+    from rasping.results import mutant_table
+
+    m = TRACRBENCH.mutants()[0]
+    assert get_mutant(m.job_id).benchmark == "tracrbench"
+    assert baseline_dir("gp", 5000, benchmark="tracrbench") == RUNS_DIR / "symbolic_baselines_tracrbench" / "gp_budget5000"
+    assert baseline_dir("gp", 5000) == RUNS_DIR / "symbolic_baselines" / "gp_budget5000"  # RaspBugs unchanged
+    assert REPAIR_EXPERIMENT == {"raspbugs": "main_repair", "tracrbench": "tracrbench_repair"}
+    t = mutant_table().set_index("job_id")
+    assert t.loc[m.job_id, "benchmark"] == "tracrbench" and t.loc[m.job_id, "program"] == m.program
+    assert t["benchmark"].value_counts().to_dict() == {"tracrbench": 1153, "raspbugs": 847}

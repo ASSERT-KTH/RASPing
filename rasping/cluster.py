@@ -18,6 +18,11 @@ CONTAINER = REPO_ROOT / "container.sif"
 LOG_DIR = REPO_ROOT / "submitit_logs"
 
 #: Cluster defaults used for the v1 runs: one MIG slice (1/7 A100, 10 GB) per job.
+#: Largest SLURM job array a submission uses. Berzelius rejects arrays of more than 1,000
+#: tasks (MaxArraySize 1001). Its account also caps queued jobs at 5,000 (GrpSubmitJobs),
+#: shared by everyone on the account, so very large launches must be fed in over time.
+MAX_ARRAY_SIZE = 1000
+
 DEFAULT_SLURM = {
     "timeout_min": 12 * 60,
     "slurm_additional_parameters": {"reservation": "1g.10gb"},
@@ -74,9 +79,12 @@ def submit(
         params = {**DEFAULT_SLURM, **slurm_params}
         ex.update_parameters(name=name, nodes=1, slurm_array_parallelism=array_parallelism,
                              **params)
-    with ex.batch():
-        jobs = [ex.submit(run_command, c) for c in cmds]
-    print(f"Submitted {len(jobs)} jobs ({name}); logs in {folder}")
+    jobs = []
+    for start in range(0, len(cmds), MAX_ARRAY_SIZE):  # one SLURM array per chunk
+        with ex.batch():
+            jobs += [ex.submit(run_command, c) for c in cmds[start:start + MAX_ARRAY_SIZE]]
+    print(f"Submitted {len(jobs)} jobs ({name}) in {-(-len(cmds) // MAX_ARRAY_SIZE)} arrays; "
+          f"logs in {folder}")
     return jobs
 
 
