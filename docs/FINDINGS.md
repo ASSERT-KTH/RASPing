@@ -145,12 +145,48 @@ weights and training numerics (`tests/test_golden.py`).
 
 ## Training (GBPR)
 
-### F2 — Early-stopping patience: paper says 10, code used 50 — `paper`
+### F2 — Early-stopping patience: paper says 10, code used 50; v2 uses 500 — `paper`
 - **Evidence:** `experiments/train_mutations/train_mutations.py:170` CLI default
   `early_stopping_patience=50`; no launcher overrides it (the function default of 10 at :37
   is never reached). `launch_random_init_baseline.py:11-12` confirms 50.
 - **Paper:** §5.1 "validation loss improvement < 1e-4 for 10 epochs".
 - **Decision (Nov 24, 2026):** keep 50 (`config.TrainConfig`); correct the paper text to 50.
+- **Revised (Nov 26, 2026): v2 uses patience 500**, with the 10,000-epoch cap unchanged
+  (`TrainConfig.early_stopping_patience`; v1's 50 is `V1_EARLY_STOPPING_PATIENCE`).
+  - **Evidence:** the init pilot's first round (100 RaspBugs mutants, seed 0, patience 50)
+    stopped every most_freq run early, at median test accuracy 0.88–0.96. A rerun of four
+    arms at patience 500 (array 18472838) repaired:
+
+    | Start | Patience 50 | Patience 500 |
+    |---|---|---|
+    | compiled | 42% | 56% |
+    | rescaled | 73% | 86% |
+    | soft:10 | 72% | 82% |
+    | xavier | 75% | 75% |
+
+    Almost all mutants repaired at 50 were also repaired at 500: 1 of 400 pairs was
+    repaired only at 50, and 38 only at 500.
+  - **Replay:** a smaller patience follows the same trajectory until it stops, so
+    replaying the trainer's rule on the patience-500 curves gives patience 50–500 without
+    new runs. Replaying 500 reproduces all 400 runs exactly. Replayed % repaired at
+    patience 50/100/200/300/400/500:
+    - compiled: 41/49/52/56/56/56
+    - rescaled: 70/78/80/84/85/86
+    - soft:10: 72/75/77/80/82/82
+    - xavier: 75 throughout
+
+    Compiled levels off at 300 and soft:10 at 400. Rescaled gains 2 more mutants from 300
+    to 500, all on most_freq.
+  - **Cost:** median epochs at 500 are compiled 2,153, rescaled 851, soft:10 1,211 and
+    xavier 610. 12 of the 400 runs reached the 10,000-epoch cap (longest wall time 7.9 h):
+    - 7 were still improving, mostly compiled-start reverse runs;
+    - 2 had plateaued at low accuracy while tiny loss decreases kept resetting the counter;
+    - 3 stopped early just under the cap, one of them repaired.
+  - **Paper:** state patience 500, report the replay table in an appendix, and say that
+    the comparison between starts doesn't depend on the patience setting. The v1 numbers
+    (patience 50) understate every start except Xavier.
+  - **Invalidates:** nothing frozen. All v2 GBPR runs use 500. The init pilot's
+    first-round tables stay at 50 (`experiments/init_pilot`).
 
 ### F36 — Minibatches in a fixed order every epoch; compiled-init runs are deterministic — `fixed`
 - **Evidence:** the v1 trainer (`experiments/train_mutations/trainer.py`, ported to
@@ -420,6 +456,27 @@ weights and training numerics (`tests/test_golden.py`).
   source. A cancelling mutant is equivalent to the reference, and the oracle already excludes
   those. Cosmic-ray still spends an oracle run on each, and `tracrbench/mutants.csv.gz` lists them as
   order-2 `CORRECT_MODEL` mutants.
+
+### F39 — GPU training is not reproducible run by run — `open`
+- **Evidence:** the patience replay (F2) compared the replayed patience-50 outcome against
+  the actual patience-50 runs (100 mutants × 4 starts, seed 0, same code, same start
+  weights). Stopping epochs matched in 44/400 runs and test accuracies in 175/400.
+  The repaired/not-repaired outcome flipped in 14/400:
+  - 4 most_freq runs with test accuracy 0.975–0.992, on either side of the threshold;
+  - 9 compiled-start sort/reverse runs whose trajectories ended differently.
+
+  The validation-loss curves differ from epoch 0. Xavier runs were bit-identical after
+  epoch 0 in 75/100 cases, while compiled runs differed by more than 1e-3 in 59/100: the
+  compiled models' large weights amplify floating-point noise. All runs were on Berzelius
+  A100 MIG slices (`gpu:0`).
+- **Cause:** XLA's default GPU reductions are nondeterministic. This is the GPU analogue
+  of F34.
+- **Consequence:** totals per start agree within 3 mutants (compiled 41 vs 42, rescaled 70
+  vs 73, soft:10 72 vs 72, xavier 75 vs 75), so aggregate comparisons hold. A single GPU
+  run is not reproducible, and the noise is largest for compiled starts. v2 reports each
+  mutant over 3 seeds (repaired in k of 3), which absorbs this along with seed variance.
+- **Next:** test `XLA_FLAGS=--xla_gpu_deterministic_ops=true`: whether runs become
+  bit-reproducible and what it costs in speed. Decide before the v2 main reruns.
 
 ### F33 — Oracle accuracy round-tripped through pandas — `obsolete` (F35)
 - 80 `oracle_accuracy_50` values in the v1 manifest (`raspbugs_v1.jsonl.gz`) carried float

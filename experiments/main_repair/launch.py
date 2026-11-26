@@ -7,8 +7,8 @@ writing `runs/main_repair/<program>/<job_id>/`. Already finished runs are skippe
     python experiments/main_repair/launch.py                    # submit
     python -m rasping.results collect main_repair --version v2  # then collect
 
-v1 (TMLR) runs: the 1,466 v1 mutants (Dyck programs included), default TrainConfig (10k epochs, batch 256, lr 1e-4,
-patience 50), trajectories stored every 50 steps.
+v1 (TMLR) runs: the 1,466 v1 mutants (Dyck programs included), 10k epochs, batch 256, lr 1e-4,
+patience 50, trajectories stored every 50 steps. v2 uses `TrainConfig`: patience 500 (F2).
 """
 
 import click

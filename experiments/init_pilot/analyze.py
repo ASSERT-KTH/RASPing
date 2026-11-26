@@ -9,7 +9,7 @@ Reads results/<version>/init_pilot/runs.csv (collect with
     figures/init_pilot_repaired.pdf  % repaired per program and arm
     tables/init_pilot_patience.tex  per arm: % repaired with patience 50 vs 500 (if those runs exist)
 
-The arm tables use the default patience only; the patience-500 runs (`launch.py --patience
+The arm tables use the first round's patience (50) only; the patience-500 runs (`launch.py --patience
 500`) appear only in the patience table, paired with the same mutants at patience 50.
 """
 
@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from rasping import analysis
-from rasping.config import PROGRAMS, TrainConfig
+from rasping.config import PROGRAMS, V1_EARLY_STOPPING_PATIENCE
 from rasping.results import load_runs
 from rasping.tables import latex_table, pct, save_figure, tt, write_table
 
@@ -28,7 +28,7 @@ LABELS = {"compiled": "compiled", "xavier": "Xavier", "rescaled": "rescaled (str
           "soft:10": "soft 10", "from": "other mutant (same shapes)"}
 
 
-PATIENCE = TrainConfig.early_stopping_patience
+PATIENCE = V1_EARLY_STOPPING_PATIENCE  # the pilot's first round
 HIGH_PATIENCE = 500
 
 

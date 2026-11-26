@@ -39,7 +39,7 @@ import click
 import numpy as np
 
 from rasping import cluster, raspbugs
-from rasping.config import PROGRAMS, RUNS_DIR, TrainConfig
+from rasping.config import PROGRAMS, RUNS_DIR, V1_EARLY_STOPPING_PATIENCE
 
 ARMS = ("compiled", "xavier", "rescaled", "shuffled", "soft:50", "soft:30", "soft:10", "from")
 
@@ -61,12 +61,13 @@ def pick_twin(job_id: str, seed: int) -> str | None:
               type=click.Choice(ARMS))
 @click.option("--program", "programs", multiple=True, default=PROGRAMS, show_default=True,
               type=click.Choice(PROGRAMS))
-@click.option("--patience", type=int, default=TrainConfig.early_stopping_patience, show_default=True,
-              help="Early-stopping patience; non-default values get a _patience<P> run directory")
+@click.option("--patience", type=int, default=V1_EARLY_STOPPING_PATIENCE, show_default=True,
+              help="Early-stopping patience; other values than the first round's 50 get a "
+                   "_patience<P> run directory")
 @cluster.add_cli_options
 def main(n_per_program, sample_seed, seeds, arms, programs, patience, **cli):
     root = RUNS_DIR / "init_pilot"
-    default = patience == TrainConfig.early_stopping_patience
+    default = patience == V1_EARLY_STOPPING_PATIENCE
     suffix = "" if default else f"_patience{patience}"
     selection = {p: raspbugs.stratified_sample(p, n_per_program, sample_seed) for p in programs}
     twins = {j: pick_twin(j, sample_seed) for js in selection.values() for j in js}
