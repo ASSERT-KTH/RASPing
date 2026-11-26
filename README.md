@@ -67,6 +67,8 @@ python experiments/main_repair/analyze.py --version v2
 | GP / BFS (§5.3) | `experiments/symbolic_baselines/launch.py --method gp\|bfs` (v2 budget 5,000; v1 used `--budget 1000`) | `experiments/symbolic_baselines/collect.py` |
 | spec size (§5.4) | `experiments/spec_size/launch.py` | `python -m rasping.results collect spec_size` |
 | init control (§5.5) | `experiments/init_control/launch.py` | `python -m rasping.results collect init_control` + `experiments/init_control/weight_stats.py` |
+| TracrBench repair (v2) | `experiments/main_repair/launch.py --benchmark tracrbench` | `python -m rasping.results collect tracrbench_repair`, then `experiments/main_repair/analyze.py --benchmark tracrbench` |
+| TracrBench GP / BFS (v2) | `experiments/symbolic_baselines/launch.py --benchmark tracrbench --method gp\|bfs` | `experiments/symbolic_baselines/collect.py --benchmark tracrbench` |
 | init pilot (v2) | `experiments/init_pilot/launch.py` | `python -m rasping.results collect init_pilot`, then `experiments/init_pilot/analyze.py` |
 | trajectories (§5.6) | `experiments/trajectories/launch.py` | — |
 

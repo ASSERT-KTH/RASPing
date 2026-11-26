@@ -1,4 +1,4 @@
-"""Submit one symbolic-baseline job (GP or BFS) per RaspBugs mutant (CPU jobs).
+"""Submit one symbolic-baseline job (GP or BFS) per mutant of a benchmark (CPU jobs).
 
 Each job runs `experiments/symbolic_baselines/run.py` and writes
 `runs/symbolic_baselines/<method>_budget<B>/<job_id>.json`; mutants whose record already
@@ -35,39 +35,42 @@ import sys
 
 import click
 
-from rasping import cluster, raspbugs
-from rasping.baselines import METHODS, run_dir
-from rasping.config import BASELINE_BUDGET, PROGRAMS
+from rasping import cluster
+from rasping.baselines import METHODS, experiment, run_dir
+from rasping.benchmarks import BENCHMARKS
+from rasping.config import BASELINE_BUDGET
 
 RUN_SCRIPT = "experiments/symbolic_baselines/run.py"
 
 
 @click.command()
 @click.option("--method", type=click.Choice(METHODS), required=True)
+@click.option("--benchmark", type=click.Choice(sorted(BENCHMARKS)), default="raspbugs", show_default=True)
 @click.option("--budget", type=int, default=BASELINE_BUDGET, show_default=True)
 @click.option("--n-per-program", type=int, default=None,
-              help="Only a stratified sample of this many mutants per program (raspbugs.stratified_sample)")
+              help="Only a stratified sample of this many mutants per program (Benchmark.stratified_sample)")
 @click.option("--sample-seed", type=int, default=0, show_default=True)
 @click.option("--timeout-hours", type=float, default=12, show_default=True, help="SLURM time limit per job")
 @click.option("--partition", default=None, help="SLURM partition (e.g. the cluster's CPU partition)")
 @click.option("--mem-gb", type=int, default=32, show_default=True, help="SLURM memory per job (F37)")
 @cluster.add_cli_options
-def main(method, budget, n_per_program, sample_seed, timeout_hours, partition, mem_gb, dry_run, local,
-         no_container, limit):
-    out = run_dir(method, budget)
+def main(method, benchmark, budget, n_per_program, sample_seed, timeout_hours, partition, mem_gb,
+         dry_run, local, no_container, limit):
+    bench = BENCHMARKS[benchmark]
+    out = run_dir(method, budget, benchmark=benchmark)
     python = sys.executable if no_container else "python"
     if n_per_program is None:
-        mutants = raspbugs.mutants()
+        mutants = bench.mutants()
     else:
-        mutants = [raspbugs.get(j) for p in PROGRAMS
-                   for j in raspbugs.stratified_sample(p, n_per_program, sample_seed)]
+        mutants = [bench.get(j) for p in bench.programs()
+                   for j in bench.stratified_sample(p, n_per_program, sample_seed)]
     todo = [m for m in mutants if not (out / f"{m.job_id}.json").exists()]
-    print(f"{method} budget {budget}: {len(mutants) - len(todo)}/{len(mutants)} done, "
+    print(f"{benchmark} {method} budget {budget}: {len(mutants) - len(todo)}/{len(mutants)} done, "
           f"{len(todo)} to run")
     commands = [[python, RUN_SCRIPT, "--method", method, "--job-id", m.job_id,
                  "--budget", str(budget)] for m in todo]
     cluster.submit_from_cli(
-        commands, f"symbolic_{method}_budget{budget}", dry_run, local, no_container, limit,
+        commands, f"{experiment(benchmark)}_{method}_budget{budget}", dry_run, local, no_container, limit,
         gpu=False, timeout_min=int(timeout_hours * 60), mem_gb=mem_gb,
         **({"slurm_partition": partition} if partition else {}),
         slurm_additional_parameters={},  # CPU-only: drop the default GPU (MIG) reservation

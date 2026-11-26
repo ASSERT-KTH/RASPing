@@ -154,6 +154,10 @@ RASPBUGS = Benchmark("raspbugs", RASPBUGS_DIR)
 TRACRBENCH = Benchmark("tracrbench", TRACRBENCH_DIR)
 BENCHMARKS = {b.name: b for b in (RASPBUGS, TRACRBENCH)}
 
+#: Experiment (directory under runs/ and results/<version>/) of gradient-based repair on
+#: each benchmark: `experiments/main_repair/launch.py --benchmark <name>`.
+REPAIR_EXPERIMENT = {"raspbugs": "main_repair", "tracrbench": "tracrbench_repair"}
+
 
 def get_mutant(job_id: str) -> Mutant:
     """A mutant of either benchmark."""

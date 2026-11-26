@@ -2,6 +2,7 @@
 
     python experiments/main_repair/analyze.py --version v1_tmlr
     python experiments/main_repair/analyze.py --version v2
+    python experiments/main_repair/analyze.py --version v2 --benchmark tracrbench   # v2_tracrbench_*
 
 Reads results/<version>/main_repair/runs.csv; writes paper_artifacts/<version>/.
 
@@ -29,8 +30,9 @@ import numpy as np
 import pandas as pd
 
 from rasping import analysis, raspbugs
-from rasping.baselines import EXPERIMENT as BASELINES
+from rasping.baselines import experiment as baseline_experiment
 from rasping.baselines import records
+from rasping.benchmarks import REPAIR_EXPERIMENT
 from rasping.config import (
     BASELINE_BUDGET,
     BASELINE_BUDGETS,
@@ -38,6 +40,7 @@ from rasping.config import (
     PROGRAMS,
     V2_INITS,
 )
+from rasping.programs import tracrbench_records
 from rasping.results import load_runs, mutant_table, results_dir
 from rasping.tables import latex_table, pct, save_figure, tt, write_table
 
@@ -104,11 +107,12 @@ def method_label(m: str) -> str:
     return m if m in BASELINE_LABELS.values() else f"{METHOD_LABEL} ({m})"
 
 
-def baseline_runs(version: str, budget: int) -> dict[str, pd.DataFrame]:
+def baseline_runs(version: str, budget: int, benchmark: str = "raspbugs") -> dict[str, pd.DataFrame]:
     """GP/BFS outcomes per mutant at `budget`, as runs tables (arm = "GP"/"BFS")."""
     out, meta = {}, mutant_table(version)
     for m, label in BASELINE_LABELS.items():
-        runs_path, hist_path = records.table_paths(results_dir(version, BASELINES), m, BASELINE_BUDGET)
+        runs_path, hist_path = records.table_paths(results_dir(version, baseline_experiment(benchmark)),
+                                                   m, BASELINE_BUDGET)
         if not runs_path.exists():
             continue
         t = analysis.baseline_at_budget(pd.read_csv(runs_path), pd.read_csv(hist_path), budget)
@@ -131,23 +135,36 @@ def pass1_table(pm, by, keys, methods, version, name, key_label):
     return t
 
 
-def v2(df, version):
+def groups(benchmark: str) -> tuple[dict[str, str], list[str]]:
+    """program -> group, and the groups in table order: RaspBugs by program; TracrBench by
+    whether the program uses attention (its 58 programs are too many for columns)."""
+    if benchmark == "raspbugs":
+        return {p: p for p in PROGRAMS}, list(PROGRAMS)
+    att = {r["name"]: r["uses_attention"] for r in tracrbench_records() if r["included"]}
+    return {p: "attention" if a else "elementwise" for p, a in att.items()}, ["attention", "elementwise"]
+
+
+def v2(df, version, benchmark="raspbugs"):
+    prefix = "v2_" if benchmark == "raspbugs" else f"v2_{benchmark}_"
     df = df.assign(arm=df["init"].map(analysis.init_arm))
     starts = [a for a in V2_INITS if a in set(df["arm"])] + sorted(set(df["arm"]) - set(V2_INITS))
-    base = baseline_runs(version, BASELINE_BUDGET)
+    base = baseline_runs(version, BASELINE_BUDGET, benchmark)
     cols = ["arm", "job_id", "seed", "program", "mutation_order", "test_accuracy"]
     pm = analysis.per_mutant(pd.concat([df[cols], *[b[cols] for b in base.values()]]))
+    group_of, group_keys = groups(benchmark)
+    pm["group"] = pm["program"].map(group_of)
     methods = starts + list(base)
-    print(f"v2: {df['job_id'].nunique()} mutants; starts {starts} "
+    print(f"v2 {benchmark}: {df['job_id'].nunique()} mutants; starts {starts} "
           f"(seeds {sorted(df['seed'].unique())}); baselines {list(base) or 'none'}")
 
-    pass1_table(pm, "program", list(PROGRAMS), methods, version, "v2_pass1_by_program.tex", tt)
+    label = tt if benchmark == "raspbugs" else str.capitalize
+    pass1_table(pm, "group", group_keys, methods, version, f"{prefix}pass1_by_program.tex", label)
     orders = sorted(pm["mutation_order"].unique())
-    by_order = pass1_table(pm, "mutation_order", orders, methods, version, "v2_pass1_by_order.tex",
+    by_order = pass1_table(pm, "mutation_order", orders, methods, version, f"{prefix}pass1_by_order.tex",
                            lambda o: f"Order {o}")
 
     s = analysis.seed_agreement(pm, starts)
-    write_table(version, "v2_seed_agreement.tex", latex_table(
+    write_table(version, f"{prefix}seed_agreement.tex", latex_table(
         ["Start", "Seeds", "None", "Some", "All", "pass@1", "pass@n"],
         [[r.method, r.seeds, pct(r.none), pct(r.some), pct(r.all), pct(r.pass1), pct(r.pass_n)]
          for r in s.itertuples()]))
@@ -156,17 +173,17 @@ def v2(df, version):
     pairs += [(a, b) for a in starts for b in base]
     rows = []
     for a, b in pairs:
-        d = analysis.paired_difference(pm, a, b, by="program").set_index("program")
+        d = analysis.paired_difference(pm.assign(program=pm["group"]), a, b, by="program").set_index("program")
         rows.append([f"{method_label(a)} $-$ {method_label(b)}",
                      *[f"{d.loc[p, 'diff']:+.1f} [{d.loc[p, 'ci_lo']:+.1f}, {d.loc[p, 'ci_hi']:+.1f}]"
-                       if p in d.index else "--" for p in [*PROGRAMS, "All"]],
+                       if p in d.index else "--" for p in [*group_keys, "All"]],
                      f"{d.loc['All', 'a_better']}/{d.loc['All', 'b_better']}",
                      f"{d.loc['All', 'sign_p']:.2g}"])
-    write_table(version, "v2_paired.tex", latex_table(
-        ["Difference (points)", *map(tt, PROGRAMS), "All", "Better (a/b)", "Sign test $p$"], rows))
+    write_table(version, f"{prefix}paired.tex", latex_table(
+        ["Difference (points)", *map(label, group_keys), "All", "Better (a/b)", "Sign test $p$"], rows))
 
     tr = analysis.order_trend(pm, methods)
-    write_table(version, "v2_order_trend.tex", latex_table(
+    write_table(version, f"{prefix}order_trend.tex", latex_table(
         ["Method", "Mutants", "pass@1 change per order (points) [95\\% CI]"],
         [[method_label(r.method), r.mutants, f"{r.slope:+.1f} [{r.ci_lo:+.1f}, {r.ci_hi:+.1f}]"]
          for r in tr.itertuples()]))
@@ -174,11 +191,11 @@ def v2(df, version):
     if base:
         rows = []
         for b in BASELINE_BUDGETS:
-            at = baseline_runs(version, b)
+            at = baseline_runs(version, b, benchmark)
             pmb = analysis.per_mutant(pd.concat([t[cols] for t in at.values()]))
             t = analysis.pass_at_1(pmb).set_index("method")
             rows.append([b, *[cell(t.loc[m]) if m in t.index else "--" for m in base]])
-        write_table(version, "v2_baseline_budgets.tex",
+        write_table(version, f"{prefix}baseline_budgets.tex",
                     latex_table(["Budget (programs)", *base], rows))
 
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -192,13 +209,18 @@ def v2(df, version):
     ax.set_ylabel("pass@1 (%)")
     ax.set_ylim(0, 100)
     ax.legend(fontsize=7)
-    save_figure(fig, version, "v2_pass1_by_order.pdf")
+    save_figure(fig, version, f"{prefix}pass1_by_order.pdf")
 
 
 @click.command()
 @click.option("--version", default="v1_tmlr", show_default=True)
-def main(version):
-    df = load_runs(version, "main_repair")
+@click.option("--benchmark", type=click.Choice(sorted(REPAIR_EXPERIMENT)), default="raspbugs",
+              show_default=True, help="tracrbench reads results/<version>/tracrbench_repair (v2 only)")
+def main(version, benchmark):
+    df = load_runs(version, REPAIR_EXPERIMENT[benchmark])
+    if benchmark != "raspbugs":
+        v2(df, version, benchmark)
+        return
     df = df[df["program"].isin(PROGRAMS)].assign(before=lambda d: before_accuracy(d))
     if df["job_id"].duplicated().any():  # v2: several starts and seeds per mutant
         v2(df, version)

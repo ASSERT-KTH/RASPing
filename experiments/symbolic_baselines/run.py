@@ -1,6 +1,7 @@
-"""Run one symbolic repair baseline (GP or BFS) on one RaspBugs mutant.
+"""Run one symbolic repair baseline (GP or BFS) on one mutant (RaspBugs or TracrBench).
 
-Writes the result record to `<runs-dir>/symbolic_baselines/<method>_budget<B>/<job_id>.json`:
+Writes the result record to `<runs-dir>/symbolic_baselines/<method>_budget<B>/<job_id>.json`
+(`symbolic_baselines_tracrbench/` for TracrBench mutants):
 the v1 keys (status, num_programs, num_duplicates, num_compile_failures, train_acc,
 test_acc, best_source, program_history, job_id, program_name, duration_s, and seed for
 GP) plus method, budget, program and the search hyperparameters.
@@ -27,7 +28,7 @@ from rasping.config import DATA_DIR, RUNS_DIR
 
 @click.command()
 @click.option("--method", type=click.Choice(METHODS), required=True)
-@click.option("--job-id", required=True, help="RaspBugs mutant id")
+@click.option("--job-id", required=True, help="Mutant id (either benchmark)")
 @click.option("--budget", type=int, default=1000, show_default=True,
               help="Number of generated programs (duplicates and the mutant itself included)")
 @click.option("--population-size", type=int, default=gp.DEFAULTS["population_size"],
@@ -59,7 +60,7 @@ def main(method, job_id, budget, population_size, tournament_k, seed, max_depth,
             mutant, data_dir, max_depth=max_depth, budget=budget, eval_timeout=eval_timeout,
             log_every=50 if log_every is None else log_every)
 
-    out = run_dir(method, budget, runs_dir) / f"{job_id}.json"
+    out = run_dir(method, budget, runs_dir, mutant.benchmark) / f"{job_id}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(result))

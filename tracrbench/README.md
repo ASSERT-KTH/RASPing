@@ -119,3 +119,18 @@ The selected mutants' compiled accuracy (exact match on the whole test split, th
 manifest field `oracle_accuracy_50`, named after RaspBugs' 50-sample oracle) has median
 0.008. 12% are at 0 and 3% above 0.5. `architectures.csv` has each mutant's parameter count
 and shape signature: median 18.8k parameters, maximum 3.4M (a swap_min_max mutant).
+
+## Experiments
+
+The same launchers as RaspBugs, with `--benchmark tracrbench`:
+
+```bash
+python experiments/main_repair/launch.py --benchmark tracrbench            # GBPR -> runs/tracrbench_repair/
+python experiments/symbolic_baselines/launch.py --benchmark tracrbench --method gp   # -> runs/symbolic_baselines_tracrbench/
+python -m rasping.results collect tracrbench_repair --version v2
+python experiments/symbolic_baselines/collect.py --benchmark tracrbench --version v2
+python experiments/main_repair/analyze.py --version v2 --benchmark tracrbench
+```
+
+The analysis reports attention and elementwise programs separately (`v2_tracrbench_*` tables).
+
