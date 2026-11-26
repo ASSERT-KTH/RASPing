@@ -261,3 +261,138 @@ def patience_table(runs: pd.DataFrame, low: int, high: int, programs: list[str],
                    epochs_lo=d["n_epochs_lo"].median(), epochs_hi=d["n_epochs_hi"].median())
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+# --------------------------------------------------------------------------- v2: pass@1 over seeds
+# v2 reports each method by pass@1: the mean over seeds of "this run repaired the mutant",
+# averaged over mutants, with a bootstrap confidence interval that resamples mutants (each
+# keeps all its seeds). pass@n (repaired in at least one of n seeds) and the share of
+# mutants repaired in some but not all seeds measure seed sensitivity (F39).
+
+
+def per_mutant(runs: pd.DataFrame, method_col: str = "arm", acc_col: str = "test_accuracy",
+               threshold: float = THRESHOLD) -> pd.DataFrame:
+    """One row per (method, mutant): program, mutation_order, `runs` (seeds), `repaired`
+    (runs at or above the threshold) and `pass1` = repaired / runs."""
+    d = runs.assign(_rep=runs[acc_col] >= threshold)
+    out = (d.groupby([method_col, "job_id"], sort=False)
+           .agg(program=("program", "first"), mutation_order=("mutation_order", "first"),
+                runs=("_rep", "size"), repaired=("_rep", "sum"))
+           .reset_index().rename(columns={method_col: "method"}))
+    out["pass1"] = out["repaired"] / out["runs"]
+    return out
+
+
+def bootstrap_means(values, n_boot: int = 10_000, seed: int = 0, chunk: int = 1000) -> np.ndarray:
+    """Means of `n_boot` resamples (with replacement) of `values`."""
+    v = np.asarray(values, dtype=float)
+    rng = np.random.default_rng(seed)
+    out = []
+    for start in range(0, n_boot, chunk):
+        b = min(chunk, n_boot - start)
+        out.append(v[rng.integers(0, len(v), (b, len(v)))].mean(axis=1))
+    return np.concatenate(out)
+
+
+def mean_ci(values, level: float = 0.95, n_boot: int = 10_000, seed: int = 0) -> tuple[float, float, float]:
+    """(mean, lower, upper): percentile bootstrap interval of the mean."""
+    v = np.asarray(values, dtype=float)
+    if len(v) == 0:
+        return np.nan, np.nan, np.nan
+    lo, hi = np.quantile(bootstrap_means(v, n_boot, seed), [(1 - level) / 2, (1 + level) / 2])
+    return float(v.mean()), float(lo), float(hi)
+
+
+def pass_at_1(pm: pd.DataFrame, by: str | None = None, methods: list[str] | None = None,
+              total_label: str = "All", **ci) -> pd.DataFrame:
+    """Per method (and group of `by`, plus a `total_label` row): mutants, pass@1 with its
+    bootstrap CI and pass@n, all in %. `pm` comes from `per_mutant`."""
+    methods = methods or list(dict.fromkeys(pm["method"]))
+    rows = []
+    for m in methods:
+        d = pm[pm["method"] == m]
+        groups = ([(k, g) for k, g in d.groupby(by)] if by else []) + [(total_label, d)]
+        for key, g in groups:
+            p, lo, hi = mean_ci(g["pass1"], **ci)
+            rows.append({"method": m, **({by: key} if by else {}), "mutants": len(g),
+                         "seeds": int(g["runs"].max()) if len(g) else 0,
+                         "pass1": 100 * p, "ci_lo": 100 * lo, "ci_hi": 100 * hi,
+                         "pass_n": 100 * (g["repaired"] > 0).mean() if len(g) else np.nan})
+    return pd.DataFrame(rows)
+
+
+def seed_agreement(pm: pd.DataFrame, methods: list[str] | None = None) -> pd.DataFrame:
+    """Per method: % of mutants repaired in no seed, in some but not all, and in all seeds."""
+    methods = methods or list(dict.fromkeys(pm["method"]))
+    rows = []
+    for m in methods:
+        d = pm[pm["method"] == m]
+        rows.append({"method": m, "mutants": len(d), "seeds": int(d["runs"].max()),
+                     "none": 100 * (d["repaired"] == 0).mean(),
+                     "some": 100 * ((d["repaired"] > 0) & (d["repaired"] < d["runs"])).mean(),
+                     "all": 100 * (d["repaired"] == d["runs"]).mean(),
+                     "pass1": 100 * d["pass1"].mean(), "pass_n": 100 * (d["repaired"] > 0).mean()})
+    return pd.DataFrame(rows)
+
+
+def paired_difference(pm: pd.DataFrame, a: str, b: str, by: str | None = None,
+                      total_label: str = "All", **ci) -> pd.DataFrame:
+    """pass@1 of method `a` minus `b` on the mutants both have (in points), with a paired
+    bootstrap CI; counts of mutants where a is better / worse / equal, and a two-sided sign
+    test on those counts."""
+    from scipy.stats import binomtest
+
+    pa = pm[pm["method"] == a].set_index("job_id")
+    pb = pm[pm["method"] == b].set_index("job_id")
+    j = pa[["pass1", "program", "mutation_order"]].join(pb[["pass1"]], rsuffix="_b", how="inner")
+    j["diff"] = j["pass1"] - j["pass1_b"]
+    groups = ([(k, g) for k, g in j.groupby(by)] if by else []) + [(total_label, j)]
+    rows = []
+    for key, g in groups:
+        d, lo, hi = mean_ci(g["diff"], **ci)
+        better, worse = int((g["diff"] > 0).sum()), int((g["diff"] < 0).sum())
+        p = binomtest(better, better + worse).pvalue if better + worse else 1.0
+        rows.append({"a": a, "b": b, **({by: key} if by else {}), "mutants": len(g),
+                     "diff": 100 * d, "ci_lo": 100 * lo, "ci_hi": 100 * hi,
+                     "a_better": better, "b_better": worse, "equal": len(g) - better - worse,
+                     "sign_p": float(p)})
+    return pd.DataFrame(rows)
+
+
+def order_trend(pm: pd.DataFrame, methods: list[str] | None = None, n_boot: int = 2000,
+                seed: int = 0) -> pd.DataFrame:
+    """Change in pass@1 per mutation order (points), per method: least-squares slope of
+    per-mutant pass@1 on mutation order with one intercept per program, so the program mix
+    of each order doesn't masquerade as an order effect. CI: bootstrap over mutants."""
+    methods = methods or list(dict.fromkeys(pm["method"]))
+    rng = np.random.default_rng(seed)
+
+    def slope(d):
+        progs = sorted(d["program"].unique())
+        X = np.column_stack([d["mutation_order"].to_numpy(float)]
+                            + [(d["program"] == p).to_numpy(float) for p in progs])
+        return np.linalg.lstsq(X, d["pass1"].to_numpy(float), rcond=None)[0][0]
+
+    rows = []
+    for m in methods:
+        d = pm[pm["method"] == m].reset_index(drop=True)
+        s = slope(d)
+        boots = [slope(d.iloc[rng.integers(0, len(d), len(d))]) for _ in range(n_boot)]
+        lo, hi = np.quantile(boots, [0.025, 0.975])
+        rows.append({"method": m, "mutants": len(d), "slope": 100 * s,
+                     "ci_lo": 100 * lo, "ci_hi": 100 * hi})
+    return pd.DataFrame(rows)
+
+
+def baseline_at_budget(runs: pd.DataFrame, history: pd.DataFrame, budget: int) -> pd.DataFrame:
+    """Symbolic-baseline outcome per mutant after `budget` evaluated programs: the test
+    accuracy of the program selected at that point (F17), i.e. the last history change
+    point at or before `budget`; the record's final value at its own budget. Returns
+    job_id, seed, test_accuracy."""
+    full = runs["budget"].iloc[0] if len(runs) else budget
+    if budget >= full:
+        return runs[["job_id", "seed", "test_acc"]].rename(columns={"test_acc": "test_accuracy"})
+    h = history[history["step"] <= budget].sort_values("step").groupby("job_id")["best_test_acc"].last()
+    out = runs[["job_id", "seed"]].copy()
+    out["test_accuracy"] = out["job_id"].map(h).fillna(0.0).to_numpy()
+    return out

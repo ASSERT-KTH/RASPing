@@ -80,6 +80,17 @@ METHOD_LABEL = "GBPR"
 #: is at least this value.
 THRESHOLD = 0.99
 
+#: v2 main reruns: starting points (`rasping.repair.INITS`), chosen from the init pilot,
+#: and seeds. Results are reported as pass@1 over the seeds (`analysis.pass_at_1`).
+V2_INITS = ("compiled", "xavier", "rescaled", "soft:10")
+V2_SEEDS = (0, 1, 2)
+
+#: Symbolic baselines (GP, BFS): v2 budget in evaluated programs, chosen from a
+#: calibration on the init pilot's 100 mutants (Nov 25, 2026), and the budgets reported
+#: along the way (read off the same runs' histories).
+BASELINE_BUDGET = 5000
+BASELINE_BUDGETS = (500, 1000, 2000, 3000, 5000)
+
 # --------------------------------------------------------------------------- training
 
 #: XLA flag that makes GPU training bit-reproducible, at about 1.27x the time per epoch

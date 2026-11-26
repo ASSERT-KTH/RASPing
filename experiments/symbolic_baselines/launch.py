@@ -5,8 +5,8 @@ Each job runs `experiments/symbolic_baselines/run.py` and writes
 exists are skipped, so re-running the launcher resubmits only missing jobs. Collect the
 records into tables with `experiments/symbolic_baselines/collect.py`.
 
-    python experiments/symbolic_baselines/launch.py --method gp --budget 1000
-    python experiments/symbolic_baselines/launch.py --method bfs --budget 1000
+    python experiments/symbolic_baselines/launch.py --method gp     # v2: budget 5,000
+    python experiments/symbolic_baselines/launch.py --method bfs
 
 Budget calibration on the init pilot's sample (25 per program, stratified by order):
 
@@ -37,14 +37,14 @@ import click
 
 from rasping import cluster, raspbugs
 from rasping.baselines import METHODS, run_dir
-from rasping.config import PROGRAMS
+from rasping.config import BASELINE_BUDGET, PROGRAMS
 
 RUN_SCRIPT = "experiments/symbolic_baselines/run.py"
 
 
 @click.command()
 @click.option("--method", type=click.Choice(METHODS), required=True)
-@click.option("--budget", type=int, default=1000, show_default=True)
+@click.option("--budget", type=int, default=BASELINE_BUDGET, show_default=True)
 @click.option("--n-per-program", type=int, default=None,
               help="Only a stratified sample of this many mutants per program (raspbugs.stratified_sample)")
 @click.option("--sample-seed", type=int, default=0, show_default=True)
