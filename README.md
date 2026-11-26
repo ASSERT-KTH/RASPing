@@ -40,6 +40,7 @@ uv run python scripts/reproduce_paper.py --version v1_tmlr   # -> paper_artifact
 | Paper artifact | Script | Inputs (`results/<version>/...`) |
 |---|---|---|
 | Table 1, Table 5, Fig 3, Fig 7 | `experiments/main_repair/analyze.py` | `main_repair/runs.csv` |
+| v2: pass@1 [95% CI] per start, GP and BFS, by program and order; paired differences; order trend; seed agreement; baseline budgets | `experiments/main_repair/analyze.py --version v2` | `main_repair/runs.csv`, `symbolic_baselines/{gp,bfs}_budget5000_*` |
 | Fig 4, Fig 5 | `experiments/symbolic_baselines/analyze.py` | `main_repair/val_curves.csv.gz`, `symbolic_baselines/*` |
 | Table 8, Fig 8 | `experiments/spec_size/analyze.py` | `spec_size/*`, `main_repair/runs.csv` |
 | Table 2, Table 9, Fig 9, Fig 10 | `experiments/init_control/analyze.py` | `init_control/*`, `main_repair/*` |
@@ -63,7 +64,7 @@ python experiments/main_repair/analyze.py --version v2
 | Experiment | Launch | Collect |
 |---|---|---|
 | main repair (§5.2) | `experiments/main_repair/launch.py` | `python -m rasping.results collect main_repair` |
-| GP / BFS (§5.3) | `experiments/symbolic_baselines/launch.py --method gp\|bfs --budget 1000` | `experiments/symbolic_baselines/collect.py` |
+| GP / BFS (§5.3) | `experiments/symbolic_baselines/launch.py --method gp\|bfs` (v2 budget 5,000; v1 used `--budget 1000`) | `experiments/symbolic_baselines/collect.py` |
 | spec size (§5.4) | `experiments/spec_size/launch.py` | `python -m rasping.results collect spec_size` |
 | init control (§5.5) | `experiments/init_control/launch.py` | `python -m rasping.results collect init_control` + `experiments/init_control/weight_stats.py` |
 | init pilot (v2) | `experiments/init_pilot/launch.py` | `python -m rasping.results collect init_pilot`, then `experiments/init_pilot/analyze.py` |

@@ -20,11 +20,8 @@ run each, 10k epochs, batch 256, lr 1e-4, patience 50, trajectories stored every
 import click
 
 from rasping import cluster, raspbugs
-from rasping.config import PROGRAMS, RUNS_DIR
+from rasping.config import PROGRAMS, RUNS_DIR, V2_INITS, V2_SEEDS
 from rasping.repair import check_init
-
-#: The v2 starting points (`rasping.repair.INITS`).
-INITS = ("compiled", "xavier", "rescaled", "soft:10")
 
 
 def run_dir(program: str, job_id: str, init: str, seed: int):
@@ -39,9 +36,9 @@ def _check_inits(ctx, param, values):
 
 
 @click.command()
-@click.option("--init", "inits", multiple=True, default=INITS, show_default=True, callback=_check_inits,
+@click.option("--init", "inits", multiple=True, default=V2_INITS, show_default=True, callback=_check_inits,
               help="Starting point (repeatable)")
-@click.option("--seed", "seeds", type=int, multiple=True, default=(0, 1, 2), show_default=True)
+@click.option("--seed", "seeds", type=int, multiple=True, default=V2_SEEDS, show_default=True)
 @click.option("--program", "programs", multiple=True, default=PROGRAMS, show_default=True,
               type=click.Choice(PROGRAMS))
 @click.option("--timeout-hours", type=float, default=24, show_default=True,

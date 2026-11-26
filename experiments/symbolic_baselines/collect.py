@@ -7,7 +7,7 @@
 Columns and row order match `results/v1_tmlr/symbolic_baselines/` (see
 `rasping.baselines.records`).
 
-    python experiments/symbolic_baselines/collect.py --version v2 [--method gp] [--budget 1000]
+    python experiments/symbolic_baselines/collect.py --version v2 [--method gp] [--budget 5000]
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from pathlib import Path
 import click
 
 from rasping.baselines import EXPERIMENT, METHODS, records, run_dir
-from rasping.config import RUNS_DIR
+from rasping.config import BASELINE_BUDGET, RUNS_DIR
 from rasping.results import results_dir
 
 
@@ -25,7 +25,7 @@ from rasping.results import results_dir
 @click.option("--version", default=None, help="Results version, e.g. v2 (-> results/<version>/)")
 @click.option("--method", type=click.Choice(METHODS), default=None,
               help="Collect only this method [default: all]")
-@click.option("--budget", type=int, default=1000, show_default=True)
+@click.option("--budget", type=int, default=BASELINE_BUDGET, show_default=True)
 @click.option("--runs-dir", type=click.Path(path_type=Path), default=RUNS_DIR, show_default=True)
 @click.option("--out-dir", type=click.Path(path_type=Path), default=None,
               help="Write the tables here instead of results/<version>/symbolic_baselines")
