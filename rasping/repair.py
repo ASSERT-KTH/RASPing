@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import pickle
 import subprocess
 import time
@@ -121,6 +122,7 @@ class RunRecord:
     # provenance
     git_commit: str = ""
     device: str = ""  # JAX device the run trained on, e.g. "cuda:0" or "cpu:0"
+    xla_flags: str = ""  # XLA_FLAGS at run time; v2 GPU runs are deterministic (F39)
 
 
 def _device() -> str:
@@ -194,7 +196,7 @@ def repair(
         init=init, seed=seed, n_train=len(X), n_val=len(Xv), n_steps_budget=n_steps,
         config={**config.to_dict(), "n_epochs": n_epochs}, initial_test_accuracy=initial_test_acc,
         start_test_accuracy=start_test_acc, start_agreement=start_agreement,
-        git_commit=_git_commit(), device=_device(),
+        git_commit=_git_commit(), device=_device(), xla_flags=os.environ.get("XLA_FLAGS", ""),
     )
 
     wandb_run = None

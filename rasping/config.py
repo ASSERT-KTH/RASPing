@@ -82,6 +82,10 @@ THRESHOLD = 0.99
 
 # --------------------------------------------------------------------------- training
 
+#: XLA flag that makes GPU training bit-reproducible, at about 1.27x the time per epoch
+#: (F39). `rasping._jax_setup` adds it to XLA_FLAGS before JAX starts; no effect on CPU.
+DETERMINISTIC_XLA_FLAG = "--xla_gpu_deterministic_ops=true"
+
 
 #: Early-stopping patience of the v1 (TMLR) runs and of the init pilot's first round (F2).
 V1_EARLY_STOPPING_PATIENCE = 50
