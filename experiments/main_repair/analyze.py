@@ -72,6 +72,9 @@ def histograms(df, by, panels, title, version, name, ncols):
 def main(version):
     df = load_runs(version, "main_repair")
     df = df[df["program"].isin(PROGRAMS)].assign(before=lambda d: before_accuracy(d))
+    if df["job_id"].duplicated().any():  # v2: several starts and seeds per mutant
+        raise SystemExit("These tables assume one run per mutant (v1). The v2 runs have several "
+                         "starts and seeds per mutant; their analysis is not written yet.")
     print(f"{len(df)} mutants of {sorted(df['program'].unique())}")
     table1(df, version)
     table5(df, version)
